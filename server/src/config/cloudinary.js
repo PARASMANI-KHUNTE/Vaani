@@ -27,6 +27,15 @@ const configureCloudinary = () => {
   return cloudinary;
 };
 
+const tryConfigureCloudinary = () => {
+  try {
+    return configureCloudinary();
+  } catch {
+    return null;
+  }
+};
+
 module.exports = {
   configureCloudinary,
+  tryConfigureCloudinary,
 };

@@ -24,6 +24,11 @@ const env = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || "",
     folder: process.env.CLOUDINARY_FOLDER || "canvas-chat",
   },
+  retention: {
+    messageDays: Number(process.env.MESSAGE_RETENTION_DAYS || 90),
+    chatDays: Number(process.env.CHAT_RETENTION_DAYS || 120),
+    cleanupIntervalHours: Number(process.env.RETENTION_CLEANUP_INTERVAL_HOURS || 6),
+  },
 };
 
 module.exports = env;

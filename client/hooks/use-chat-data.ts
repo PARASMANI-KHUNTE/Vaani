@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
+  clearChatMessages,
   createChat,
   deleteChat,
   deleteMessage,
@@ -27,8 +28,10 @@ type MediaTransferState = {
   isUploading: boolean;
   progress: number;
   fileName: string | null;
+  fileType: string | null;
   error: string | null;
   canRetry: boolean;
+  canCancel: boolean;
 };
 
 type MediaMessageInput = {
@@ -56,6 +59,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     setUserOnlineState,
     addNotification,
   } = useChatStore();
+  const selectChat = useChatStore((state) => state.selectChat);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
@@ -65,12 +69,15 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     isUploading: false,
     progress: 0,
     fileName: null,
+    fileType: null,
     error: null,
     canRetry: false,
+    canCancel: false,
   });
   const [isPending, startTransition] = useTransition();
   const typingTimeoutRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
   const searchAbortControllerRef = useRef<AbortController | null>(null);
   const failedMediaRef = useRef<MediaMessageInput | null>(null);
 
@@ -567,12 +574,22 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
     try {
       failedMediaRef.current = null;
+      let fileType: string;
+      if (file.type.startsWith('video/')) {
+        fileType = 'video';
+      } else if (file.type.startsWith('image/')) {
+        fileType = 'image';
+      } else {
+        fileType = 'file';
+      }
       setMediaTransfer({
         isUploading: true,
         progress: 0,
         fileName: file.name,
+        fileType,
         error: null,
         canRetry: false,
+        canCancel: true,
       });
 
       const uploadResponse = await uploadMessageMedia(token, file, (progress) => {
@@ -580,8 +597,10 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
           isUploading: true,
           progress,
           fileName: file.name,
+          fileType,
           error: null,
           canRetry: false,
+          canCancel: true,
         });
       });
       const media = {
@@ -646,8 +665,10 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         isUploading: false,
         progress: 0,
         fileName: null,
+        fileType: null,
         error: null,
         canRetry: false,
+        canCancel: false,
       });
     } catch (sendError) {
       const message =
@@ -659,12 +680,15 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         waveform,
       };
       setError(message);
+      const errorFileType = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : 'file';
       setMediaTransfer({
         isUploading: false,
         progress: 0,
         fileName: file.name,
+        fileType: errorFileType,
         error: message,
         canRetry: true,
+        canCancel: false,
       });
     }
   };
@@ -683,8 +707,27 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       isUploading: false,
       progress: 0,
       fileName: null,
+      fileType: null,
       error: null,
       canRetry: false,
+      canCancel: false,
+    });
+  };
+
+  const cancelMediaUpload = () => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
+    }
+    failedMediaRef.current = null;
+    setMediaTransfer({
+      isUploading: false,
+      progress: 0,
+      fileName: null,
+      fileType: null,
+      error: null,
+      canRetry: false,
+      canCancel: false,
     });
   };
 
@@ -803,6 +846,24 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
   };
 
+  const clearSelectedChatMessages = async (chatId: string) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await clearChatMessages(token, chatId);
+      setMessages(chatId, []);
+      upsertChat(response.chat);
+
+      if (selectedChatId === chatId) {
+        selectChat(chatId);
+      }
+    } catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : "Failed to clear messages");
+    }
+  };
+
   return {
     chats,
     messages: selectedChatId ? messagesByChat[selectedChatId] || [] : [],
@@ -816,12 +877,14 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     userResults,
     clearError: () => setError(null),
     dismissMediaTransfer,
+    cancelMediaUpload,
     startChatWithUser,
     sendChatMessage,
     sendMediaMessage,
     retryLastMediaUpload,
     notifyTyping,
     deleteChatMessage,
+    clearSelectedChatMessages,
     deleteSelectedChat,
     markSelectedChatRead,
     markSelectedChatUnread,

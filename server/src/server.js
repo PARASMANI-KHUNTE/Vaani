@@ -3,6 +3,7 @@ const app = require("./app");
 const env = require("./config/env");
 const { connectDatabase } = require("./config/database");
 const { initializeSocketServer } = require("./modules/socket/socket.server");
+const { initializeRetentionCleanup } = require("./utils/retentionCleanup");
 
 const startServer = async () => {
   await connectDatabase();
@@ -10,6 +11,7 @@ const startServer = async () => {
 
   const server = http.createServer(app);
   initializeSocketServer(server);
+  initializeRetentionCleanup();
 
   server.listen(env.port, () => {
     console.log(`Server listening on port http://localhost:${env.port}`);

@@ -15,6 +15,10 @@ const chatUserStateSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    hidden: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     _id: false,

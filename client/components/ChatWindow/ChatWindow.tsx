@@ -7,6 +7,8 @@ import {
   ImagePlus,
   LoaderCircle,
   Mic,
+  Phone,
+  Paperclip,
   RefreshCcw,
   SendHorizonal,
   SmilePlus,
@@ -16,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
-import { Chat, Message } from "@/lib/types";
+import { CallStatus, Chat, Message } from "@/lib/types";
 
 type ChatWindowProps = {
   chat: Chat | null;
@@ -27,8 +29,10 @@ type ChatWindowProps = {
     isUploading: boolean;
     progress: number;
     fileName: string | null;
+    fileType?: string | null;
     error?: string | null;
     canRetry?: boolean;
+    canCancel?: boolean;
   };
   onSendMessage: (content: string, replyToId?: string | null) => Promise<void>;
   onSendMedia?: (input: {
@@ -39,12 +43,16 @@ type ChatWindowProps = {
   }) => Promise<void>;
   onRetryMedia?: () => Promise<void>;
   onDismissMedia?: () => void;
+  onCancelMedia?: () => void;
   onTyping?: () => void;
   onDeleteMessage?: (messageId: string, scope: "me" | "everyone") => Promise<void>;
   onBack?: () => void;
   onClose?: () => void;
   isOnline?: boolean;
   typingLabel?: string | null;
+  onStartAudioCall?: () => void;
+  onStartVideoCall?: () => void;
+  callStatus?: CallStatus;
 };
 
 const emojis = ["😀", "😂", "😍", "🔥", "👍", "🙏", "🎉", "💬", "😎", "❤️"];
@@ -59,12 +67,16 @@ export const ChatWindow = ({
   onSendMedia,
   onRetryMedia,
   onDismissMedia,
+  onCancelMedia,
   onTyping,
   onDeleteMessage,
   onBack,
   onClose,
   isOnline,
   typingLabel,
+  onStartAudioCall,
+  onStartVideoCall,
+  callStatus = "idle",
 }: ChatWindowProps) => {
   const [draft, setDraft] = useState("");
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
@@ -78,6 +90,7 @@ export const ChatWindow = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -304,7 +317,7 @@ export const ChatWindow = ({
 
   if (!chat) {
     return (
-      <section className="surface-elevated flex h-full min-h-[480px] items-center justify-center rounded-[36px] p-8">
+      <section className="surface-elevated flex h-full min-h-[480px] items-center justify-center rounded-[28px] p-6 sm:rounded-[36px] sm:p-8">
         <div className="max-w-sm text-center animate-fade-up">
           <div className="relative mx-auto mb-6">
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-200/30 to-lagoon/20 blur-2xl" />
@@ -352,17 +365,17 @@ export const ChatWindow = ({
         </div>
       ) : null}
 
-      <header className="flex items-center gap-4 border-b border-ink/6 bg-gradient-to-r from-white/60 to-white/30 px-5 py-3.5">
+      <header className="flex items-center gap-3 border-b border-ink/6 bg-gradient-to-r from-white/60 to-white/30 px-3.5 py-3 sm:gap-4 sm:px-5 sm:py-3.5">
         {onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="btn-secondary !py-2.5 !px-3 lg:hidden"
+            className="btn-secondary !px-2.5 !py-2.5 lg:hidden"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         ) : null}
-        <div className="warm-outline relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-sand">
+        <div className="warm-outline relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-sand sm:h-12 sm:w-12">
           {chat.otherParticipant?.avatar ? (
             <Image
               src={chat.otherParticipant.avatar}
@@ -384,7 +397,7 @@ export const ChatWindow = ({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="truncate text-base font-semibold text-ink">
+            <h2 className="truncate text-sm font-semibold text-ink sm:text-base">
               {chat.otherParticipant?.name || "Unknown user"}
             </h2>
             {isOnline && (
@@ -393,7 +406,7 @@ export const ChatWindow = ({
               </span>
             )}
           </div>
-          <p className="text-sm text-ink/50">
+          <p className="text-xs text-ink/50 sm:text-sm">
             {typingLabel ? (
               <span className="text-lagoon/80 italic">{typingLabel}</span>
             ) : isOnline ? (
@@ -404,21 +417,42 @@ export const ChatWindow = ({
           </p>
         </div>
 
-        {onClose ? (
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            onClick={onClose}
-            className="btn-secondary ml-auto !py-2.5 !px-3 text-ink/50 hover:text-ink"
-            aria-label="Close chat"
+            onClick={onStartAudioCall}
+            disabled={!onStartAudioCall || !chat.otherParticipant || !["idle", "ended"].includes(callStatus)}
+            className="btn-secondary !px-2.5 !py-2.5 text-lagoon disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Start audio call"
           >
-            <X className="h-4 w-4" />
+            <Phone className="h-4 w-4" />
           </button>
-        ) : null}
+          <button
+            type="button"
+            onClick={onStartVideoCall}
+            disabled={!onStartVideoCall || !chat.otherParticipant || !["idle", "ended"].includes(callStatus)}
+            className="btn-secondary !px-2.5 !py-2.5 text-lagoon disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Start video call"
+          >
+            <Video className="h-4 w-4" />
+          </button>
+
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary !px-2.5 !py-2.5 text-ink/50 hover:text-ink"
+              aria-label="Close chat"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-paper-grid bg-[size:18px_18px] px-5 py-5 [background-color:rgba(255,253,249,0.4)]"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-paper-grid bg-[size:18px_18px] px-3 py-4 [background-color:rgba(255,253,249,0.4)] sm:px-5 sm:py-5"
       >
         {isLoading
           ? Array.from({ length: 6 }).map((_, index) => (
@@ -433,28 +467,68 @@ export const ChatWindow = ({
                   key={message._id}
                   message={message}
                   isOwnMessage={senderId === currentUserId}
+                  currentUserId={currentUserId}
                   onReply={(entry) => setReplyTarget(entry)}
-                  onDelete={(entry, scope) => void onDeleteMessage?.(entry._id, scope)}
+                  onDelete={(entry, scope) => {
+                    if (entry.optimistic) {
+                      return;
+                    }
+                    void onDeleteMessage?.(entry._id, scope);
+                  }}
+                  onReact={(entry, emoji) => {
+                    console.log("React to message:", entry._id, "with emoji:", emoji);
+                  }}
                 />
               );
             })}
       </div>
 
-      <div className="border-t border-ink/6 bg-gradient-to-br from-white/80 to-shell/30 p-4">
+      <div className="border-t border-ink/6 bg-gradient-to-br from-white/80 to-shell/30 p-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] sm:p-4">
         {mediaTransfer?.isUploading ? (
           <div className="mb-3 rounded-2xl border border-lagoon/10 bg-white/80 px-4 py-3 shadow-soft">
             <div className="flex items-center justify-between gap-3 text-sm text-ink">
-              <div className="flex items-center gap-2">
-                <LoaderCircle className="h-4 w-4 animate-spin text-lagoon" />
-                <span className="font-medium">
-                  Uploading {mediaTransfer.fileName ? `"${mediaTransfer.fileName}"` : "attachment"}
-                </span>
+              <div className="flex items-center gap-2.5">
+                {mediaTransfer.fileType === 'video' ? (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-lagoon/10">
+                    <Video className="h-4 w-4 text-lagoon" />
+                  </div>
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-lagoon/10">
+                    {mediaTransfer.fileType === 'video' ? (
+                      <Video className="h-4 w-4 text-lagoon" />
+                    ) : mediaTransfer.fileType === 'file' ? (
+                      <Paperclip className="h-4 w-4 text-lagoon" />
+                    ) : (
+                      <ImagePlus className="h-4 w-4 text-lagoon" />
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-col">
+                  <span className="font-medium">
+                    {mediaTransfer.fileType === 'video' ? 'Uploading video' : mediaTransfer.fileType === 'file' ? 'Uploading file' : 'Uploading image'}
+                  </span>
+                  <span className="text-xs text-ink/50 truncate max-w-[180px]">
+                    {mediaTransfer.fileName || 'attachment'}
+                  </span>
+                </div>
               </div>
-              <span className="text-xs text-ink/55">{mediaTransfer.progress}%</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-ink/55">{mediaTransfer.progress}%</span>
+                {mediaTransfer.canCancel && (
+                  <button
+                    type="button"
+                    onClick={() => onCancelMedia?.()}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-ink/5 text-ink/60 transition hover:bg-red-100 hover:text-red-600"
+                    title="Cancel upload"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-shell/80">
               <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#155e75,#cb6a16)] transition-all duration-200"
+                className="h-full rounded-full bg-gradient-to-r from-lagoon to-ember transition-all duration-200"
                 style={{ width: `${mediaTransfer.progress}%` }}
               />
             </div>
@@ -463,7 +537,7 @@ export const ChatWindow = ({
 
         {mediaTransfer?.error ? (
           <div className="mb-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 shadow-soft">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Upload issue</p>
                 <p className="mt-1 text-sm text-red-700">
@@ -496,12 +570,12 @@ export const ChatWindow = ({
 
         {isRecording ? (
           <div className="mb-3 rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 shadow-soft">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Live recording</p>
                 <p className="mt-1 text-sm font-medium text-red-700">REC {formatRecordingTime(recordingSeconds)}</p>
               </div>
-              <div className="flex h-12 flex-1 items-end gap-1 rounded-2xl bg-white/70 px-3 py-2">
+              <div className="flex h-12 w-full items-end gap-1 rounded-2xl bg-white/70 px-3 py-2 sm:flex-1">
                 {(recordingWaveform.length
                   ? recordingWaveform
                   : Array.from({ length: 24 }, () => 0.12)
@@ -538,7 +612,7 @@ export const ChatWindow = ({
           </div>
         ) : null}
 
-        <div className="flex items-end gap-2.5 rounded-[28px] border border-ink/8 bg-white/90 px-4 py-3 shadow-soft transition-all focus-within:border-lagoon/30 focus-within:shadow-md">
+        <div className="flex flex-wrap items-end gap-2 rounded-[24px] border border-ink/8 bg-white/90 px-3 py-3 shadow-soft transition-all focus-within:border-lagoon/30 focus-within:shadow-md sm:flex-nowrap sm:gap-2.5 sm:rounded-[28px] sm:px-4">
           <input
             ref={imageInputRef}
             type="file"
@@ -561,6 +635,17 @@ export const ChatWindow = ({
               event.currentTarget.value = "";
             }}
           />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] || null;
+              void handleSendFile(file);
+              event.currentTarget.value = "";
+            }}
+          />
 
           <div className="relative">
             <button
@@ -571,7 +656,7 @@ export const ChatWindow = ({
               <SmilePlus className="h-4 w-4" />
             </button>
             {showEmojiPicker ? (
-              <div className="absolute bottom-14 left-0 z-20 w-56 rounded-2xl border border-ink/8 bg-white/98 p-3 shadow-lg animate-fade-in">
+              <div className="absolute bottom-14 left-0 z-20 w-[min(224px,calc(100vw-2rem))] rounded-2xl border border-ink/8 bg-white/98 p-3 shadow-lg animate-fade-in">
                 <div className="grid grid-cols-5 gap-1.5">
                   {emojis.map((emoji) => (
                     <button
@@ -594,7 +679,7 @@ export const ChatWindow = ({
           <button
             type="button"
             onClick={() => imageInputRef.current?.click()}
-            className="btn-secondary !py-2.5 !px-2.5"
+            className="btn-secondary order-2 !px-2.5 !py-2.5 sm:order-none"
             aria-label="Send image"
             disabled={isSendingMedia || mediaTransfer?.isUploading}
           >
@@ -604,11 +689,21 @@ export const ChatWindow = ({
           <button
             type="button"
             onClick={() => videoInputRef.current?.click()}
-            className="btn-secondary !py-2.5 !px-2.5"
+            className="btn-secondary order-3 !px-2.5 !py-2.5 sm:order-none"
             aria-label="Send video"
             disabled={isSendingMedia || mediaTransfer?.isUploading}
           >
             <Video className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="btn-secondary order-4 !px-2.5 !py-2.5 sm:order-none"
+            aria-label="Send file"
+            disabled={isSendingMedia || mediaTransfer?.isUploading}
+          >
+            <Paperclip className="h-4 w-4" />
           </button>
 
           <button
@@ -620,7 +715,7 @@ export const ChatWindow = ({
                 void startVoiceRecording();
               }
             }}
-            className={`btn-secondary !py-2.5 !px-2.5 ${
+            className={`btn-secondary order-4 !px-2.5 !py-2.5 sm:order-none ${
               isRecording ? "!bg-red-500 !text-white !border-red-400" : ""
             }`}
             aria-label={isRecording ? "Stop recording voice note" : "Record voice note"}
@@ -649,14 +744,14 @@ export const ChatWindow = ({
                   ? "Uploading media..."
                   : "Type a message"
             }
-            className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent text-sm text-ink outline-none placeholder:text-ink/40"
+            className="order-1 max-h-32 min-h-[28px] w-full flex-1 resize-none bg-transparent text-sm text-ink outline-none placeholder:text-ink/40 sm:order-none sm:w-auto"
             disabled={isSendingMedia || mediaTransfer?.isUploading}
           />
 
           <button
             type="button"
             onClick={() => void submitMessage()}
-            className="btn-primary !h-11 !w-11 !rounded-full !p-0"
+            className="btn-primary order-5 !h-11 !w-11 !rounded-full !p-0 sm:order-none"
             disabled={isSendingMedia || mediaTransfer?.isUploading}
           >
             <SendHorizonal className="h-4 w-4" />

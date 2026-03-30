@@ -15,7 +15,46 @@ export type BackendUser = {
   hasBlocked?: boolean;
 };
 
-export type MessageType = "text" | "image" | "video" | "voice";
+export type MessageType = "text" | "image" | "video" | "voice" | "file";
+export type CallType = "audio" | "video";
+export type CallStatus = "idle" | "calling" | "ringing" | "connecting" | "connected" | "ended";
+
+export type CallPeerUser = {
+  _id: string;
+  name: string;
+  avatar: string | null;
+  username?: string;
+};
+
+export type CallSession = {
+  callId: string;
+  chatId: string;
+  callType: CallType;
+  callerId: string;
+  receiverId: string;
+  status: "pending" | "active";
+  createdAt: string;
+  acceptedAt: string | null;
+  caller: CallPeerUser;
+  receiver: CallPeerUser;
+  reason?: string;
+  endedByUserId?: string;
+};
+
+export type CallHistoryItem = {
+  _id: string;
+  callId: string;
+  chatId: string;
+  callType: CallType;
+  status: "missed" | "rejected" | "completed" | "cancelled" | "failed";
+  endedReason: "rejected" | "ended" | "timeout" | "disconnected" | "busy" | "failed";
+  startedAt: string;
+  answeredAt: string | null;
+  endedAt: string;
+  durationSeconds: number;
+  direction: "incoming" | "outgoing";
+  otherUser: CallPeerUser | null;
+};
 
 export type MediaAttachment = {
   url: string;
@@ -30,6 +69,12 @@ export type MediaAttachment = {
   duration?: number | null;
   waveform?: number[];
   messageType?: Exclude<MessageType, "text">;
+};
+
+export type MessageReaction = {
+  emoji: string;
+  userId: string;
+  userName?: string;
 };
 
 export type Message = {
@@ -49,6 +94,7 @@ export type Message = {
   createdAt: string;
   deliveredAt?: string | null;
   seenAt?: string | null;
+  reactions?: MessageReaction[];
   replyTo?:
     | {
         _id: string;
@@ -89,6 +135,11 @@ export type NotificationItem = {
     username?: string;
     avatar?: string | null;
   };
+};
+
+export type CallConfiguration = {
+  iceServers: RTCIceServer[];
+  callTimeoutMs: number;
 };
 
 export type UserProfile = BackendUser & {

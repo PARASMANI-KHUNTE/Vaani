@@ -4,6 +4,7 @@ const Message = require("../message/message.model");
 const User = require("../user/user.model");
 const ApiError = require("../../utils/apiError");
 const { assertUsersCanInteract, mapUserProfile } = require("../user/user.service");
+const { destroyMediaAssets } = require("../../utils/mediaUpload");
 
 const normalizeId = (value) => {
   if (!value) {
@@ -26,6 +27,7 @@ const buildDefaultUserStates = (participants = []) =>
     userId: normalizeId(participantId),
     clearedAt: null,
     manualUnread: false,
+    hidden: false,
   }));
 
 const getUserState = (chat, userId) =>
@@ -50,6 +52,7 @@ const ensureChatUserState = async (chat) => {
       userId: participantId,
       clearedAt: null,
       manualUnread: false,
+      hidden: false,
     }));
 
   if (!missingUserStates.length) {
@@ -150,7 +153,7 @@ const formatChatForList = async (chat, currentUserId) => {
     .select("content type status senderId createdAt deliveredAt seenAt")
     .lean();
 
-  if (!lastMessage && currentUserState?.clearedAt) {
+  if (!lastMessage && currentUserState?.hidden) {
     return null;
   }
 
@@ -215,11 +218,17 @@ const getChatSummary = async (chatId, currentUserId) => {
 const markChatRead = async ({ chatId, currentUserId }) => {
   await ensureChatMember(chatId, currentUserId);
 
+  const normalizedUserId = normalizeId(currentUserId);
+
   await Promise.all([
     Chat.findOneAndUpdate(
       {
         _id: chatId,
-        "userStates.userId": currentUserId,
+        userStates: {
+          $elemMatch: {
+            userId: normalizedUserId,
+          },
+        },
       },
       {
         $set: {
@@ -261,10 +270,16 @@ const markChatUnread = async ({ chatId, currentUserId }) => {
     throw new ApiError(400, "No incoming messages available to mark as unread");
   }
 
+  const normalizedUserId = normalizeId(currentUserId);
+
   await Chat.findOneAndUpdate(
     {
       _id: chatId,
-      "userStates.userId": currentUserId,
+      userStates: {
+        $elemMatch: {
+          userId: normalizedUserId,
+        },
+      },
     },
     {
       $set: {
@@ -279,15 +294,22 @@ const markChatUnread = async ({ chatId, currentUserId }) => {
 const deleteChatForUser = async ({ chatId, currentUserId }) => {
   await ensureChatMember(chatId, currentUserId);
 
+  const normalizedUserId = normalizeId(currentUserId);
+
   await Chat.findOneAndUpdate(
     {
       _id: chatId,
-      "userStates.userId": currentUserId,
+      userStates: {
+        $elemMatch: {
+          userId: normalizedUserId,
+        },
+      },
     },
     {
       $set: {
         "userStates.$.clearedAt": new Date(),
         "userStates.$.manualUnread": false,
+        "userStates.$.hidden": true,
       },
     }
   );
@@ -297,7 +319,41 @@ const deleteChatForUser = async ({ chatId, currentUserId }) => {
   };
 };
 
+const clearChatMessagesForUser = async ({ chatId, currentUserId }) => {
+  await ensureChatMember(chatId, currentUserId);
+
+  const normalizedUserId = normalizeId(currentUserId);
+
+  await Chat.findOneAndUpdate(
+    {
+      _id: chatId,
+      userStates: {
+        $elemMatch: {
+          userId: normalizedUserId,
+        },
+      },
+    },
+    {
+      $set: {
+        "userStates.$.clearedAt": new Date(),
+        "userStates.$.manualUnread": false,
+        "userStates.$.hidden": false,
+      },
+    }
+  );
+
+  return getChatSummary(chatId, currentUserId);
+};
+
+const permanentlyDeleteChat = async (chatId) => {
+  const messages = await Message.find({ chatId }).select("media").lean();
+  await destroyMediaAssets(messages.map((message) => message.media));
+  await Message.deleteMany({ chatId });
+  await Chat.deleteOne({ _id: chatId });
+};
+
 module.exports = {
+  clearChatMessagesForUser,
   createOrGetDirectChat,
   deleteChatForUser,
   ensureChatMember,
@@ -305,4 +361,5 @@ module.exports = {
   listUserChats,
   markChatRead,
   markChatUnread,
+  permanentlyDeleteChat,
 };

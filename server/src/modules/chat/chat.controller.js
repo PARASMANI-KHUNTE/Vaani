@@ -1,6 +1,7 @@
 const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess } = require("../../utils/apiResponse");
 const {
+  clearChatMessagesForUser,
   createOrGetDirectChat,
   deleteChatForUser,
   listUserChats,
@@ -58,7 +59,19 @@ const removeChat = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Chat removed from your list", result);
 });
 
+const clearChatMessages = asyncHandler(async (req, res) => {
+  const chat = await clearChatMessagesForUser({
+    chatId: req.params.chatId,
+    currentUserId: req.user._id.toString(),
+  });
+
+  return sendSuccess(res, 200, "Messages cleared successfully", {
+    chat,
+  });
+});
+
 module.exports = {
+  clearChatMessages,
   createChat,
   getChats,
   readChat,

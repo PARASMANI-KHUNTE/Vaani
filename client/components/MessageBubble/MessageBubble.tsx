@@ -2,16 +2,20 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Check, CheckCheck, Clock3, CornerUpLeft, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Clock3, CornerUpLeft, Paperclip, SmilePlus, Trash2 } from "lucide-react";
 import { Message } from "@/lib/types";
 import { cn, formatMessageTime, formatStatusTime } from "@/lib/utils";
 
 type MessageBubbleProps = {
   message: Message;
   isOwnMessage: boolean;
+  currentUserId?: string;
   onReply?: (message: Message) => void;
   onDelete?: (message: Message, scope: "me" | "everyone") => void;
+  onReact?: (message: Message, emoji: string) => void;
 };
+
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🎉", "🔥"];
 
 const StatusIcon = ({ status, optimistic, timestamp }: { status: Message["status"]; optimistic?: boolean; timestamp?: string | Date | null }) => {
   const statusTime = timestamp ? formatStatusTime(timestamp) : null;
@@ -91,8 +95,139 @@ const formatAudioDuration = (seconds?: number | null) => {
   return `${mins}:${secs}`;
 };
 
-export const MessageBubble = ({ message, isOwnMessage, onReply, onDelete }: MessageBubbleProps) => {
+const formatFileSize = (bytes?: number | null) => {
+  if (!bytes) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let unitIndex = 0;
+  let size = bytes;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+};
+
+const ReactionPicker = ({ 
+  onSelect, 
+  onClose 
+}: { 
+  onSelect: (emoji: string) => void; 
+  onClose: () => void;
+}) => (
+  <div className="absolute bottom-full left-0 mb-2 z-30 animate-fade-in">
+    <div className="flex items-center gap-1 rounded-2xl border border-ink/10 bg-white/98 p-2 shadow-xl backdrop-blur-sm">
+      {REACTION_EMOJIS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => {
+            onSelect(emoji);
+            onClose();
+          }}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-125 hover:bg-shell"
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const MessageReactions = ({ 
+  reactions, 
+  currentUserId,
+  onReact,
+  isOwnMessage
+}: { 
+  reactions?: Message["reactions"]; 
+  currentUserId?: string;
+  onReact?: (emoji: string) => void;
+  isOwnMessage: boolean;
+}) => {
+  const [showPicker, setShowPicker] = useState(false);
+
+  if (!reactions || reactions.length === 0) {
+    return null;
+  }
+
+  const groupedReactions = reactions.reduce((acc, reaction) => {
+    if (!acc[reaction.emoji]) {
+      acc[reaction.emoji] = [];
+    }
+    acc[reaction.emoji].push(reaction);
+    return acc;
+  }, {} as Record<string, typeof reactions>);
+
+  const hasUserReacted = reactions.some(r => r.userId === currentUserId);
+
+  return (
+    <div className="relative">
+      <div 
+        className={cn(
+          "mt-1 flex flex-wrap items-center gap-1",
+          isOwnMessage ? "justify-end" : "justify-start"
+        )}
+      >
+        {Object.entries(groupedReactions).map(([emoji, users]) => (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => {
+              if (onReact) {
+                onReact(emoji);
+              } else {
+                setShowPicker(!showPicker);
+              }
+            }}
+            className={cn(
+              "flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm transition-all hover:scale-105",
+              users.some(u => u.userId === currentUserId)
+                ? "border-lagoon/40 bg-lagoon/10"
+                : "border-ink/10 bg-white/80 hover:border-lagoon/30"
+            )}
+          >
+            <span>{emoji}</span>
+            <span className="text-xs font-medium text-ink/70">{users.length}</span>
+          </button>
+        ))}
+        
+        <button
+          type="button"
+          onClick={() => setShowPicker(!showPicker)}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-ink/15 text-ink/40 transition-all hover:border-lagoon/30 hover:border-solid hover:text-lagoon",
+            hasUserReacted && "hidden"
+          )}
+        >
+          <SmilePlus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {showPicker && (
+        <ReactionPicker
+          onSelect={(emoji) => {
+            if (onReact) {
+              onReact(emoji);
+            }
+            setShowPicker(false);
+          }}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+export const MessageBubble = ({ 
+  message, 
+  isOwnMessage,
+  currentUserId,
+  onReply, 
+  onDelete,
+  onReact 
+}: MessageBubbleProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
 
   const handleDeleteClick = (scope: "me" | "everyone") => {
     if (showDeleteConfirm) {
@@ -107,7 +242,12 @@ export const MessageBubble = ({ message, isOwnMessage, onReply, onDelete }: Mess
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       setShowDeleteConfirm(false);
+      setShowReactionPicker(false);
     }
+  };
+
+  const handleReact = (emoji: string) => {
+    onReact?.(message, emoji);
   };
 
   return (
@@ -118,7 +258,7 @@ export const MessageBubble = ({ message, isOwnMessage, onReply, onDelete }: Mess
     >
       <div
         className={cn(
-          "max-w-[85%] rounded-[26px] px-4 py-3 text-sm shadow-soft transition-all duration-200 sm:max-w-[70%]",
+          "relative max-w-[85%] rounded-[26px] px-4 py-3 text-sm shadow-soft transition-all duration-200 sm:max-w-[70%]",
           isOwnMessage
             ? "rounded-br-md bg-[linear-gradient(135deg,#155e75_0%,#1d6a81_58%,#104455_100%)] text-white"
             : "rounded-bl-md border border-ink/8 bg-[linear-gradient(180deg,#fffdfa,#f8f1e7)] text-ink"
@@ -144,7 +284,7 @@ export const MessageBubble = ({ message, isOwnMessage, onReply, onDelete }: Mess
         ) : null}
 
         {message.deletedForEveryone ? (
-          <p className="whitespace-pre-wrap break-words leading-6">This message was deleted</p>
+          <p className="whitespace-pre-wrap break-words leading-6 italic opacity-70">This message was deleted</p>
         ) : (
           <>
             {message.type === "image" && message.media?.url ? (
@@ -206,6 +346,53 @@ export const MessageBubble = ({ message, isOwnMessage, onReply, onDelete }: Mess
               </div>
             ) : null}
 
+            {message.type === "file" && message.media?.url ? (
+              <div
+                className={cn(
+                  "mb-3 flex items-center gap-3 rounded-2xl border p-3",
+                  isOwnMessage 
+                    ? "border-white/10 bg-white/10" 
+                    : "border-ink/8 bg-white/70"
+                )}
+              >
+                <div className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                  isOwnMessage ? "bg-white/20" : "bg-lagoon/10"
+                )}>
+                  <Paperclip className={cn("h-6 w-6", isOwnMessage ? "text-white/80" : "text-lagoon")} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={cn(
+                    "truncate text-sm font-medium",
+                    isOwnMessage ? "text-white" : "text-ink"
+                  )}>
+                    {message.media.originalName || "File"}
+                  </p>
+                  {message.media.bytes && (
+                    <p className={cn(
+                      "text-xs",
+                      isOwnMessage ? "text-white/60" : "text-ink/50"
+                    )}>
+                      {formatFileSize(message.media.bytes)}
+                    </p>
+                  )}
+                </div>
+                <a
+                  href={message.media.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "shrink-0 rounded-xl px-3 py-2 text-sm font-medium transition",
+                    isOwnMessage 
+                      ? "bg-white/20 text-white hover:bg-white/30" 
+                      : "bg-lagoon/10 text-lagoon hover:bg-lagoon/20"
+                  )}
+                >
+                  Open
+                </a>
+              </div>
+            ) : null}
+
             {message.content ? (
               <p className="whitespace-pre-wrap break-words leading-6">
                 {renderMessageContent(message.content, isOwnMessage)}
@@ -214,13 +401,39 @@ export const MessageBubble = ({ message, isOwnMessage, onReply, onDelete }: Mess
           </>
         )}
 
+        <MessageReactions 
+          reactions={message.reactions}
+          currentUserId={currentUserId}
+          onReact={handleReact}
+          isOwnMessage={isOwnMessage}
+        />
+
         <div
           className={cn(
             "mt-2 flex items-center justify-between gap-3 text-[11px]",
             isOwnMessage ? "text-white/75" : "text-ink/45"
           )}
         >
-          <div className="flex items-center gap-2 opacity-0 transition-all duration-200 group-hover:opacity-100">
+          <div className="flex items-center gap-1 opacity-0 transition-all duration-200 group-hover:opacity-100">
+            <div className="relative">
+              <button 
+                type="button" 
+                onClick={() => setShowReactionPicker(!showReactionPicker)} 
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 transition hover:bg-white/20"
+                aria-label="Add reaction"
+              >
+                <SmilePlus className="h-3.5 w-3.5" />
+              </button>
+              {showReactionPicker && (
+                <ReactionPicker
+                  onSelect={(emoji) => {
+                    handleReact(emoji);
+                    setShowReactionPicker(false);
+                  }}
+                  onClose={() => setShowReactionPicker(false)}
+                />
+              )}
+            </div>
             <button 
               type="button" 
               onClick={() => onReply?.(message)} 

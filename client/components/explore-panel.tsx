@@ -70,7 +70,7 @@ export const ExplorePanel = ({
     <div className="fixed inset-0 z-[320] bg-ink/20 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         ref={panelRef}
-        className="surface-elevated absolute right-0 top-0 h-full w-full max-w-xl border-l border-ink/8 p-5 sm:p-6"
+        className="surface-elevated absolute right-0 top-0 h-full w-full overflow-y-auto border-l border-ink/8 p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:max-w-xl sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-label="Explore users panel"

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { Compass, LogOut, Sparkles, UserRound } from "lucide-react";
 import { ChatWindow } from "@/components/ChatWindow/ChatWindow";
+import { CallScreen } from "@/components/Call/CallScreen";
+import { IncomingCallModal } from "@/components/Call/IncomingCallModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ExplorePanel } from "@/components/explore-panel";
 import { NotificationPanel } from "@/components/notification-panel";
@@ -11,6 +13,7 @@ import { NotificationToastStack } from "@/components/notification-toast-stack";
 import { ProfilePanel } from "@/components/profile-panel";
 import { Sidebar } from "@/components/Sidebar/Sidebar";
 import { Toast } from "@/components/toast";
+import { useCall } from "@/hooks/use-call";
 import { useChatData } from "@/hooks/use-chat-data";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useSocialData } from "@/hooks/use-social-data";
@@ -31,8 +34,30 @@ export const ChatShell = () => {
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
   const debouncedSearch = useDebouncedValue(searchTerm, 250);
   const debouncedExploreQuery = useDebouncedValue(exploreQuery, 250);
+  const {
+    activeCall,
+    incomingCall,
+    callStatus,
+    localStream,
+    remoteStream,
+    isMuted,
+    isVideoOn,
+    error: callError,
+    startCall,
+    acceptIncomingCall,
+    rejectIncomingCall,
+    endActiveCall,
+    toggleMute,
+    toggleVideo,
+    clearCallError,
+  } = useCall({
+    token: session?.backendAccessToken,
+    currentUserId: session?.backendUser?._id,
+  });
   const {
     chats,
     messages,
@@ -43,12 +68,14 @@ export const ChatShell = () => {
     mediaTransfer,
     clearError,
     dismissMediaTransfer,
+    cancelMediaUpload,
     startChatWithUser,
     sendChatMessage,
     sendMediaMessage,
     retryLastMediaUpload,
     notifyTyping,
     deleteChatMessage,
+    clearSelectedChatMessages,
     deleteSelectedChat,
     markSelectedChatRead,
     markSelectedChatUnread,
@@ -58,6 +85,7 @@ export const ChatShell = () => {
   });
   const {
     directoryUsers,
+    callHistory,
     error: socialError,
     clearError: clearSocialError,
     acceptRequestByUserId,
@@ -178,13 +206,14 @@ export const ChatShell = () => {
   }
 
   return (
-    <div className="space-y-5">
-      {error || socialError ? (
+    <div className="space-y-4 px-3 pb-3 pt-3 sm:space-y-5 sm:px-0 sm:pb-0 sm:pt-0">
+      {error || socialError || callError ? (
         <Toast 
-          message={error || socialError || ""} 
+          message={error || socialError || callError || ""} 
           onDismiss={() => {
             if (error) clearError();
             if (socialError) clearSocialError();
+            if (callError) clearCallError();
           }}
         />
       ) : null}
@@ -198,7 +227,7 @@ export const ChatShell = () => {
         onMarkRead={markNotificationRead}
       />
 
-      <div className="surface-elevated relative overflow-visible rounded-[32px] px-5 py-5 sm:px-6 lg:py-5">
+      <div className="surface-elevated relative overflow-visible rounded-[28px] px-4 py-4 sm:rounded-[32px] sm:px-6 sm:py-5 lg:py-5">
         <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-white/40 to-transparent pointer-events-none" />
         
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -209,7 +238,7 @@ export const ChatShell = () => {
                 Authenticated
               </p>
             </div>
-            <h1 className="soft-heading text-[1.75rem] font-semibold leading-tight text-ink md:text-2xl">
+            <h1 className="soft-heading text-[1.45rem] font-semibold leading-tight text-ink sm:text-[1.75rem] md:text-2xl">
               Welcome back, <span className="text-gradient">{session.backendUser?.name?.split(" ")[0]}</span>
             </h1>
             <p className="max-w-xl text-sm text-ink/50">
@@ -217,14 +246,14 @@ export const ChatShell = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={() => {
                 setIsNotificationPanelOpen(false);
                 setIsExploreOpen(true);
               }}
-              className="btn-secondary group"
+              className="btn-secondary group w-full sm:w-auto"
             >
               <Compass className="h-4 w-4 text-lagoon" />
               <span>Explore</span>
@@ -236,14 +265,14 @@ export const ChatShell = () => {
                 setIsNotificationPanelOpen(false);
                 setIsProfileOpen(true);
               }}
-              className="btn-secondary"
+                className="btn-secondary w-full sm:w-auto"
             >
               <UserRound className="h-4 w-4 text-lagoon" />
               <span>Profile</span>
             </button>
-          <NotificationPanel
-            notifications={notifications}
-            isOpen={isNotificationPanelOpen}
+            <NotificationPanel
+              notifications={notifications}
+              isOpen={isNotificationPanelOpen}
               onToggle={() => setIsNotificationPanelOpen((value) => !value)}
               onOpenChat={(chatId, notificationId) => {
                 if (notificationId) {
@@ -254,30 +283,30 @@ export const ChatShell = () => {
                 }
                 setIsNotificationPanelOpen(false);
               }}
-            onMarkAllRead={markNotificationsRead}
-            onMarkRead={markNotificationRead}
-            onAcceptFriendRequest={async (userId, notificationId) => {
-              await acceptRequestByUserId(userId);
-              markNotificationRead(notificationId);
-            }}
-            onRejectFriendRequest={async (userId, notificationId) => {
-              await rejectRequestByUserId(userId);
-              markNotificationRead(notificationId);
-            }}
-          />
+              onMarkAllRead={markNotificationsRead}
+              onMarkRead={markNotificationRead}
+              onAcceptFriendRequest={async (userId, notificationId) => {
+                await acceptRequestByUserId(userId);
+                markNotificationRead(notificationId);
+              }}
+              onRejectFriendRequest={async (userId, notificationId) => {
+                await rejectRequestByUserId(userId);
+                markNotificationRead(notificationId);
+              }}
+            />
             <button
               type="button"
               onClick={() => void signOut()}
-              className="btn-secondary text-ink/60 hover:text-rose-600"
+              className="btn-secondary col-span-2 w-full text-ink/60 hover:text-rose-600 sm:col-span-1 sm:w-auto"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign out</span>
+              <span>Sign out</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="relative z-10 grid min-h-[70vh] grid-cols-1 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="relative z-10 grid min-h-[70vh] grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-5">
         <div className={cn(selectedChatId ? "hidden xl:block" : "block")}>
           <Sidebar
             chats={filteredChats}
@@ -285,12 +314,22 @@ export const ChatShell = () => {
             currentUserId={session.backendUser?._id}
             onSelectChat={selectChat}
             onDeleteChat={(chatId) => void deleteSelectedChat(chatId)}
+            onClearChatMessages={(chatId) => void clearSelectedChatMessages(chatId)}
             onMarkChatRead={(chatId) => void markSelectedChatRead(chatId)}
             onMarkChatUnread={(chatId) => void markSelectedChatUnread(chatId)}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             isLoading={isLoadingChats}
             onlineUserIds={onlineUserIds}
+            selectedChatIds={selectedChatIds}
+            onSelectChats={setSelectedChatIds}
+            isSelectionMode={isSelectionMode}
+            onToggleSelectionMode={() => {
+              setIsSelectionMode(!isSelectionMode);
+              if (isSelectionMode) {
+                setSelectedChatIds([]);
+              }
+            }}
           />
         </div>
         <div className={cn(!selectedChatId ? "hidden xl:block" : "block")}>
@@ -304,15 +343,42 @@ export const ChatShell = () => {
             onSendMedia={sendMediaMessage}
             onRetryMedia={retryLastMediaUpload}
             onDismissMedia={dismissMediaTransfer}
+            onCancelMedia={cancelMediaUpload}
             onTyping={notifyTyping}
             onDeleteMessage={deleteChatMessage}
             onBack={selectedChatId ? () => selectChat(null) : undefined}
             onClose={selectedChatId ? () => selectChat(null) : undefined}
             isOnline={isActiveUserOnline}
             typingLabel={activeTyping ? `${activeTyping.userName} is typing...` : null}
+            onStartAudioCall={
+              activeChat ? () => void startCall({ chat: activeChat, callType: "audio" }) : undefined
+            }
+            onStartVideoCall={
+              activeChat ? () => void startCall({ chat: activeChat, callType: "video" }) : undefined
+            }
+            callStatus={callStatus}
           />
         </div>
       </div>
+
+      <IncomingCallModal
+        call={incomingCall}
+        onAccept={() => void acceptIncomingCall()}
+        onReject={() => void rejectIncomingCall()}
+      />
+
+      <CallScreen
+        call={activeCall}
+        status={callStatus}
+        localStream={localStream}
+        remoteStream={remoteStream}
+        isMuted={isMuted}
+        isVideoOn={isVideoOn}
+        error={callError}
+        onToggleMute={toggleMute}
+        onToggleVideo={toggleVideo}
+        onEndCall={() => void endActiveCall()}
+      />
 
       <ExplorePanel
         isOpen={isExploreOpen}
@@ -333,6 +399,7 @@ export const ChatShell = () => {
       <ProfilePanel
         isOpen={isProfileOpen}
         profile={profile}
+        callHistory={callHistory}
         isLoading={isLoadingProfile}
         onClose={() => setIsProfileOpen(false)}
         onSave={saveProfile}

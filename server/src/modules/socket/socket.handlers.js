@@ -16,6 +16,7 @@ const {
   isUserOnline,
   removeOnlineUser,
 } = require("./socket.service");
+const { handleCallDisconnect, registerCallHandlers } = require("./call.handler");
 
 const emitPresence = (io, eventName, userId) => {
   io.emit(eventName, {
@@ -37,6 +38,7 @@ const registerSocketHandlers = (io, socket) => {
     onlineUserIds: getOnlineUserIds(),
   });
   emitPresence(io, SOCKET_EVENTS.USER_ONLINE, currentUserId);
+  registerCallHandlers(io, socket);
 
   socket.on(SOCKET_EVENTS.JOIN_CHAT, async ({ chatId }) => {
     try {
@@ -247,6 +249,7 @@ const registerSocketHandlers = (io, socket) => {
 
   socket.on("disconnect", () => {
     const becameOffline = removeOnlineUser(currentUserId, socket.id);
+    handleCallDisconnect(io, currentUserId);
 
     if (becameOffline) {
       emitPresence(io, SOCKET_EVENTS.USER_OFFLINE, currentUserId);

@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const env = require("./config/env");
 const errorHandler = require("./middlewares/errorHandler");
 const authRoutes = require("./modules/auth/auth.routes");
+const callRoutes = require("./modules/call/call.routes");
 const chatRoutes = require("./modules/chat/chat.routes");
 const messageRoutes = require("./modules/message/message.routes");
 const userRoutes = require("./modules/user/user.routes");
@@ -30,6 +31,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/calls", callRoutes);
 app.use("/users", userRoutes);
 app.use("/chats", chatRoutes);
 app.use("/messages", messageRoutes);

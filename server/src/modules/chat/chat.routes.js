@@ -10,6 +10,7 @@ router.use(authMiddleware);
 
 router.get("/", chatController.getChats);
 router.post("/", createChatValidator, validateRequest, chatController.createChat);
+router.post("/:chatId/clear", chatIdParamValidator, validateRequest, chatController.clearChatMessages);
 router.patch("/:chatId/read", chatIdParamValidator, validateRequest, chatController.readChat);
 router.patch("/:chatId/unread", chatIdParamValidator, validateRequest, chatController.unreadChat);
 router.delete("/:chatId", chatIdParamValidator, validateRequest, chatController.removeChat);

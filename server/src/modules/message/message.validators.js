@@ -25,8 +25,8 @@ const createMessageValidator = [
     .withMessage("content must be 5000 characters or fewer"),
   body("type")
     .optional()
-    .isIn(["text", "image", "video", "voice"])
-    .withMessage("type must be text, image, video, or voice"),
+    .isIn(["text", "image", "video", "voice", "file"])
+    .withMessage("type must be text, image, video, voice, or file"),
   body("media").optional().isObject().withMessage("media must be an object"),
   body().custom((value) => {
     const type = value.type || "text";

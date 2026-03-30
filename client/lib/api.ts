@@ -1,4 +1,14 @@
-import { BackendUser, Chat, MediaAttachment, Message, MessageListResponse, MessageType, UserProfile } from "@/lib/types";
+import {
+  BackendUser,
+  CallConfiguration,
+  CallHistoryItem,
+  Chat,
+  MediaAttachment,
+  Message,
+  MessageListResponse,
+  MessageType,
+  UserProfile,
+} from "@/lib/types";
 
 const apiBaseUrl =
   typeof window === "undefined"
@@ -113,6 +123,18 @@ export const getChats = async (token: string) =>
     token,
   });
 
+export const getCallConfiguration = async (token: string) =>
+  request<{ config: CallConfiguration }>("/calls/config", {
+    method: "GET",
+    token,
+  });
+
+export const getCallHistory = async (token: string, limit = 12) =>
+  request<{ history: CallHistoryItem[] }>(`/calls/history?limit=${limit}`, {
+    method: "GET",
+    token,
+  });
+
 export const getMessages = async (token: string, chatId: string, page = 1, limit = 20) =>
   request<MessageListResponse>(`/messages/${chatId}?page=${page}&limit=${limit}`, {
     method: "GET",
@@ -211,6 +233,12 @@ export const markChatUnread = async (token: string, chatId: string) =>
 export const deleteChat = async (token: string, chatId: string) =>
   request<{ chatId: string }>(`/chats/${chatId}`, {
     method: "DELETE",
+    token,
+  });
+
+export const clearChatMessages = async (token: string, chatId: string) =>
+  request<{ chat: Chat }>(`/chats/${chatId}/clear`, {
+    method: "POST",
     token,
   });
 

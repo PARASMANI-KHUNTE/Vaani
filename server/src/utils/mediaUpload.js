@@ -1,11 +1,12 @@
 const { URL } = require("url");
 const ApiError = require("./apiError");
-const { configureCloudinary } = require("../config/cloudinary");
+const { configureCloudinary, tryConfigureCloudinary } = require("../config/cloudinary");
 const env = require("../config/env");
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 const MIME_BY_EXTENSION = {
   jpg: "image/jpeg",
@@ -20,6 +21,18 @@ const MIME_BY_EXTENSION = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   m4a: "audio/x-m4a",
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  zip: "application/zip",
+  rar: "application/x-rar-compressed",
+  "7z": "application/x-7z-compressed",
+  txt: "text/plain",
+  csv: "text/csv",
 };
 
 const MEDIA_RULES = [
@@ -40,6 +53,25 @@ const MEDIA_RULES = [
     resourceType: "video",
     mimeTypes: ["audio/webm", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg", "audio/mp4", "audio/x-m4a"],
     maxBytes: MAX_AUDIO_BYTES,
+  },
+  {
+    messageType: "file",
+    resourceType: "raw",
+    mimeTypes: [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/zip",
+      "application/x-rar-compressed",
+      "application/x-7z-compressed",
+      "text/plain",
+      "text/csv",
+    ],
+    maxBytes: MAX_FILE_BYTES,
   },
 ];
 
@@ -210,8 +242,50 @@ const createSignedUploadParams = ({ mimeType, userId, originalName = "upload" })
   };
 };
 
+const destroyMediaAsset = async (media) => {
+  if (!media?.publicId) {
+    return false;
+  }
+
+  const cloudinary = tryConfigureCloudinary();
+
+  if (!cloudinary) {
+    return false;
+  }
+
+  const resourceType = media.resourceType === "raw" ? "raw" : media.resourceType || "image";
+
+  try {
+    const result = await cloudinary.uploader.destroy(media.publicId, {
+      resource_type: resourceType,
+      invalidate: true,
+    });
+
+    return result?.result === "ok" || result?.result === "not found";
+  } catch (error) {
+    console.error("Failed to destroy media asset", media.publicId, error.message);
+    return false;
+  }
+};
+
+const destroyMediaAssets = async (mediaItems = []) => {
+  const uniqueMedia = mediaItems.filter(
+    (item, index, list) =>
+      item?.publicId && list.findIndex((entry) => entry?.publicId === item.publicId) === index
+  );
+
+  if (!uniqueMedia.length) {
+    return 0;
+  }
+
+  const results = await Promise.all(uniqueMedia.map((media) => destroyMediaAsset(media)));
+  return results.filter(Boolean).length;
+};
+
 module.exports = {
   createSignedUploadParams,
+  destroyMediaAsset,
+  destroyMediaAssets,
   getMediaRuleByMime,
   normalizeMessageMedia,
   uploadMessageMedia,

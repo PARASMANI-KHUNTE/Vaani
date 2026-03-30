@@ -113,7 +113,7 @@ export const NotificationToastStack = ({
 
   return (
     <div
-      className="fixed right-4 top-4 z-[250] flex max-w-sm flex-col gap-3"
+      className="fixed inset-x-3 top-3 z-[250] flex flex-col gap-3 sm:inset-x-auto sm:right-4 sm:top-4 sm:max-w-sm"
       role="region"
       aria-label="Notifications"
     >
@@ -122,7 +122,7 @@ export const NotificationToastStack = ({
           key={toast.toastId}
           className={cn(
             "animate-in slide-in-from-right-8 fade-in duration-300",
-            "rounded-[20px] border border-white/80 bg-white/95 p-4 shadow-xl backdrop-blur-md",
+            "rounded-[20px] border border-white/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md sm:p-4",
             "cursor-pointer transition-all hover:scale-[1.02] hover:shadow-2xl",
             "relative overflow-hidden"
           )}

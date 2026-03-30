@@ -73,7 +73,7 @@ export const Toast = ({ message, duration = 5000, onDismiss, type = "error" }: T
         fixed inset-x-3 top-3 z-50 rounded-2xl border ${style.border} ${style.bg} px-4 py-3.5 
         shadow-lg backdrop-blur-sm sm:left-auto sm:right-4 sm:top-4 sm:max-w-sm
         transition-all duration-300 ease-out
-        ${isLeaving ? 'opacity-0 translate-x-4' : 'opacity-100 translate-x-0 animate-slide-in-right'}
+        ${isLeaving ? 'opacity-0 translate-y-2 sm:translate-x-4 sm:translate-y-0' : 'opacity-100 translate-x-0 translate-y-0 animate-slide-in-right'}
       `}
     >
       <div className="flex items-start gap-3">

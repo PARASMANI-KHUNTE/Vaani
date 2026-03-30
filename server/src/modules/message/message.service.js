@@ -6,6 +6,7 @@ const { assertSafeMessageContent } = require("../../utils/contentSafety");
 const { assertUsersCanInteract } = require("../user/user.service");
 const {
   createSignedUploadParams,
+  destroyMediaAsset,
   normalizeMessageMedia,
   uploadMessageMedia,
 } = require("../../utils/mediaUpload");
@@ -82,7 +83,10 @@ const createMessage = async ({ chatId, senderId, content, type = "text", replyTo
         updatedAt: new Date(),
         "userStates.$[senderState].clearedAt": null,
         "userStates.$[senderState].manualUnread": false,
+        "userStates.$[senderState].hidden": false,
+        "userStates.$[receiverState].clearedAt": null,
         "userStates.$[receiverState].manualUnread": true,
+        "userStates.$[receiverState].hidden": false,
       },
     },
     {
@@ -211,6 +215,10 @@ const deleteMessage = async ({ messageId, currentUserId, scope }) => {
   if (scope === "everyone") {
     if (message.senderId.toString() !== currentUserId.toString()) {
       throw new ApiError(403, "Only the sender can delete for everyone");
+    }
+
+    if (message.media?.publicId) {
+      await destroyMediaAsset(message.media);
     }
 
     const updatedMessage = await Message.findByIdAndUpdate(
