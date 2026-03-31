@@ -1,5 +1,27 @@
 const mongoose = require("mongoose");
 
+const pushTokenSchema = new mongoose.Schema(
+  {
+    token: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    platform: {
+      type: String,
+      enum: ["android", "ios"],
+      default: "android",
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -65,7 +87,24 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    pushTokens: {
+      type: [pushTokenSchema],
+      default: [],
+    },
     lastSeen: {
+      type: Date,
+      default: null,
+    },
+    accountStatus: {
+      type: String,
+      enum: ["active", "disabled", "deleted"],
+      default: "active",
+    },
+    disabledAt: {
+      type: Date,
+      default: null,
+    },
+    deletedAt: {
       type: Date,
       default: null,
     },

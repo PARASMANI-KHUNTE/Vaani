@@ -6,10 +6,18 @@ const { registerSocketHandlers } = require("./socket.handlers");
 const { authenticateSocket } = require("./socket.service");
 const { setSocketIO } = require("./socket.notifications");
 
+const allowedOrigins = [env.clientUrl, ...env.mobileOrigins].filter(Boolean);
+
 const initializeSocketServer = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: env.clientUrl,
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
       credentials: true,
     },
   });

@@ -7,6 +7,14 @@ const loginValidator = [
     .withMessage("Google idToken is required"),
 ];
 
+const mobileCodeRedeemValidator = [
+  body("code")
+    .trim()
+    .notEmpty()
+    .withMessage("mobile auth code is required"),
+];
+
 module.exports = {
   loginValidator,
+  mobileCodeRedeemValidator,
 };

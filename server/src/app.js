@@ -10,14 +10,22 @@ const chatRoutes = require("./modules/chat/chat.routes");
 const messageRoutes = require("./modules/message/message.routes");
 const userRoutes = require("./modules/user/user.routes");
 
+const allowedOrigins = [env.clientUrl, ...env.mobileOrigins].filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+};
+
 const app = express();
 
-app.use(
-  cors({
-    origin: env.clientUrl,
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 app.use(helmet());
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 app.use(express.json({ limit: "1mb" }));

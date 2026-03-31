@@ -3,14 +3,19 @@ const { sendSuccess } = require("../../utils/apiResponse");
 const {
   acceptFriendRequest,
   blockUser,
+  disableOwnAccount,
+  deleteOwnAccount,
   exploreUsers,
   getOwnProfile,
+  getProfileByUserId,
   getProfileByUsername,
+  registerPushToken,
   rejectFriendRequest,
   removeFriend,
   requestFriend,
   searchUsers,
   unblockUser,
+  unregisterPushToken,
   updateOwnProfile,
 } = require("./user.service");
 
@@ -56,9 +61,43 @@ const updateMe = asyncHandler(async (req, res) => {
   });
 });
 
+const registerDevicePushToken = asyncHandler(async (req, res) => {
+  const token = await registerPushToken({
+    userId: req.user._id.toString(),
+    token: req.body.token,
+    platform: req.body.platform,
+  });
+
+  return sendSuccess(res, 200, "Push token registered successfully", {
+    token,
+  });
+});
+
+const unregisterDevicePushToken = asyncHandler(async (req, res) => {
+  const token = await unregisterPushToken({
+    userId: req.user._id.toString(),
+    token: req.body.token,
+  });
+
+  return sendSuccess(res, 200, "Push token removed successfully", {
+    token,
+  });
+});
+
 const profileByUsername = asyncHandler(async (req, res) => {
   const profile = await getProfileByUsername({
     username: req.params.username,
+    currentUserId: req.user._id.toString(),
+  });
+
+  return sendSuccess(res, 200, "Profile fetched successfully", {
+    profile,
+  });
+});
+
+const profileByUserId = asyncHandler(async (req, res) => {
+  const profile = await getProfileByUserId({
+    userId: req.params.userId,
     currentUserId: req.user._id.toString(),
   });
 
@@ -133,16 +172,37 @@ const unblock = asyncHandler(async (req, res) => {
   });
 });
 
+const disableAccount = asyncHandler(async (req, res) => {
+  const result = await disableOwnAccount({
+    userId: req.user._id.toString(),
+  });
+
+  return sendSuccess(res, 200, "Account disabled successfully", result);
+});
+
+const deleteAccount = asyncHandler(async (req, res) => {
+  const result = await deleteOwnAccount({
+    userId: req.user._id.toString(),
+  });
+
+  return sendSuccess(res, 200, "Account deleted successfully", result);
+});
+
 module.exports = {
   acceptFriend,
   block,
   explore,
   me,
+  profileByUserId,
   profileByUsername,
+  registerDevicePushToken,
   rejectFriend,
   search,
   sendFriendRequest,
   unblock,
+  unregisterDevicePushToken,
   unfriend,
   updateMe,
+  disableAccount,
+  deleteAccount,
 };

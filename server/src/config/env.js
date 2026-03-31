@@ -10,14 +10,24 @@ requiredVariables.forEach((variableName) => {
   }
 });
 
+const googleClientIds = process.env.GOOGLE_CLIENT_IDS
+  ? process.env.GOOGLE_CLIENT_IDS.split(",")
+      .map((clientId) => clientId.trim())
+      .filter(Boolean)
+  : [process.env.GOOGLE_CLIENT_ID].filter(Boolean);
+
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 5000),
   clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
+  mobileOrigins: process.env.MOBILE_ORIGINS
+    ? process.env.MOBILE_ORIGINS.split(",").map((origin) => origin.trim())
+    : [],
   mongodbUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleClientIds,
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
     apiKey: process.env.CLOUDINARY_API_KEY || "",

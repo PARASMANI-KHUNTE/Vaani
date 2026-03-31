@@ -38,6 +38,29 @@ const chatSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    groupName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    groupAvatar: {
+      type: String,
+      default: null,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    admins: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      ],
+      default: [],
+    },
     userStates: {
       type: [chatUserStateSchema],
       default: [],
@@ -49,5 +72,6 @@ const chatSchema = new mongoose.Schema(
 );
 
 chatSchema.index({ participants: 1 });
+chatSchema.index({ isGroup: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Chat", chatSchema);

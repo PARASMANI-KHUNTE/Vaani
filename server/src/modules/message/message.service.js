@@ -32,11 +32,11 @@ const getChatUserState = (chat, userId) =>
 
 const createMessage = async ({ chatId, senderId, content, type = "text", replyToId = null, media = null }) => {
   const chat = await ensureChatMember(chatId, senderId);
-  const otherParticipantId = chat.participants.find(
-    (participantId) => participantId.toString() !== senderId.toString()
-  );
+  const otherParticipantId =
+    !chat.isGroup &&
+    chat.participants.find((participantId) => participantId.toString() !== senderId.toString());
 
-  if (otherParticipantId) {
+  if (otherParticipantId && !chat.isGroup) {
     await assertUsersCanInteract({
       currentUserId: senderId,
       targetUserId: otherParticipantId.toString(),
@@ -277,6 +277,56 @@ const createSignedMediaUpload = async ({ mimeType, originalName, currentUserId }
   });
 };
 
+const addReaction = async ({ messageId, currentUserId, emoji }) => {
+  if (!emoji) {
+    throw new ApiError(400, "Emoji is required");
+  }
+
+  const message = await Message.findById(messageId);
+  if (!message) {
+    throw new ApiError(404, "Message not found");
+  }
+
+  await ensureChatMember(message.chatId, currentUserId);
+
+  const existingReactions = message.reactions || [];
+  const userReactionIndex = existingReactions.findIndex(
+    r => r.userId.toString() === currentUserId && r.emoji === emoji
+  );
+
+  if (userReactionIndex === -1) {
+    existingReactions.push({
+      emoji,
+      userId: currentUserId,
+    });
+  }
+
+  message.reactions = existingReactions;
+  await message.save();
+
+  return Message.findById(messageId).populate(basePopulate).lean();
+};
+
+const removeReaction = async ({ messageId, currentUserId, emoji }) => {
+  if (!emoji) {
+    throw new ApiError(400, "Emoji is required");
+  }
+
+  const message = await Message.findById(messageId);
+  if (!message) {
+    throw new ApiError(404, "Message not found");
+  }
+
+  const existingReactions = message.reactions || [];
+  message.reactions = existingReactions.filter(
+    r => !(r.userId.toString() === currentUserId && r.emoji === emoji)
+  );
+
+  await message.save();
+
+  return Message.findById(messageId).populate(basePopulate).lean();
+};
+
 module.exports = {
   createSignedMediaUpload,
   createMessage,
@@ -286,4 +336,6 @@ module.exports = {
   markMessagesAsDelivered,
   markMessagesAsSeen,
   uploadMediaForMessage,
+  addReaction,
+  removeReaction,
 };

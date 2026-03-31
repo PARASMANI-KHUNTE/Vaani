@@ -17,6 +17,8 @@ router.post("/upload/signature", messageController.createUploadSignature);
 router.post("/upload", singleMessageMediaUpload("file"), messageController.uploadMedia);
 router.get("/:chatId", getMessagesValidator, validateRequest, messageController.getMessages);
 router.post("/", createMessageValidator, validateRequest, messageController.postMessage);
+router.post("/:messageId/reaction", messageController.addReaction);
+router.delete("/:messageId/reaction", messageController.removeReaction);
 router.delete("/:messageId", deleteMessageValidator, validateRequest, messageController.removeMessage);
 
 module.exports = router;

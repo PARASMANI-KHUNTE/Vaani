@@ -23,7 +23,19 @@ const apiRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const groupMutationRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  message: {
+    success: false,
+    message: "Too many group or chat write operations. Please slow down.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authRateLimiter,
   apiRateLimiter,
+  groupMutationRateLimiter,
 };

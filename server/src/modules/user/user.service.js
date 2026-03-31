@@ -1,5 +1,10 @@
 const User = require("./user.model");
+const Chat = require("../chat/chat.model");
+const Message = require("../message/message.model");
+const CallLog = require("../call/call.model");
 const ApiError = require("../../utils/apiError");
+const { isExpoPushToken } = require("../../utils/pushNotifications");
+const { destroyMediaAssets } = require("../../utils/mediaUpload");
 const {
   notifyFriendRequestReceived,
   notifyFriendRequestAccepted,
@@ -8,6 +13,19 @@ const {
 
 const findUserById = async (userId) => {
   return User.findById(userId).lean();
+};
+
+const assertAccountIsActive = (user, message = "User account is unavailable") => {
+  if (!user || user.accountStatus !== "active") {
+    throw new ApiError(403, message);
+  }
+};
+
+const permanentlyDeleteChatById = async (chatId) => {
+  const messages = await Message.find({ chatId }).select("media").lean();
+  await destroyMediaAssets(messages.map((message) => message.media));
+  await Message.deleteMany({ chatId });
+  await Chat.deleteOne({ _id: chatId });
 };
 
 const sanitizeUsername = (value) =>
@@ -81,6 +99,14 @@ const findOrCreateUser = async ({ email, name, avatar }) => {
   let user;
 
   if (existingUser) {
+    if (existingUser.accountStatus === "deleted") {
+      throw new ApiError(403, "This account has been deleted");
+    }
+
+    if (existingUser.accountStatus === "disabled") {
+      throw new ApiError(403, "This account is disabled");
+    }
+
     user = await User.findOneAndUpdate(
       { email: normalizedEmail },
       {
@@ -88,6 +114,8 @@ const findOrCreateUser = async ({ email, name, avatar }) => {
           name: name.trim(),
           avatar: avatar || null,
           lastSeen: new Date(),
+          accountStatus: "active",
+          disabledAt: null,
         },
       },
       {
@@ -133,6 +161,7 @@ const searchUsers = async ({ query, excludeUserId, limit = 8 }) => {
 
   const users = await User.find({
     _id: { $ne: excludeUserId },
+    accountStatus: "active",
     $or: [
       { name: searchPattern },
       { email: searchPattern },
@@ -156,6 +185,7 @@ const exploreUsers = async ({ currentUserId, limit = 24 }) => {
     User.findById(currentUserId).select("blockedUsers").lean(),
     User.find({
       _id: { $ne: currentUserId },
+      accountStatus: "active",
     })
       .select(
         "username name email avatar tagline bio lastSeen createdAt friends sentFriendRequests receivedFriendRequests blockedUsers"
@@ -208,10 +238,56 @@ const updateOwnProfile = async ({ userId, name, tagline, bio }) => {
   return mapUserProfile(updatedUser, userId, updatedUser);
 };
 
+const registerPushToken = async ({ userId, token, platform = "android" }) => {
+  if (!isExpoPushToken(token)) {
+    throw new ApiError(400, "Invalid Expo push token");
+  }
+
+  await User.findByIdAndUpdate(userId, {
+    $pull: {
+      pushTokens: { token },
+    },
+  });
+
+  await User.findByIdAndUpdate(userId, {
+    $push: {
+      pushTokens: {
+        token,
+        platform,
+        updatedAt: new Date(),
+      },
+    },
+  });
+
+  return { token, platform };
+};
+
+const unregisterPushToken = async ({ userId, token }) => {
+  await User.findByIdAndUpdate(userId, {
+    $pull: {
+      pushTokens: { token },
+    },
+  });
+
+  return { token };
+};
+
+const getUserPushTokens = async (userId) => {
+  const user = await User.findById(userId).select("pushTokens").lean();
+
+  if (!user) {
+    return [];
+  }
+
+  return (user.pushTokens || [])
+    .map((entry) => entry.token)
+    .filter((token) => isExpoPushToken(token));
+};
+
 const getProfileByUserId = async ({ userId, currentUserId }) => {
   const [currentUser, profile] = await Promise.all([
     currentUserId ? User.findById(currentUserId).select("blockedUsers").lean() : null,
-    User.findById(userId)
+    User.findOne({ _id: userId, accountStatus: "active" })
       .select(
         "username name email avatar tagline bio lastSeen createdAt friends sentFriendRequests receivedFriendRequests blockedUsers"
       )
@@ -221,6 +297,8 @@ const getProfileByUserId = async ({ userId, currentUserId }) => {
   if (!profile) {
     throw new ApiError(404, "Profile not found");
   }
+
+  assertAccountIsActive(profile, "Profile is unavailable");
 
   return mapUserProfile(profile, currentUserId, currentUser);
 };
@@ -232,7 +310,7 @@ const getProfileByUsername = async ({ username, currentUserId }) => {
 
   const [currentUser, profile] = await Promise.all([
     currentUserId ? User.findById(currentUserId).select("blockedUsers").lean() : null,
-    User.findOne({ username: username.toLowerCase() })
+    User.findOne({ username: username.toLowerCase(), accountStatus: "active" })
       .select(
         "username name email avatar tagline bio lastSeen createdAt friends sentFriendRequests receivedFriendRequests blockedUsers"
       )
@@ -242,6 +320,8 @@ const getProfileByUsername = async ({ username, currentUserId }) => {
   if (!profile) {
     throw new ApiError(404, "Profile not found");
   }
+
+  assertAccountIsActive(profile, "Profile is unavailable");
 
   return mapUserProfile(profile, currentUserId, currentUser);
 };
@@ -281,6 +361,12 @@ const requestFriend = async ({ currentUserId, targetUserId }) => {
   if (!currentUser || !targetUser) {
     throw new ApiError(404, "User not found");
   }
+
+  assertAccountIsActive(currentUser, "Your account is unavailable");
+  assertAccountIsActive(targetUser, "This user is unavailable for interaction");
+
+  assertAccountIsActive(currentUser, "Your account is unavailable");
+  assertAccountIsActive(targetUser, "Target user account is unavailable");
 
   assertRelationshipAllowed(currentUser, targetUser, targetUserId);
 
@@ -325,6 +411,9 @@ const acceptFriendRequest = async ({ currentUserId, targetUserId }) => {
     throw new ApiError(404, "User not found");
   }
 
+  assertAccountIsActive(currentUser, "Your account is unavailable");
+  assertAccountIsActive(targetUser, "Target user account is unavailable");
+
   const relationship = getRelationship(currentUser, targetUserId);
 
   if (!relationship.hasReceivedRequest) {
@@ -360,6 +449,9 @@ const rejectFriendRequest = async ({ currentUserId, targetUserId }) => {
     throw new ApiError(404, "User not found");
   }
 
+  assertAccountIsActive(currentUser, "Your account is unavailable");
+  assertAccountIsActive(targetUser, "Target user account is unavailable");
+
   await Promise.all([
     User.findByIdAndUpdate(currentUserId, {
       $pull: { receivedFriendRequests: targetUserId },
@@ -384,6 +476,8 @@ const removeFriend = async ({ currentUserId, targetUserId }) => {
     throw new ApiError(404, "User not found");
   }
 
+  assertAccountIsActive(targetUser, "Target user account is unavailable");
+
   await Promise.all([
     User.findByIdAndUpdate(currentUserId, {
       $pull: { friends: targetUserId },
@@ -405,6 +499,8 @@ const blockUser = async ({ currentUserId, targetUserId }) => {
   if (!targetUser) {
     throw new ApiError(404, "User not found");
   }
+
+  assertAccountIsActive(targetUser, "Target user account is unavailable");
 
   await Promise.all([
     User.findByIdAndUpdate(currentUserId, {
@@ -437,6 +533,8 @@ const unblockUser = async ({ currentUserId, targetUserId }) => {
     throw new ApiError(404, "User not found");
   }
 
+  assertAccountIsActive(targetUser, "Target user account is unavailable");
+
   await User.findByIdAndUpdate(currentUserId, {
     $pull: {
       blockedUsers: targetUserId,
@@ -467,6 +565,87 @@ const assertUsersCanInteract = async ({ currentUserId, targetUserId }) => {
   }
 };
 
+const disableOwnAccount = async ({ userId }) => {
+  const user = await User.findById(userId).lean();
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.accountStatus === "deleted") {
+    throw new ApiError(400, "Deleted account cannot be disabled");
+  }
+
+  await User.findByIdAndUpdate(userId, {
+    $set: {
+      accountStatus: "disabled",
+      disabledAt: new Date(),
+      pushTokens: [],
+      lastSeen: new Date(),
+    },
+  });
+
+  return { disabled: true };
+};
+
+const deleteOwnAccount = async ({ userId }) => {
+  const user = await User.findById(userId).lean();
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.accountStatus === "deleted") {
+    return { deleted: true };
+  }
+
+  const userChats = await Chat.find({ participants: userId }).select("_id").lean();
+  await Promise.all(userChats.map((chat) => permanentlyDeleteChatById(chat._id.toString())));
+
+  await Promise.all([
+    User.updateMany(
+      { _id: { $ne: userId } },
+      {
+        $pull: {
+          friends: userId,
+          sentFriendRequests: userId,
+          receivedFriendRequests: userId,
+          blockedUsers: userId,
+        },
+      }
+    ),
+    CallLog.deleteMany({
+      $or: [{ callerId: userId }, { receiverId: userId }],
+    }),
+  ]);
+
+  const deletedEmail = `deleted-${Date.now()}-${String(userId).slice(-6)}@deleted.local`;
+  const deletedName = `Deleted User ${String(userId).slice(-4)}`;
+  const deletedUsername = `deleted_${Date.now().toString().slice(-8)}${String(userId).slice(-4)}`.slice(0, 30);
+
+  await User.findByIdAndUpdate(userId, {
+    $set: {
+      username: deletedUsername,
+      name: deletedName,
+      email: deletedEmail,
+      avatar: null,
+      tagline: "",
+      bio: "",
+      friends: [],
+      sentFriendRequests: [],
+      receivedFriendRequests: [],
+      blockedUsers: [],
+      pushTokens: [],
+      accountStatus: "deleted",
+      disabledAt: null,
+      deletedAt: new Date(),
+      lastSeen: new Date(),
+    },
+  });
+
+  return { deleted: true };
+};
+
 module.exports = {
   acceptFriendRequest,
   assertUsersCanInteract,
@@ -477,11 +656,16 @@ module.exports = {
   getOwnProfile,
   getProfileByUserId,
   getProfileByUsername,
+  getUserPushTokens,
   mapUserProfile,
+  registerPushToken,
   rejectFriendRequest,
   removeFriend,
   searchUsers,
   requestFriend,
   unblockUser,
+  unregisterPushToken,
   updateOwnProfile,
+  disableOwnAccount,
+  deleteOwnAccount,
 };

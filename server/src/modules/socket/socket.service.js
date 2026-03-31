@@ -48,7 +48,7 @@ const authenticateSocket = async (socket, next) => {
     const decodedToken = jwt.verify(token, env.jwtSecret);
     const user = await User.findById(decodedToken.sub).lean();
 
-    if (!user) {
+    if (!user || user.accountStatus !== "active") {
       return next(new Error("Unauthorized"));
     }
 

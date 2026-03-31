@@ -2,6 +2,7 @@ const { URL } = require("url");
 const ApiError = require("./apiError");
 const { configureCloudinary, tryConfigureCloudinary } = require("../config/cloudinary");
 const env = require("../config/env");
+const logger = require("./logger");
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
@@ -263,7 +264,7 @@ const destroyMediaAsset = async (media) => {
 
     return result?.result === "ok" || result?.result === "not found";
   } catch (error) {
-    console.error("Failed to destroy media asset", media.publicId, error.message);
+    logger.error("Failed to destroy media asset", { publicId: media.publicId, error: error.message });
     return false;
   }
 };

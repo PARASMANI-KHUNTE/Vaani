@@ -1,130 +1,73 @@
-# API Information
+﻿# API Information
 
-## Base URLs
+Base URL is configured in `web/.env` as `VITE_API_URL`.
 
-### Local development
+## Auth
 
-- Web client: `http://localhost:3000`
-- API server: `http://localhost:5000`
+- `POST /auth/login` -> exchange Google ID token for app JWT
+- `GET /auth/me` -> fetch current user
+- `POST /auth/mobile/code` -> issue one-time mobile auth code
+- `POST /auth/mobile/redeem` -> redeem one-time mobile auth code
 
-## Response Style
-
-Successful REST responses generally follow:
-
-```json
-{
-  "success": true,
-  "message": "Human readable message",
-  "data": {}
-}
-```
-
-## REST Endpoints
-
-### Health
-
-- `GET /health`
-
-### Auth
-
-- `POST /auth/login`
-- `GET /auth/me`
-
-### Users
+## Users / Social
 
 - `GET /users/me`
 - `PATCH /users/me`
-- `GET /users/explore`
-- `GET /users/search?q=...`
+- `POST /users/me/disable`
+- `DELETE /users/me`
 - `GET /users/profile/:username`
-- `POST /users/:userId/friend-request`
-- `POST /users/:userId/friend-request/accept`
-- `POST /users/:userId/friend-request/reject`
-- `DELETE /users/:userId/friend`
-- `POST /users/:userId/block`
-- `DELETE /users/:userId/block`
+- `GET /users/:userId/profile`
+- `GET /users/search?q=`
+- `GET /users/explore`
+- `POST /users/:id/friend-request`
+- `POST /users/:id/friend-request/accept`
+- `POST /users/:id/friend-request/reject`
+- `DELETE /users/:id/friend`
+- `POST /users/:id/block`
+- `DELETE /users/:id/block`
 
-### Chats
+## Chats
 
 - `GET /chats`
 - `POST /chats`
-- `POST /chats/:chatId/clear`
 - `PATCH /chats/:chatId/read`
 - `PATCH /chats/:chatId/unread`
+- `POST /chats/:chatId/clear`
 - `DELETE /chats/:chatId`
+- `PATCH /chats/:chatId/group`
+- `POST /chats/:chatId/members`
+- `DELETE /chats/:chatId/members/:memberId`
+- `POST /chats/:chatId/admins/:memberId`
+- `DELETE /chats/:chatId/admins/:memberId`
+- `POST /chats/:chatId/owner`
+- `POST /chats/:chatId/leave`
+- `POST /chats/:chatId/invite-link`
+- `GET /chats/invite/:token`
+- `POST /chats/invite/:token/join`
 
-### Messages
+Notes:
+- Mutation endpoints support optional `Idempotency-Key` header for safe retries.
 
-- `POST /messages/upload/signature`
-- `POST /messages/upload`
-- `GET /messages/:chatId?page=1&limit=20`
+## Messages
+
+- `GET /messages/:chatId?page=&limit=`
 - `POST /messages`
 - `DELETE /messages/:messageId?scope=me|everyone`
+- `POST /messages/:messageId/reaction`
+- `DELETE /messages/:messageId/reaction?emoji=`
+- `POST /messages/upload/signature`
+- `POST /messages/upload` (fallback)
 
-### Calls
+## Calls
 
 - `GET /calls/config`
-- `GET /calls/active`
-- `GET /calls/history`
+- `GET /calls/history?limit=`
 
-## Socket Events
+## Socket.IO (high level)
 
-### Messaging and social
-
-Client to server:
-
-- `SEND_MESSAGE`
-- `JOIN_CHAT`
-- `TYPING`
-- `STOP_TYPING`
-- `DELETE_MESSAGE`
-
-Server to client:
-
-- `NEW_MESSAGE`
-- `MESSAGE_DELIVERED`
-- `MESSAGE_SEEN`
-- `MESSAGE_DELETED`
-- `CHAT_UPDATED`
-- `USER_ONLINE`
-- `USER_OFFLINE`
-- `PRESENCE_SYNC`
-- `FRIEND_REQUEST_RECEIVED`
-- `FRIEND_REQUEST_ACCEPTED`
-- `FRIEND_REQUEST_REJECTED`
-
-### Calling
-
-Client to server:
-
-- `CALL_USER`
-- `ACCEPT_CALL`
-- `REJECT_CALL`
-- `OFFER`
-- `ANSWER`
-- `ICE_CANDIDATE`
-- `END_CALL`
-
-Server to client:
-
-- `INCOMING_CALL`
-- `CALL_ACCEPTED`
-- `CALL_REJECTED`
-- `OFFER`
-- `ANSWER`
-- `ICE_CANDIDATE`
-- `CALL_ENDED`
-
-## Security Expectations
-
-- Protected REST endpoints require `Authorization: Bearer <jwt>`
-- Socket handshake requires JWT auth
-- Chat and call access are validated server-side
-- Blocked users are prevented from interacting
-
-## Media Handling Notes
-
-- Signed direct uploads are supported
-- Cloudinary stores message media
-- The backend can fallback to proxied upload when needed
-- WebRTC call media is never stored or forwarded by the server
+- Message send/deliver/seen
+- Typing indicators
+- Presence updates
+- Notifications
+- Direct call signaling (offer/answer/ICE)
+- Group call signaling (start/join/leave/end/signal/state updates)

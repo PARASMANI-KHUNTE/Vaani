@@ -1,4 +1,5 @@
 const env = require("../config/env");
+const logger = require("./logger");
 const Chat = require("../modules/chat/chat.model");
 const Message = require("../modules/message/message.model");
 const { destroyMediaAssets } = require("./mediaUpload");
@@ -88,12 +89,12 @@ const initializeRetentionCleanup = () => {
   }
 
   void runRetentionCleanup().catch((error) => {
-    console.error("Initial retention cleanup failed", error);
+    logger.error("Initial retention cleanup failed", { error: error.message, stack: error.stack });
   });
 
   cleanupTimer = setInterval(() => {
     void runRetentionCleanup().catch((error) => {
-      console.error("Scheduled retention cleanup failed", error);
+      logger.error("Scheduled retention cleanup failed", { error: error.message, stack: error.stack });
     });
   }, intervalHours * 60 * 60 * 1000);
 };

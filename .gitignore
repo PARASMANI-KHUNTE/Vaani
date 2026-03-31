@@ -1,21 +1,19 @@
 # Dependencies
 node_modules/
-client/node_modules/
 server/node_modules/
+mobile/node_modules/
 
 # Build output
-.next/
-client/.next/
 dist/
 build/
 coverage/
-client/coverage/
 server/coverage/
+mobile/coverage/
 
 # TypeScript
 *.tsbuildinfo
-client/*.tsbuildinfo
 server/*.tsbuildinfo
+mobile/*.tsbuildinfo
 
 # Environment files
 .env
@@ -23,9 +21,10 @@ server/*.tsbuildinfo
 .env.development.local
 .env.test.local
 .env.production.local
-client/.env.local
-client/.env.*.local
 server/.env
+mobile/.env
+mobile/.env.local
+mobile/.env.*.local
 
 # Logs
 *.log
@@ -46,3 +45,20 @@ temp/
 .cache/
 .turbo/
 .vercel/
+
+# Mobile / Expo
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+mobile/web-build/
+mobile/android/local.properties
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/app/.cxx/
+mobile/android/.cxx/
+mobile/ios/Pods/
+mobile/ios/build/
+
+# Windows odd path artifact
+nul

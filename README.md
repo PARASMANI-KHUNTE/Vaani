@@ -1,6 +1,6 @@
-# Canvas Chat
+﻿# Canvas Chat
 
-Canvas Chat is a production-oriented realtime communication platform built with Next.js, Express, Socket.IO, MongoDB, Cloudinary, and WebRTC. It currently supports authentication, direct messaging, media sharing, social features, and 1-to-1 audio/video calling.
+Canvas Chat is a realtime communication platform built with a React + Vite web app, an Express API, Socket.IO, MongoDB, Cloudinary, and WebRTC.
 
 ## Documentation Index
 
@@ -15,29 +15,31 @@ Canvas Chat is a production-oriented realtime communication platform built with 
 
 ## Current Stack
 
-### Frontend
+### Web
 
-- Next.js App Router
+- React 19 + Vite 8
+- TypeScript
 - Tailwind CSS
-- NextAuth
-- Socket.IO client
+- React Router
+- Google OAuth (GIS)
 - Zustand
+- Socket.IO client
+- Framer Motion
 
 ### Backend
 
-- Node.js
-- Express
+- Node.js + Express
 - Socket.IO
-- MongoDB
-- Redis-ready design
-- Cloudinary
+- MongoDB + Mongoose
+- Cloudinary media storage
+- JWT auth
 
 ## Local Development
 
-### Client
+### Web (Vite)
 
 ```powershell
-cd client
+cd web
 npm install
 npm run dev
 ```
@@ -53,7 +55,7 @@ npm run dev
 ## Environment Files
 
 - backend template: [`server/.env.example`](./server/.env.example)
-- frontend template: [`client/.env.example`](./client/.env.example)
+- web template: [`web/.env.example`](./web/.env.example)
 
 ## Current Scope
 
@@ -63,14 +65,16 @@ Implemented:
 - direct chat
 - realtime messaging
 - presence and typing
-- media and voice notes
+- media, file, and voice notes
+- reactions and replies
 - social relationship system
 - audio/video calling
 - call history
+- account disable and delete
 
 Not yet implemented:
 
-- Expo mobile app
-- TURN server support
+- TURN server support for difficult NAT cases
 - group communication
-- production push notification stack
+- production push notification pipeline
+- finalized Expo mobile app

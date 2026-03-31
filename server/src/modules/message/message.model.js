@@ -99,6 +99,23 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    reactions: [
+      {
+        emoji: {
+          type: String,
+          required: true,
+        },
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     deletedForEveryone: {
       type: Boolean,
       default: false,
@@ -116,6 +133,34 @@ const messageSchema = new mongoose.Schema(
     deletedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null,
+    },
+    isSystem: {
+      type: Boolean,
+      default: false,
+    },
+    systemEvent: {
+      type: {
+        eventType: {
+          type: String,
+          enum: [
+            "group_created",
+            "group_renamed",
+            "group_avatar_updated",
+            "member_added",
+            "member_removed",
+            "member_left",
+            "admin_promoted",
+            "admin_demoted",
+            "ownership_transferred",
+          ],
+          default: null,
+        },
+        metadata: {
+          type: mongoose.Schema.Types.Mixed,
+          default: null,
+        },
+      },
       default: null,
     },
   },

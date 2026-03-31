@@ -6,6 +6,8 @@ const {
   deleteMessage,
   getMessagesByChat,
   uploadMediaForMessage,
+  addReaction: addReactionToMessage,
+  removeReaction: removeReactionFromMessage,
 } = require("./message.service");
 
 const getMessages = asyncHandler(async (req, res) => {
@@ -69,10 +71,32 @@ const removeMessage = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Message deleted successfully", result);
 });
 
+const addReaction = asyncHandler(async (req, res) => {
+  const message = await addReactionToMessage({
+    messageId: req.params.messageId,
+    currentUserId: req.user._id.toString(),
+    emoji: req.body.emoji,
+  });
+
+  return sendSuccess(res, 200, "Reaction added successfully", { message });
+});
+
+const removeReaction = asyncHandler(async (req, res) => {
+  const message = await removeReactionFromMessage({
+    messageId: req.params.messageId,
+    currentUserId: req.user._id.toString(),
+    emoji: req.query.emoji,
+  });
+
+  return sendSuccess(res, 200, "Reaction removed successfully", { message });
+});
+
 module.exports = {
   getMessages,
   postMessage,
   removeMessage,
+  addReaction,
+  removeReaction,
   createUploadSignature,
   uploadMedia,
 };

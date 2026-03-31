@@ -7,11 +7,31 @@ const searchUsersValidator = [
     .withMessage("Search query must be between 1 and 80 characters"),
 ];
 
+const registerPushTokenValidator = [
+  body("token")
+    .trim()
+    .matches(/^ExponentPushToken\[[A-Za-z0-9+\-_=]+\]$/)
+    .withMessage("token must be a valid Expo push token"),
+  body("platform")
+    .optional()
+    .isIn(["android", "ios"])
+    .withMessage("platform must be android or ios"),
+];
+
+const unregisterPushTokenValidator = [
+  body("token")
+    .trim()
+    .matches(/^ExponentPushToken\[[A-Za-z0-9+\-_=]+\]$/)
+    .withMessage("token must be a valid Expo push token"),
+];
+
 module.exports = {
+  registerPushTokenValidator,
   relationshipUserIdValidator: [
     param("userId").isMongoId().withMessage("userId must be a valid id"),
   ],
   searchUsersValidator,
+  unregisterPushTokenValidator,
   updateProfileValidator: [
     body("name")
       .optional()

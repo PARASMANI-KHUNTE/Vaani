@@ -26,6 +26,10 @@ const authMiddleware = asyncHandler(async (req, _res, next) => {
     throw new ApiError(401, "Authenticated user no longer exists");
   }
 
+  if (user.accountStatus !== "active") {
+    throw new ApiError(403, "Account is disabled or deleted");
+  }
+
   req.user = user;
   req.auth = decodedToken;
 

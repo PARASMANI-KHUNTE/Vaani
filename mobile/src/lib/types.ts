@@ -1,0 +1,130 @@
+export type SessionUser = {
+  userId?: string;
+  name?: string;
+  email?: string;
+  avatar?: string | null;
+};
+
+export type MobileSession = {
+  accessToken: string;
+  user: SessionUser | null;
+};
+
+export type ChatParticipant = {
+  _id: string;
+  name: string;
+  avatar?: string | null;
+  username?: string;
+  tagline?: string;
+  bio?: string;
+  isFriend?: boolean;
+  requestSent?: boolean;
+  requestReceived?: boolean;
+  isBlocked?: boolean;
+  hasBlocked?: boolean;
+};
+
+export type MobileChat = {
+  _id: string;
+  unreadCount: number;
+  manuallyMarkedUnread?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  otherParticipant: ChatParticipant | null;
+  lastMessage:
+    | {
+        content?: string;
+        type: "text" | "image" | "video" | "voice" | "file";
+        createdAt: string;
+      }
+    | null;
+};
+
+export type MobileMessageReaction = {
+  emoji: string;
+  userId: string;
+};
+
+export type MobileMessage = {
+  _id: string;
+  chatId: string;
+  senderId:
+    | string
+    | {
+        _id: string;
+        name: string;
+        avatar?: string | null;
+      };
+  content: string;
+  type: "text" | "image" | "video" | "voice" | "file";
+  status: "sent" | "delivered" | "seen";
+  createdAt: string;
+  deliveredAt?: string;
+  seenAt?: string;
+  reactions?: MobileMessageReaction[];
+  media?: {
+    url: string;
+    thumbnailUrl?: string;
+    publicId?: string;
+    mimeType?: string;
+    fileSize?: number;
+    duration?: number;
+  };
+  replyTo?: {
+    _id: string;
+    content: string;
+    type: string;
+    senderId: string | { _id: string; name: string };
+  };
+};
+
+export type MobileProfile = {
+  _id: string;
+  username: string;
+  name: string;
+  email?: string;
+  avatar: string | null;
+  tagline: string;
+  bio: string;
+  lastSeen: string | null;
+  createdAt?: string;
+  friendsCount: number;
+  isFriend: boolean;
+  requestSent: boolean;
+  requestReceived: boolean;
+  isBlocked: boolean;
+  hasBlocked: boolean;
+};
+
+export type MobileCallHistoryItem = {
+  _id: string;
+  callId: string;
+  chatId: string;
+  callType: "audio" | "video";
+  status: "missed" | "rejected" | "completed" | "cancelled" | "failed";
+  endedReason: "rejected" | "ended" | "timeout" | "disconnected" | "busy" | "failed";
+  startedAt: string;
+  answeredAt: string | null;
+  endedAt: string;
+  durationSeconds: number;
+  direction: "incoming" | "outgoing";
+  otherUser: ChatParticipant | null;
+};
+
+export type MobileNotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  chatId?: string;
+  userId?: string;
+  read: boolean;
+  kind: "message" | "presence" | "friend_request" | "call" | "reaction";
+  action?: "received" | "accepted" | "rejected";
+  fromUser?: {
+    _id: string;
+    name: string;
+    username?: string;
+    avatar?: string | null;
+  };
+};

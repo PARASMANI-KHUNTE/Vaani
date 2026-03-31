@@ -1,6 +1,8 @@
 const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess } = require("../../utils/apiResponse");
+const ApiError = require("../../utils/apiError");
 const { loginWithGoogleProfile } = require("./auth.service");
+const { issueMobileAuthCode, redeemMobileAuthCode } = require("./mobileAuthCodeStore");
 
 const login = asyncHandler(async (req, res) => {
   const session = await loginWithGoogleProfile(req.body.idToken);
@@ -14,7 +16,34 @@ const me = asyncHandler(async (req, res) => {
   });
 });
 
+const issueMobileCode = asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new ApiError(401, "Authorization token is required");
+  }
+
+  const accessToken = authHeader.split(" ")[1];
+  const payload = issueMobileAuthCode(accessToken);
+
+  return sendSuccess(res, 200, "Mobile auth code created", payload);
+});
+
+const redeemMobileCode = asyncHandler(async (req, res) => {
+  const accessToken = redeemMobileAuthCode(req.body.code);
+
+  if (!accessToken) {
+    throw new ApiError(400, "Invalid or expired mobile auth code");
+  }
+
+  return sendSuccess(res, 200, "Mobile auth code redeemed", {
+    accessToken,
+  });
+});
+
 module.exports = {
   login,
   me,
+  issueMobileCode,
+  redeemMobileCode,
 };

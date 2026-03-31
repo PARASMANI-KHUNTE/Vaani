@@ -1,11 +1,14 @@
 const Chat = require("../chat/chat.model");
 const User = require("../user/user.model");
 const { getChatSummary } = require("../chat/chat.service");
+const logger = require("../../utils/logger");
 const {
   createMessage,
   deleteMessage,
   markMessageAsDelivered,
   markMessagesAsSeen,
+  addReaction,
+  removeReaction,
 } = require("../message/message.service");
 const { SOCKET_EVENTS } = require("./socket.constants");
 const {
@@ -16,6 +19,7 @@ const {
   isUserOnline,
   removeOnlineUser,
 } = require("./socket.service");
+const { sendUserPushNotification } = require("./socket.notifications");
 const { handleCallDisconnect, registerCallHandlers } = require("./call.handler");
 
 const emitPresence = (io, eventName, userId) => {
@@ -84,7 +88,7 @@ const registerSocketHandlers = (io, socket) => {
         });
       }
     } catch (error) {
-      console.error("JOIN_CHAT failed", error);
+      logger.error("JOIN_CHAT failed", { error: error.message, stack: error.stack });
     }
   });
 
@@ -133,6 +137,25 @@ const registerSocketHandlers = (io, socket) => {
           messageId: message._id,
         });
       }
+
+      await Promise.all(
+        receiverIds
+          .filter((participantId) => !isUserOnline(participantId))
+          .map((participantId) =>
+            sendUserPushNotification(participantId, {
+              title: socket.user.name,
+              body:
+                type === "text"
+                  ? content || "Sent you a message"
+                  : `Sent a ${type === "voice" ? "voice note" : type} message`,
+              data: {
+                kind: "message",
+                chatId,
+                messageId: message._id.toString(),
+              },
+            })
+          )
+      );
 
       if (typeof acknowledgement === "function") {
         acknowledgement({
@@ -195,6 +218,73 @@ const registerSocketHandlers = (io, socket) => {
     }
   });
 
+  socket.on(SOCKET_EVENTS.REACTION_ADDED, async (payload, acknowledgement) => {
+    try {
+      const { messageId, emoji } = payload || {};
+
+      if (!messageId || !emoji) {
+        throw new Error("messageId and emoji are required");
+      }
+
+      const message = await addReaction({
+        messageId,
+        currentUserId,
+        emoji,
+      });
+
+      const chat = await Chat.findById(message.chatId).lean();
+      chat.participants.forEach((participantId) => {
+        io.to(getUserRoom(participantId.toString())).emit(SOCKET_EVENTS.REACTION_ADDED, {
+          message,
+          userId: currentUserId,
+          userName: socket.user.name,
+          emoji,
+        });
+      });
+
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: true, message });
+      }
+    } catch (error) {
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: false, error: error.message || "Failed to add reaction" });
+      }
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.REACTION_REMOVED, async (payload, acknowledgement) => {
+    try {
+      const { messageId, emoji } = payload || {};
+
+      if (!messageId || !emoji) {
+        throw new Error("messageId and emoji are required");
+      }
+
+      const message = await removeReaction({
+        messageId,
+        currentUserId,
+        emoji,
+      });
+
+      const chat = await Chat.findById(message.chatId).lean();
+      chat.participants.forEach((participantId) => {
+        io.to(getUserRoom(participantId.toString())).emit(SOCKET_EVENTS.REACTION_REMOVED, {
+          message,
+          userId: currentUserId,
+          emoji,
+        });
+      });
+
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: true, message });
+      }
+    } catch (error) {
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: false, error: error.message || "Failed to remove reaction" });
+      }
+    }
+  });
+
   socket.on(SOCKET_EVENTS.TYPING, async ({ chatId }) => {
     try {
       if (!chatId) {
@@ -217,7 +307,7 @@ const registerSocketHandlers = (io, socket) => {
         isTyping: true,
       });
     } catch (error) {
-      console.error("TYPING failed", error);
+      logger.error("TYPING failed", { error: error.message, stack: error.stack });
     }
   });
 
@@ -243,7 +333,7 @@ const registerSocketHandlers = (io, socket) => {
         isTyping: false,
       });
     } catch (error) {
-      console.error("STOP_TYPING failed", error);
+      logger.error("STOP_TYPING failed", { error: error.message, stack: error.stack });
     }
   });
 
