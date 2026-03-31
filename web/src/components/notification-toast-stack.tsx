@@ -9,6 +9,7 @@ type NotificationToastStackProps = {
   notifications: NotificationItem[];
   onOpenChat: (chatId?: string, notificationId?: string) => void;
   onMarkRead: (notificationId: string) => void;
+  notificationToneEnabled?: boolean;
 };
 
 interface ToastItem extends NotificationItem {
@@ -18,34 +19,30 @@ interface ToastItem extends NotificationItem {
 
 const playNotificationSound = () => {
   try {
-    const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    const audioContext = new (
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    )();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    const now = audioContext.currentTime;
+    const createCalmNote = (frequency: number, startOffset: number, duration: number, gainValue: number) => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
 
-    oscillator.frequency.value = 880;
-    oscillator.type = "sine";
-    gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(frequency, now + startOffset);
+      gain.gain.setValueAtTime(0.0001, now + startOffset);
+      gain.gain.linearRampToValueAtTime(gainValue, now + startOffset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
+      osc.start(now + startOffset);
+      osc.stop(now + startOffset + duration + 0.02);
+    };
 
-    setTimeout(() => {
-      oscillator.connect(audioContext.destination);
-      const osc2 = audioContext.createOscillator();
-      const gain2 = audioContext.createGain();
-      osc2.connect(gain2);
-      gain2.connect(audioContext.destination);
-      osc2.frequency.value = 1100;
-      osc2.type = "sine";
-      gain2.gain.setValueAtTime(0.05, audioContext.currentTime + 0.15);
-      gain2.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.45);
-      osc2.start(audioContext.currentTime + 0.15);
-      osc2.stop(audioContext.currentTime + 0.45);
-    }, 150);
+    createCalmNote(523.25, 0, 0.35, 0.018);
+    createCalmNote(659.25, 0.12, 0.42, 0.015);
   } catch {
     // Silently ignore audio errors - notification sound is non-critical
   }
@@ -55,6 +52,7 @@ export const NotificationToastStack = ({
   notifications,
   onOpenChat,
   onMarkRead,
+  notificationToneEnabled = true,
 }: NotificationToastStackProps) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
@@ -67,7 +65,9 @@ export const NotificationToastStack = ({
     );
 
     if (newNotifications.length > 0) {
+      if (notificationToneEnabled) {
       playNotificationSound();
+      }
 
       const newToasts: ToastItem[] = newNotifications.map((notification) => ({
         ...notification,
@@ -79,7 +79,7 @@ export const NotificationToastStack = ({
     }
 
     previousNotificationsRef.current = notifications;
-  }, [notifications, dismissedIds]);
+  }, [notifications, dismissedIds, notificationToneEnabled]);
 
   useEffect(() => {
     const autoDismiss = setInterval(() => {

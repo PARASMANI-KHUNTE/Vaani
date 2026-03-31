@@ -541,6 +541,11 @@ body::after {
 
   /* Mobile Responsive Styles */
   @media (max-width: 640px) {
+    /* Chat App Container */
+    .ambient-grid {
+      padding: 6px !important;
+    }
+
     /* Body */
     body {
       background: linear-gradient(180deg, #eef3ff 0%, #edf8f8 50%, #fff2df 100%);
@@ -553,42 +558,17 @@ body::after {
     /* Panels */
     .surface-panel {
       border-radius: 20px !important;
-      padding: 12px !important;
+      padding: 10px !important;
     }
 
     .surface-card {
       border-radius: 16px !important;
-      padding: 12px !important;
+      padding: 10px !important;
     }
 
     .surface-elevated {
       border-radius: 18px !important;
-      padding: 10px !important;
-    }
-
-    /* Chat Shell Layout */
-    .chat-shell-container {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      height: 100dvh;
-      padding: 8px;
-      gap: 8px;
-    }
-
-    /* Sidebar on Mobile */
-    .sidebar-container {
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    /* Chat Window on Mobile */
-    .chat-window-container {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
+      padding: 8px !important;
     }
 
     /* Header Mobile */
@@ -607,7 +587,7 @@ body::after {
     /* Input fields */
     input, 
     textarea {
-      font-size: 16px !important; /* Prevents zoom on iOS */
+      font-size: 16px !important;
     }
 
     /* Avatar sizes */
@@ -627,13 +607,13 @@ body::after {
     .text-base { font-size: 15px; }
 
     /* Padding adjustments */
-    .p-4 { padding: 12px; }
-    .px-4 { padding-left: 12px; padding-right: 12px; }
-    .py-3 { padding-top: 10px; padding-bottom: 10px; }
+    .p-4 { padding: 10px; }
+    .px-4 { padding-left: 10px; padding-right: 10px; }
+    .py-3 { padding-top: 8px; padding-bottom: 8px; }
 
     /* Gap adjustments */
-    .gap-3 { gap: 8px; }
-    .gap-4 { gap: 10px; }
+    .gap-3 { gap: 6px; }
+    .gap-4 { gap: 8px; }
 
     /* Panel transitions */
     .mobile-panel {
@@ -697,6 +677,23 @@ body::after {
 
     .safe-area-right {
       padding-right: env(safe-area-inset-right);
+    }
+
+    /* Chat message input mobile */
+    .chat-input-container {
+      padding: 8px 10px !important;
+      padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    }
+
+    /* Sidebar chat items */
+    .chat-list-item {
+      padding: 10px !important;
+    }
+
+    /* Message input */
+    .message-input {
+      min-height: 44px !important;
+      max-height: 120px !important;
     }
   }
 

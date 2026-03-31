@@ -339,6 +339,7 @@ export const ChatShell = () => {
       ) : null}
       <NotificationToastStack
         notifications={notifications}
+        notificationToneEnabled={notificationToneEnabled}
         onOpenChat={(chatId) => {
           if (chatId) {
             selectChat(chatId);

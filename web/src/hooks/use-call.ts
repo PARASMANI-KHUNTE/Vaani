@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getCallConfiguration } from "@/lib/api";
 import { getSocketClient, socketEvents } from "@/lib/socket";
 import { CallConfiguration, CallSession, CallStatus, CallType, Chat } from "@/lib/types";
@@ -68,25 +68,26 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
   const activeCallRef = useRef<CallSession | null>(null);
   const incomingCallRef = useRef<CallSession | null>(null);
   const requestedCallTypeRef = useRef<CallType>("audio");
+  const isAnsweringOfferRef = useRef(false);
 
-  const cleanupSession = () => {
+  const cleanupSession = useCallback(() => {
     sessionRef.current?.cleanup();
     sessionRef.current = null;
     setLocalStream(null);
     setRemoteStream(null);
     setIsMuted(false);
     setIsVideoOn(true);
-  };
+  }, []);
 
-  const resetCallState = (nextStatus: CallStatus = "idle") => {
+  const resetCallState = useCallback((nextStatus: CallStatus = "idle") => {
     cleanupSession();
     setIncomingCall(null);
     setActiveCall(null);
     activeCallRef.current = null;
     setCallStatus(nextStatus);
-  };
+  }, [cleanupSession]);
 
-  const ensureSession = () => {
+  const ensureSession = useCallback(() => {
     if (sessionRef.current) {
       return sessionRef.current;
     }
@@ -128,7 +129,7 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
     });
 
     return sessionRef.current;
-  };
+  }, [configuration.iceServers, resetCallState, token]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -226,6 +227,10 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
       callId: string;
       offer: RTCSessionDescriptionInit;
     }) => {
+      if (isAnsweringOfferRef.current) {
+        return;
+      }
+
       try {
         const call = activeCallRef.current || incomingCallRef.current;
 
@@ -238,8 +243,17 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
         if (session.getSignalingState() === "have-remote-offer") {
           return;
         }
+        if (session.getSignalingState() === "stable" && session.hasRemoteDescription()) {
+          return;
+        }
 
+        isAnsweringOfferRef.current = true;
         await session.setRemoteDescription(offer);
+
+        if (session.getSignalingState() !== "have-remote-offer") {
+          return;
+        }
+
         const answer = await session.createAnswer();
         setLocalStream(session.getLocalStream());
         socket.emit(socketEvents.answer, {
@@ -250,6 +264,8 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
       } catch (offerError) {
         setError(offerError instanceof Error ? offerError.message : "Unable to answer the call.");
         resetCallState("ended");
+      } finally {
+        isAnsweringOfferRef.current = false;
       }
     };
 
@@ -287,7 +303,8 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
       candidate: RTCIceCandidateInit;
     }) => {
       try {
-        if (!activeCallRef.current || activeCallRef.current.callId !== callId) {
+        const call = activeCallRef.current || incomingCallRef.current;
+        if (!call || call.callId !== callId) {
           return;
         }
 
@@ -319,9 +336,9 @@ export const useCall = ({ token, currentUserId }: UseCallParams): UseCallResult 
       socket.off(socketEvents.iceCandidate, handleIceCandidate);
       socket.off(socketEvents.callEnded, handleCallEnded);
     };
-  }, [callStatus, configuration.iceServers, currentUserId, token]);
+  }, [callStatus, currentUserId, ensureSession, resetCallState, token]);
 
-  useEffect(() => () => cleanupSession(), []);
+  useEffect(() => () => cleanupSession(), [cleanupSession]);
 
   useEffect(() => {
     if (!token || !activeCall) {

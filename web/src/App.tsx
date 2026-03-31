@@ -12,7 +12,7 @@ import DocsPage from "@/pages/docs-page";
 import { useAuth } from "@/lib/auth-context";
 
 const ChatApp = () => (
-  <main className="ambient-grid relative h-dvh overflow-hidden p-2 sm:p-3 lg:p-4">
+  <main className="ambient-grid relative h-dvh overflow-hidden p-1 sm:p-2 md:p-3 lg:p-4">
     <div className="animate-drift absolute left-[-7rem] top-[-6rem] h-72 w-72 rounded-full bg-sky-400/20 blur-3xl dark:bg-sky-500/15" />
     <div className="animate-drift absolute right-[-8rem] top-24 h-80 w-80 rounded-full bg-teal-400/18 blur-3xl [animation-delay:1.2s] dark:bg-teal-400/14" />
     <div className="animate-drift absolute bottom-[-8rem] left-[20%] h-72 w-72 rounded-full bg-orange-300/18 blur-3xl [animation-delay:2.2s] dark:bg-orange-400/12" />

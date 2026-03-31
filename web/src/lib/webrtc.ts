@@ -159,7 +159,24 @@ export class WebRTCCallSession {
     }
 
     const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
+    if (peerConnection.signalingState !== "have-remote-offer") {
+      this.options.onDebug?.("answer-race-ignored", peerConnection.signalingState);
+      return answer;
+    }
+
+    try {
+      await peerConnection.setLocalDescription(answer);
+    } catch (error) {
+      const signalingStateNow = String(peerConnection.signalingState);
+      if (
+        signalingStateNow === "stable" &&
+        peerConnection.localDescription?.type === "answer"
+      ) {
+        this.options.onDebug?.("answer-setlocal-ignored", "already-stable-with-answer");
+        return peerConnection.localDescription;
+      }
+      throw error;
+    }
     this.options.onDebug?.("answer-created");
     return answer;
   }

@@ -385,13 +385,13 @@ export const ChatWindow = ({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className="surface-elevated flex h-full min-h-0 items-center justify-center rounded-[28px] p-6 sm:rounded-[36px] sm:p-8"
+        className="surface-elevated flex h-full min-h-0 items-center justify-center rounded-[20px] p-4 sm:rounded-[36px] sm:p-8 md:rounded-[28px]"
       >
         <div className="max-w-sm text-center animate-fade-up">
-          <div className="relative mx-auto mb-8">
+          <div className="relative mx-auto mb-6 sm:mb-8">
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-300/15 to-indigo-500/20 blur-3xl" />
-            <div className="relative flex h-28 w-28 items-center justify-center">
-              <svg className="h-28 w-28 text-slate-600/40" viewBox="0 0 120 120" fill="none">
+            <div className="relative flex h-20 w-20 items-center justify-center sm:h-28 sm:w-28">
+              <svg className="h-20 w-20 text-slate-600/40 sm:h-28 sm:w-28" viewBox="0 0 120 120" fill="none">
                 <rect x="10" y="25" width="60" height="45" rx="12" stroke="currentColor" strokeWidth="2.5" fill="none" />
                 <rect x="50" y="50" width="60" height="45" rx="12" stroke="currentColor" strokeWidth="2.5" fill="none" opacity="0.5" />
                 <circle cx="30" cy="47" r="3" fill="currentColor" opacity="0.4" />
@@ -401,12 +401,12 @@ export const ChatWindow = ({
               </svg>
             </div>
           </div>
-          <h2 className="soft-heading text-2xl font-semibold text-ink dark:text-slate-200">Select a conversation</h2>
-          <p className="mt-3 text-sm leading-7 text-ink/55 dark:text-slate-400/80">
-            Choose a conversation from the sidebar to start messaging.
-            Your messages will appear here with delivery status and timestamps.
+          <h2 className="soft-heading text-xl font-semibold text-ink dark:text-slate-200 sm:text-2xl">Select a conversation</h2>
+          <p className="mt-2 text-xs leading-6 text-ink/55 dark:text-slate-400/80 sm:mt-3 sm:text-sm">
+            <span className="hidden sm:inline">Choose a conversation from the sidebar to start messaging.</span>
+            <span className="sm:hidden">Start a new conversation from the Messages tab.</span>
           </p>
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-ink/10 bg-white/65 px-4 py-2 dark:border-white/5 dark:bg-white/5">
+          <div className="mt-4 hidden items-center justify-center gap-2 sm:inline-flex sm:mt-6">
             <kbd className="rounded-md border border-ink/15 bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-ink/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">/</kbd>
             <span className="text-xs text-ink/55 dark:text-slate-400">to search</span>
           </div>
@@ -481,9 +481,9 @@ export const ChatWindow = ({
         ) : null}
       </AnimatePresence>
 
-      <header className="flex items-center gap-2.5 border-b border-ink/10 bg-gradient-to-r from-white/75 via-sky-50/55 to-teal-50/45 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3 md:gap-4 md:px-5 md:py-3.5 dark:border-white/10 dark:bg-gradient-to-r dark:from-slate-900/70 dark:via-indigo-950/25 dark:to-slate-900/60">
+      <header className="flex items-center gap-2 border-b border-ink/10 bg-gradient-to-r from-white/75 via-sky-50/55 to-teal-50/45 px-3 py-2 sm:gap-2.5 sm:px-4 sm:py-3 md:gap-4 md:px-5 md:py-3.5 dark:border-white/10 dark:bg-gradient-to-r dark:from-slate-900/70 dark:via-indigo-950/25 dark:to-slate-900/60">
         {onBack ? (
-          <button type="button" onClick={onBack} className="btn-secondary !px-2.5 !py-2.5 lg:hidden">
+          <button type="button" onClick={onBack} className="btn-secondary !px-2 !py-2 sm:!px-2.5 sm:!py-2.5 md:hidden">
             <ArrowLeft className="h-4 w-4" />
           </button>
         ) : null}

@@ -46,16 +46,25 @@ export const CallScreen = ({
   useEffect(() => {
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
+      if (remoteStream) {
+        void remoteVideoRef.current.play().catch(() => undefined);
+      }
     }
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = remoteStream;
+      if (remoteStream) {
+        void remoteAudioRef.current.play().catch(() => undefined);
+      }
     }
   }, [remoteStream]);
 
   useEffect(() => {
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
+      if (localStream) {
+        void localVideoRef.current.play().catch(() => undefined);
+      }
     }
   }, [localStream]);
 

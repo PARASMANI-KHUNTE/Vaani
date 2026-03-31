@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   addGroupMembers,
   clearChatMessages,
@@ -989,7 +989,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     });
   };
 
-  const sendTypingState = (isTyping: boolean) => {
+  const sendTypingState = useCallback((isTyping: boolean) => {
     if (!token || !selectedChatId) {
       return;
     }
@@ -998,7 +998,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     socket.emit(isTyping ? socketEvents.typing : socketEvents.stopTyping, {
       chatId: selectedChatId,
     });
-  };
+  }, [selectedChatId, token]);
 
   const notifyTyping = () => {
     sendTypingState(true);
@@ -1019,7 +1019,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         sendTypingState(false);
       }
     };
-  }, []);
+  }, [sendTypingState]);
 
   const deleteChatMessage = async (messageId: string, scope: "me" | "everyone") => {
     if (!token || !selectedChatId) {
