@@ -62,10 +62,13 @@ export const useChatStore = create<ChatState>()(
         });
       },
       selectChat: (chatId) =>
-        set({
+        set((state) => ({
           selectedChatId: chatId,
           hasExplicitlyClosedChat: chatId === null,
-        }),
+          chats: state.chats.map((chat) =>
+            chat._id === chatId ? { ...chat, unreadCount: 0 } : chat
+          ),
+        })),
       setMessages: (chatId, messages) =>
         set((state) => ({
           messagesByChat: {
@@ -77,12 +80,31 @@ export const useChatStore = create<ChatState>()(
         set((state) => {
           const existingMessages = state.messagesByChat[chatId] || [];
           const alreadyExists = existingMessages.some((entry) => entry._id === message._id);
+          const nextMessages = alreadyExists ? existingMessages : [...existingMessages, message];
+
+          // Update the chat object in the list
+          const nextChats = state.chats.map((chat) => {
+            if (chat._id === chatId) {
+              const isUnread = state.selectedChatId !== chatId;
+              return {
+                ...chat,
+                lastMessage: message,
+                unreadCount: isUnread ? chat.unreadCount + 1 : 0,
+                updatedAt: message.createdAt,
+              };
+            }
+            return chat;
+          });
+
+          // Sort chats by updatedAt
+          nextChats.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
           return {
             messagesByChat: {
               ...state.messagesByChat,
-              [chatId]: alreadyExists ? existingMessages : [...existingMessages, message],
+              [chatId]: nextMessages,
             },
+            chats: nextChats,
           };
         }),
       updateMessage: (chatId, messageId, updater) =>
@@ -112,7 +134,12 @@ export const useChatStore = create<ChatState>()(
         })),
       upsertChat: (chat) =>
         set((state) => {
-          const nextChats = [chat, ...state.chats.filter((entry) => entry._id !== chat._id)];
+          const chatWithDefaults = { ...chat, unreadCount: chat.unreadCount || 0 };
+          const nextChats = [
+            chatWithDefaults,
+            ...state.chats.filter((entry) => entry._id !== chat._id),
+          ];
+          nextChats.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
           return {
             chats: nextChats,

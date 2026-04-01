@@ -1,24 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
-import { Compass, LogOut, MailCheck, MailMinus, MessageSquare, Sparkles, Trash2, UserRound, Users } from "lucide-react";
+import { Compass, LogOut, MailCheck, MailMinus, MessageSquare, Sparkles, Trash2, UserRound } from "lucide-react";
 import { ChatWindow } from "@/components/ChatWindow/ChatWindow";
-import { CallScreen } from "@/components/Call/CallScreen";
-import { IncomingCallModal } from "@/components/Call/IncomingCallModal";
 import { NotificationPanel } from "@/components/notification-panel";
+import { ConfirmDialog, AlertDialog } from "@/components/confirm-dialog";
 import { NotificationToastStack } from "@/components/notification-toast-stack";
 import { Sidebar } from "@/components/Sidebar/Sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toast } from "@/components/toast";
-import { useCall } from "@/hooks/use-call";
 import { useChatData } from "@/hooks/use-chat-data";
-import { useSocialData } from "@/hooks/use-social-data";
+import { NewChatModal } from "@/components/new-chat-modal";
 import { useAuth } from "@/lib/auth-context";
-import { BackendUser } from "@/lib/types";
+import { acceptFriendRequest, rejectFriendRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/store/chat-store";
 
@@ -40,6 +38,8 @@ export const ChatShell = () => {
     const stored = localStorage.getItem("notificationToneEnabled");
     return stored !== null ? JSON.parse(stored) : true;
   });
+  const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
+  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const debouncedSearch = searchTerm.trim().toLowerCase();
 
   useEffect(() => {
@@ -47,67 +47,31 @@ export const ChatShell = () => {
   }, [notificationToneEnabled]);
 
   const {
-    activeCall,
-    incomingCall,
-    callStatus,
-    localStream,
-    remoteStream,
-    isMuted,
-    isVideoOn,
-    error: callError,
-    startCall,
-    acceptIncomingCall,
-    rejectIncomingCall,
-    endActiveCall,
-    toggleMute,
-    toggleVideo,
-    clearCallError,
-  } = useCall({
-    token: session?.backendAccessToken,
-    currentUserId: session?.backendUser?._id,
-  });
-  const {
     chats,
     messages,
     isLoadingChats,
     isLoadingMessages,
     error,
-    mediaTransfer,
     clearError,
-    dismissMediaTransfer,
-    cancelMediaUpload,
-    renameGroupConversation,
-    updateGroupAvatar,
-    addMembersToGroup,
-    removeMemberFromGroup,
-    promoteMemberToAdmin,
-    demoteAdminToMember,
-    transferGroupOwner,
-    leaveGroupConversation,
-    createGroupConversation,
-    createInviteLinkForGroup,
     sendChatMessage,
     sendMediaMessage,
-    retryLastMediaUpload,
     notifyTyping,
     deleteChatMessage,
-    clearSelectedChatMessages,
+    toggleReaction,
     deleteSelectedChat,
     markSelectedChatRead,
     markSelectedChatUnread,
-    toggleReaction,
+    clearSelectedChatMessages,
+    mediaTransfer,
+    retryLastMediaUpload,
+    cancelMediaUpload,
+    dismissMediaTransfer,
+    startChatWithUser,
+    createGroupConversation,
+    leaveGroupConversation: leaveGroup,
   } = useChatData({
     token: session?.backendAccessToken,
     currentUserId: session?.backendUser?._id,
-  });
-  const {
-    directoryUsers,
-    error: socialError,
-    clearError: clearSocialError,
-    acceptRequestByUserId,
-    rejectRequestByUserId,
-  } = useSocialData({
-    token: session?.backendAccessToken,
   });
 
   const filteredChats = useMemo(() => {
@@ -135,6 +99,7 @@ export const ChatShell = () => {
     () => filteredChats.filter((chat) => selectedChatIds.includes(chat._id)),
     [filteredChats, selectedChatIds]
   );
+
   useEffect(() => {
     if (!selectedChatIds.length) {
       return;
@@ -145,26 +110,14 @@ export const ChatShell = () => {
       setSelectedChatIds(nextSelectedIds);
     }
   }, [filteredChats, selectedChatIds]);
-  const openUserProfile = useCallback(
-    (user: BackendUser) => {
-      const path = user.username
-        ? `/profile/${encodeURIComponent(user.username)}`
-        : `/profile/user/${encodeURIComponent(user._id)}`;
-      navigate(path);
-    },
-    [navigate]
-  );
-
   const handleGoogleLoginSuccess = useCallback(
     (credentialResponse: CredentialResponse) => {
       void loginWithGoogleCredential(credentialResponse).catch((error) => {
         clearError();
-        clearSocialError();
-        clearCallError();
         console.error(error);
       });
     },
-    [clearCallError, clearError, clearSocialError, loginWithGoogleCredential]
+    [clearError, loginWithGoogleCredential]
   );
 
   const handleGoogleLoginError = useCallback(() => {
@@ -177,6 +130,10 @@ export const ChatShell = () => {
     setIsSelectionMode(false);
   }, [markSelectedChatRead, selectedChatIds]);
 
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteInfo, setBulkDeleteInfo] = useState({ groupCount: 0, dmCount: 0 });
+  const [bulkDeleteComplete, setBulkDeleteComplete] = useState(false);
+
   const handleBulkMarkUnread = useCallback(async () => {
     await Promise.allSettled(selectedChatIds.map(async (chatId) => markSelectedChatUnread(chatId)));
     setSelectedChatIds([]);
@@ -188,7 +145,9 @@ export const ChatShell = () => {
     const groupCount = selectedChats.length - deletableIds.length;
 
     if (groupCount > 0) {
-      window.alert("Group chats were skipped. Leave group first to remove them from list.");
+      setBulkDeleteInfo({ groupCount, dmCount: deletableIds.length });
+      setBulkDeleteOpen(true);
+      return;
     }
     if (deletableIds.length === 0) {
       return;
@@ -197,71 +156,37 @@ export const ChatShell = () => {
     await Promise.allSettled(deletableIds.map(async (chatId) => deleteSelectedChat(chatId)));
     setSelectedChatIds([]);
     setIsSelectionMode(false);
+    setBulkDeleteComplete(true);
   }, [deleteSelectedChat, selectedChats]);
 
-  const handleBulkLeaveGroups = useCallback(async () => {
-    const groupIds = selectedChats.filter((chat) => chat.isGroup).map((chat) => chat._id);
-    if (groupIds.length === 0) {
-      window.alert("No groups selected.");
-      return;
+  const handleAcceptFriendRequest = useCallback(async (userId: string, notificationId: string) => {
+    if (!session?.backendAccessToken) return;
+    try {
+      await acceptFriendRequest(session.backendAccessToken, userId);
+      markNotificationRead(notificationId);
+    } catch (err) {
+      setFriendRequestError(err instanceof Error ? err.message : "Failed to accept friend request");
     }
+  }, [session, markNotificationRead]);
 
-    if (!window.confirm(`Leave ${groupIds.length} selected group(s)?`)) {
-      return;
+  const handleRejectFriendRequest = useCallback(async (userId: string, notificationId: string) => {
+    if (!session?.backendAccessToken) return;
+    try {
+      await rejectFriendRequest(session.backendAccessToken, userId);
+      markNotificationRead(notificationId);
+    } catch (err) {
+      setFriendRequestError(err instanceof Error ? err.message : "Failed to reject friend request");
     }
-
-    await Promise.allSettled(groupIds.map(async (chatId) => leaveGroupConversation(chatId)));
-    setSelectedChatIds([]);
-    setIsSelectionMode(false);
-  }, [leaveGroupConversation, selectedChats]);
-
-  const handleBulkMakeGroup = useCallback(async () => {
-    const participantIds = Array.from(
-      new Set(
-        selectedChats
-          .filter((chat) => !chat.isGroup && chat.otherParticipant?._id)
-          .map((chat) => chat.otherParticipant!._id)
-      )
-    );
-
-    if (participantIds.length < 2) {
-      window.alert("Select at least two direct chats to create a group.");
-      return;
-    }
-
-    const groupName = window.prompt("Group name");
-    if (!groupName || groupName.trim().length < 2) {
-      window.alert("Group name must be at least 2 characters.");
-      return;
-    }
-
-    await createGroupConversation(groupName.trim(), participantIds);
-    setSelectedChatIds([]);
-    setIsSelectionMode(false);
-  }, [createGroupConversation, selectedChats]);
+  }, [session, markNotificationRead]);
 
   if (status === "loading") {
     return (
-      <div className="surface-panel rounded-[36px] p-8 md:p-10">
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-3">
-              <div className="h-3 w-20 animate-pulse rounded-full bg-shell dark:bg-slate-700" />
-              <div className="h-8 w-56 animate-pulse rounded-2xl bg-shell dark:bg-slate-700" />
-            </div>
-            <div className="flex gap-3">
-              <div className="h-11 w-28 animate-pulse rounded-2xl bg-shell dark:bg-slate-700" />
-              <div className="h-11 w-28 animate-pulse rounded-2xl bg-shell dark:bg-slate-700" />
-            </div>
+      <div className="flex h-full w-full items-center justify-center bg-base-50 dark:bg-base-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent flex items-center justify-center">
+            <div className="h-4 w-4 rounded-full bg-blue-600/20" />
           </div>
-          <div className="grid min-h-[65vh] grid-cols-1 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-22 animate-pulse rounded-[28px] bg-shell dark:bg-slate-700" />
-              ))}
-            </div>
-            <div className="hidden rounded-[36px] bg-shell/40 dark:bg-slate-800/40 xl:block" />
-          </div>
+          <p className="text-sm font-medium text-slate-500">Loading workspace...</p>
         </div>
       </div>
     );
@@ -269,275 +194,126 @@ export const ChatShell = () => {
 
   if (!session?.backendAccessToken) {
     return (
-      <section className="surface-panel relative overflow-hidden rounded-[40px] px-8 py-14 md:px-12 md:py-16">
-        <div className="absolute inset-0 bg-mesh opacity-60" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,94,117,0.1),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(180,83,9,0.12),transparent_35%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(21,94,117,0.15),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(180,83,9,0.08),transparent_35%)]" />
-        
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-lagoon/5 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-ember/5 to-transparent rounded-full blur-3xl" />
-        
-          <div className="relative mx-auto max-w-2xl text-center">
-          <div className="animate-fade-down mb-6">
-            <div className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-lagoon to-teal flex items-center justify-center shadow-xl">
-              <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
-                <path d="M8 10c0-2.21 1.79-4 4-4s4 1.79 4 4-1.79 4-4 4"/>
-                <circle cx="9" cy="14" r="1" fill="currentColor"/>
-                <circle cx="15" cy="14" r="1" fill="currentColor"/>
-                <path d="M9 17c.5.5 1.5 1 3 1s2.5-.5 3-1"/>
-              </svg>
-            </div>
+      <section className="flex h-full w-full items-center justify-center bg-base-50 p-6 dark:bg-base-950">
+        <div className="w-full max-w-md surface-elevated rounded-xl p-8 shadow-flat dark:shadow-flat-dark border border-border-light dark:border-border-dark text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+            <Sparkles className="h-8 w-8" />
           </div>
-          
-          <div className="animate-fade-down">
-            <p className="inline-flex items-center gap-2 rounded-full border border-lagoon/20 bg-lagoon/5 px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-lagoon">
-              <Sparkles className="h-4 w-4" />
-              Welcome
-            </p>
-          </div>
-          
-          <h1 className="soft-heading mt-8 text-4xl font-semibold tracking-tight text-ink dark:text-slate-100 md:text-5xl lg:text-6xl">
-            <span className="text-gradient">Vaani</span>
-          </h1>
-          
-          <p className="mx-auto mt-6 max-w-lg text-base leading-8 text-ink/65 dark:text-slate-400 md:text-lg">
-            A warmer, calmer space for real-time conversation. 
-            Connect with your team in a workspace that feels polished, 
-            focused, and ready for collaboration.
-          </p>
-          
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome to LinkUp</h1>
+          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">A secure workspace for professional real-time collaboration. Sign in to access your groups and directory.</p>
+          <div className="mt-8">
             <GoogleLogin
-              theme="filled_blue"
-              shape="pill"
+              theme={document.documentElement.classList.contains("dark") ? "filled_black" : "outline"}
+              shape="rectangular"
               size="large"
               text="continue_with"
+              logo_alignment="center"
+              width="100%"
               onSuccess={handleGoogleLoginSuccess}
               onError={handleGoogleLoginError}
             />
           </div>
-          
-          <p className="mt-8 text-xs text-ink/40 dark:text-slate-500">
-            By continuing, you agree to our Terms of Service and Privacy Policy
-          </p>
+          <p className="mt-6 text-xs text-slate-400 dark:text-slate-500">Enterprise-grade end-to-end security.</p>
         </div>
       </section>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col space-y-3 px-2 pb-2 pt-2 sm:space-y-4 sm:px-3 sm:pb-3 sm:pt-3 md:px-4 md:pb-4 md:pt-4 lg:px-5 lg:pb-5 lg:pt-5">
-      {error || socialError || callError ? (
-        <Toast 
-          message={error || socialError || callError || ""} 
+    <div className="flex h-screen w-screen flex-col bg-white dark:bg-slate-950 overflow-hidden relative">
+      {error ? (
+        <Toast
+          message={error}
           onDismiss={() => {
             if (error) clearError();
-            if (socialError) clearSocialError();
-            if (callError) clearCallError();
           }}
         />
       ) : null}
-      <NotificationToastStack
-        notifications={notifications}
-        notificationToneEnabled={notificationToneEnabled}
-        onOpenChat={(chatId) => {
-          if (chatId) {
-            selectChat(chatId);
-          }
-        }}
-        onMarkRead={markNotificationRead}
+      {friendRequestError ? (
+        <Toast
+          message={friendRequestError}
+          onDismiss={() => setFriendRequestError(null)}
+        />
+      ) : null}
+      
+      <NotificationToastStack 
+        notifications={notifications} 
+        notificationToneEnabled={notificationToneEnabled} 
+        onOpenChat={(chatId) => { if (chatId) selectChat(chatId); }} 
+        onMarkRead={markNotificationRead} 
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="surface-elevated relative overflow-visible rounded-[28px] px-4 py-3 sm:rounded-[32px] sm:px-6 sm:py-4"
-      >
-        <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-white/40 to-transparent pointer-events-none dark:from-white/5" />
-
-        <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 sm:py-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-lagoon/70">
-                  Online
-                </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-100 dark:ring-slate-800">
+                <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
               </div>
-              <h1 className="soft-heading text-lg font-semibold leading-tight text-ink dark:text-slate-100 sm:text-xl">
-                <span className="text-gradient">{session.backendUser?.name?.split(" ")[0]}</span>
-              </h1>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">LinkUp</h1>
             </div>
-
+            
             <nav className="hidden items-center gap-1 sm:flex">
-              <button
-                type="button"
-                className="group relative flex items-center gap-2 rounded-xl bg-lagoon/10 px-4 py-2.5 text-sm font-semibold text-lagoon transition-all dark:bg-lagoon/15"
+              <button 
+                type="button" 
+                className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 transition-all dark:bg-slate-800 dark:text-slate-100"
               >
-                <MessageSquare className="h-4 w-4" />
+                <div className="relative">
+                  <MessageSquare className="h-4 w-4" />
+                  {totalUnread > 0 && (
+                    <span className="absolute -right-2 -top-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white leading-none">
+                      {totalUnread > 99 ? "99+" : totalUnread}
+                    </span>
+                  )}
+                </div>
                 <span>Messages</span>
-                {totalUnread > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-ember px-1.5 text-[10px] font-bold text-white">
-                    {totalUnread > 99 ? "99+" : totalUnread}
-                  </span>
-                )}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNotificationPanelOpen(false);
-                  navigate("/explore");
-                }}
-                className="group flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-ink/50 transition-all hover:bg-ink/5 hover:text-ink dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100"
-              >
-                <Compass className="h-4 w-4" />
-                <span>Explore</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNotificationPanelOpen(false);
-                  navigate("/me/profile");
-                }}
-                className="group flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-ink/50 transition-all hover:bg-ink/5 hover:text-ink dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100"
-              >
-                <UserRound className="h-4 w-4" />
-                <span>Profile</span>
-              </button>
+              <button onClick={() => navigate("/explore")} className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"><Compass className="h-4 w-4" /><span>Explore</span></button>
+              <button onClick={() => navigate("/me/profile")} className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"><UserRound className="h-4 w-4" /><span>Profile</span></button>
             </nav>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 sm:hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNotificationPanelOpen(false);
-                  navigate("/explore");
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-ink/50 transition-all hover:bg-ink/5 hover:text-ink dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100"
-                title="Explore (Alt+E)"
-              >
-                <Compass className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNotificationPanelOpen(false);
-                  navigate("/me/profile");
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-ink/50 transition-all hover:bg-ink/5 hover:text-ink dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100"
-                title="Profile (Alt+P)"
-              >
-                <UserRound className="h-4 w-4" />
-              </button>
+            <div className="mr-2 hidden items-center gap-2 border-r border-slate-200 pr-4 dark:border-slate-800 xs:flex">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{session.backendUser?.name?.split(" ")[0]}</span>
             </div>
-
-            <NotificationPanel
-              notifications={notifications}
-              isOpen={isNotificationPanelOpen}
-              onToggle={() => setIsNotificationPanelOpen((value) => !value)}
-              onOpenChat={(chatId, notificationId) => {
-                if (notificationId) {
-                  markNotificationRead(notificationId);
-                }
-                if (chatId) {
-                  selectChat(chatId);
-                }
-                setIsNotificationPanelOpen(false);
-              }}
-              onMarkAllRead={markNotificationsRead}
-              onMarkRead={markNotificationRead}
-              onAcceptFriendRequest={async (userId, notificationId) => {
-                await acceptRequestByUserId(userId);
-                markNotificationRead(notificationId);
-              }}
-              onRejectFriendRequest={async (userId, notificationId) => {
-                await rejectRequestByUserId(userId);
-                markNotificationRead(notificationId);
-              }}
-              notificationToneEnabled={notificationToneEnabled}
-              onNotificationToneChange={setNotificationToneEnabled}
+            <NotificationPanel 
+              notifications={notifications} 
+              isOpen={isNotificationPanelOpen} 
+              onToggle={() => setIsNotificationPanelOpen((v) => !v)} 
+              onOpenChat={(c, n) => { if (n) markNotificationRead(n); if (c) selectChat(c); setIsNotificationPanelOpen(false); }} 
+              onMarkAllRead={markNotificationsRead} 
+              onMarkRead={markNotificationRead} 
+              onAcceptFriendRequest={handleAcceptFriendRequest}
+              onRejectFriendRequest={handleRejectFriendRequest}
+              notificationToneEnabled={notificationToneEnabled} 
+              onNotificationToneChange={setNotificationToneEnabled} 
             />
-            <button
-              type="button"
-              onClick={logout}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-ink/50 transition-all hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-              title="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20"><LogOut className="h-4 w-4" /></button>
             <ThemeToggle />
           </div>
         </div>
-      </motion.div>
+      </header>
 
-      {isSelectionMode && selectedChatIds.length > 0 ? (
-        <div className="surface-elevated flex flex-wrap items-center gap-2 rounded-2xl border border-lagoon/20 bg-lagoon/5 px-3 py-2.5">
-          <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-lagoon">
-            {selectedChatIds.length} selected
-          </span>
-          <button
-            type="button"
-            onClick={() => void handleBulkMarkRead()}
-            className="inline-flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-ink/70"
-          >
-            <MailCheck className="h-3.5 w-3.5" />
-            Mark read
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBulkMarkUnread()}
-            className="inline-flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-ink/70"
-          >
-            <MailMinus className="h-3.5 w-3.5" />
-            Mark unread
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBulkDelete()}
-            className="inline-flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-600"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBulkMakeGroup()}
-            className="inline-flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-lagoon"
-          >
-            <Users className="h-3.5 w-3.5" />
-            Make group
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBulkLeaveGroups()}
-            className="inline-flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-600"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Leave groups
-          </button>
+      {isSelectionMode && selectedChatIds.length > 0 && (
+        <div className="z-40 flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50/50 px-6 py-2 dark:border-blue-900/30 dark:bg-blue-950/20">
+          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{selectedChatIds.length} <span className="hidden xs:inline">selected</span></span>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => void handleBulkMarkRead()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold" title="Read"><MailCheck className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline ml-1.5">Read</span></button>
+            <button type="button" onClick={() => void handleBulkMarkUnread()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold" title="Unread"><MailMinus className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline ml-1.5">Unread</span></button>
+            <button type="button" onClick={() => void handleBulkDelete()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-rose-50 dark:bg-slate-800 dark:border-slate-700 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold text-rose-600" title="Delete"><Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline ml-1.5">Delete</span></button>
+          </div>
         </div>
-      ) : null}
+      )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.34, delay: 0.05 }}
-        className="relative z-10 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden sm:grid-cols-[300px_minmax(0,1fr)] md:gap-4 lg:grid-cols-[340px_minmax(0,1fr)] xl:gap-5"
-      >
-        <div className={cn(
-          "min-h-0 h-full transition-all duration-200",
-          selectedChatId ? "hidden sm:block" : "block"
-        )}>
+      <main className="flex min-h-0 flex-1 overflow-hidden pb-safe">
+        <div className={cn("h-full w-full sm:w-[320px] md:w-[360px] lg:w-[400px] border-r border-slate-200 dark:border-slate-800", selectedChatId ? "hidden sm:block" : "block")}>
           <Sidebar
             chats={filteredChats}
             selectedChatId={selectedChatId}
-            currentUserId={session.backendUser?._id}
             onSelectChat={selectChat}
             onDeleteChat={(chatId) => void deleteSelectedChat(chatId)}
-            onLeaveGroup={(chatId) => void leaveGroupConversation(chatId)}
             onClearChatMessages={(chatId) => void clearSelectedChatMessages(chatId)}
             onMarkChatRead={(chatId) => void markSelectedChatRead(chatId)}
             onMarkChatUnread={(chatId) => void markSelectedChatUnread(chatId)}
@@ -550,28 +326,19 @@ export const ChatShell = () => {
             isSelectionMode={isSelectionMode}
             onToggleSelectionMode={() => {
               setIsSelectionMode(!isSelectionMode);
-              if (isSelectionMode) {
-                setSelectedChatIds([]);
-              }
+              if (isSelectionMode) setSelectedChatIds([]);
             }}
-            onOpenUserProfile={openUserProfile}
+            onOpenNewChat={() => setIsNewChatModalOpen(true)}
           />
         </div>
-        <div className={cn(
-          "min-h-0 h-full transition-all duration-200",
-          !selectedChatId ? "hidden sm:block" : "block"
-        )}>
+        <div className={cn("h-full flex-1", !selectedChatId ? "hidden sm:block" : "block")}>
           <ChatWindow
             chat={activeChat}
             messages={messages}
             currentUserId={session.backendUser?._id}
             isLoading={isLoadingMessages}
-            mediaTransfer={mediaTransfer}
             onSendMessage={sendChatMessage}
             onSendMedia={sendMediaMessage}
-            onRetryMedia={retryLastMediaUpload}
-            onDismissMedia={dismissMediaTransfer}
-            onCancelMedia={cancelMediaUpload}
             onTyping={notifyTyping}
             onDeleteMessage={deleteChatMessage}
             onReact={toggleReaction}
@@ -579,48 +346,88 @@ export const ChatShell = () => {
             onClose={selectedChatId ? () => selectChat(null) : undefined}
             isOnline={isActiveUserOnline}
             typingLabel={activeTyping ? `${activeTyping.userName} is typing...` : null}
-            onStartAudioCall={
-              activeChat ? () => void startCall({ chat: activeChat, callType: "audio" }) : undefined
-            }
-            onStartVideoCall={
-              activeChat ? () => void startCall({ chat: activeChat, callType: "video" }) : undefined
-            }
-            onOpenUserProfile={openUserProfile}
-            groupDirectoryUsers={directoryUsers}
-            onGroupRename={(chatId, groupName) => renameGroupConversation(chatId, groupName)}
-            onGroupAvatarUpdate={(chatId, groupAvatar) => updateGroupAvatar(chatId, groupAvatar)}
-            onGroupAddMembers={(chatId, memberIds) => addMembersToGroup(chatId, memberIds)}
-            onGroupRemoveMember={(chatId, memberId) => removeMemberFromGroup(chatId, memberId)}
-            onGroupPromoteAdmin={(chatId, memberId) => promoteMemberToAdmin(chatId, memberId)}
-            onGroupDemoteAdmin={(chatId, memberId) => demoteAdminToMember(chatId, memberId)}
-            onGroupTransferOwnership={(chatId, nextOwnerId) => transferGroupOwner(chatId, nextOwnerId)}
-            onGroupLeave={(chatId) => leaveGroupConversation(chatId)}
-            onGroupCreateInviteLink={(chatId, options) => createInviteLinkForGroup(chatId, options)}
-            onOpenGroupInfo={(chatId) => navigate(`/group/${encodeURIComponent(chatId)}`)}
-            callStatus={callStatus}
+            onOpenUserProfile={(user) => navigate(`/profile/user/${user._id}`)}
+            mediaTransfer={mediaTransfer}
+            onRetryMedia={retryLastMediaUpload}
+            onCancelMedia={cancelMediaUpload}
+            onDismissMedia={dismissMediaTransfer}
+            onError={error || undefined}
+            onDismissError={clearError}
+            onLeaveGroup={async (chatId) => {
+              await leaveGroup(chatId);
+              selectChat(null);
+            }}
+            onOpenGroupInfo={(chatId) => navigate(`/group/${chatId}`)}
+            onClearChat={(chatId) => clearSelectedChatMessages(chatId)}
           />
         </div>
-      </motion.div>
+      </main>
 
-      <IncomingCallModal
-        call={incomingCall}
-        onAccept={() => void acceptIncomingCall()}
-        onReject={() => void rejectIncomingCall()}
+      {/* Bottom Navigation for Mobile */}
+      {!selectedChatId && (
+        <nav className="z-50 flex shrink-0 items-center justify-around border-t border-slate-200 bg-white/80 pb-safe pt-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 sm:hidden">
+          <button 
+            type="button" 
+            className="flex flex-col items-center gap-1 px-4 py-2 text-blue-600 transition-all dark:text-blue-400"
+          >
+            <div className="relative">
+              <MessageSquare className="h-6 w-6" />
+              {totalUnread > 0 && (
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white leading-none">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-tight">Chats</span>
+          </button>
+          <button 
+            onClick={() => navigate("/explore")}
+            className="flex flex-col items-center gap-1 px-4 py-2 text-slate-400 transition-all hover:text-slate-900 dark:hover:text-slate-100"
+          >
+            <Compass className="h-6 w-6" />
+            <span className="text-[10px] font-bold uppercase tracking-tight">Explore</span>
+          </button>
+          <button 
+            onClick={() => navigate("/me/profile")}
+            className="flex flex-col items-center gap-1 px-4 py-2 text-slate-400 transition-all hover:text-slate-900 dark:hover:text-slate-100"
+          >
+            <UserRound className="h-6 w-6" />
+            <span className="text-[10px] font-bold uppercase tracking-tight">Profile</span>
+          </button>
+        </nav>
+      )}
+
+      <NewChatModal
+        isOpen={isNewChatModalOpen}
+        onClose={() => setIsNewChatModalOpen(false)}
+        onStartChat={startChatWithUser}
+        onCreateGroup={createGroupConversation}
+        token={session?.backendAccessToken}
       />
 
-      <CallScreen
-        call={activeCall}
-        status={callStatus}
-        localStream={localStream}
-        remoteStream={remoteStream}
-        isMuted={isMuted}
-        isVideoOn={isVideoOn}
-        error={callError}
-        onToggleMute={toggleMute}
-        onToggleVideo={toggleVideo}
-        onEndCall={() => void endActiveCall()}
+      <ConfirmDialog
+        isOpen={bulkDeleteOpen}
+        title="Delete Chats"
+        message={`${bulkDeleteInfo.groupCount} group chat(s) were skipped. Leave group first to remove them. Delete ${bulkDeleteInfo.dmCount} direct message(s)?`}
+        variant="danger"
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          const deletableIds = selectedChats.filter((chat) => !chat.isGroup).map((chat) => chat._id);
+          await Promise.allSettled(deletableIds.map(async (chatId) => deleteSelectedChat(chatId)));
+          setSelectedChatIds([]);
+          setIsSelectionMode(false);
+          setBulkDeleteOpen(false);
+          setBulkDeleteComplete(true);
+        }}
+        onCancel={() => setBulkDeleteOpen(false)}
+      />
+
+      <AlertDialog
+        isOpen={bulkDeleteComplete}
+        title="Chats Deleted"
+        message="Selected chats have been removed."
+        onDismiss={() => setBulkDeleteComplete(false)}
       />
     </div>
   );
 };
-

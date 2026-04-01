@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { CredentialResponse } from "@react-oauth/google";
-import { exchangeGoogleLogin, getAuthMe } from "@/lib/api";
+import { exchangeGoogleLogin, getAuthMe, unregisterPushToken } from "@/lib/api";
 import { secureStorage } from "@/lib/secure-storage";
 
 type BackendSession = {
@@ -93,6 +93,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setStatus("authenticated");
       },
       logout: () => {
+        if (session?.backendAccessToken) {
+          void unregisterPushToken(session.backendAccessToken).catch(console.error);
+        }
         secureStorage.remove();
         setSession(null);
         setStatus("unauthenticated");

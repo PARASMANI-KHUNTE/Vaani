@@ -47,7 +47,6 @@ type MediaMessageInput = {
   file: File;
   content?: string;
   replyToId?: string | null;
-  waveform?: number[];
 };
 
 export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataParams) => {
@@ -92,18 +91,19 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
   const getNotificationPreview = (message: Message) => {
     if (message.type === "image") {
-      return message.content ? `Photo: ${message.content}` : "Sent a photo";
+      return message.content ? `📷 ${message.content}` : "Sent a photo";
     }
-
     if (message.type === "video") {
-      return message.content ? `Video: ${message.content}` : "Sent a video";
+      return message.content ? `🎬 ${message.content}` : "Sent a video";
     }
-
     if (message.type === "voice") {
-      return "Sent a voice note";
+      return "Sent a voice note 🎙️";
     }
-
-    return message.content.length > 50 ? `${message.content.slice(0, 50)}...` : message.content;
+    if (message.type === "file") {
+      return message.content ? `📎 ${message.content}` : "Sent a file";
+    }
+    const text = message.content || "";
+    return text.length > 50 ? `${text.slice(0, 50)}...` : text;
   };
 
   useEffect(() => {
@@ -120,7 +120,18 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
         if (active) {
           startTransition(() => {
-            setChats(response.chats);
+            // Merge logic: If we have a selectedChatId, make sure that specific chat 
+            // stays in the list even if the server response is slightly stale.
+            const currentSelectedId = useChatStore.getState().selectedChatId;
+            const currentChats = useChatStore.getState().chats;
+            const selectedChat = currentSelectedId ? currentChats.find(c => c._id === currentSelectedId) : null;
+            
+            let finalChats = response.chats;
+            if (selectedChat && !finalChats.find(c => c._id === selectedChat._id)) {
+              finalChats = [selectedChat, ...finalChats];
+            }
+            
+            setChats(finalChats);
           });
         }
       } catch (loadError) {
@@ -407,6 +418,9 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       userName: string;
       isTyping: boolean;
     }) => {
+      if (userId === currentUserId) {
+        return;
+      }
       setTypingState(chatId, isTyping ? { userId, userName } : null);
     };
 
@@ -533,6 +547,10 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       }
     };
 
+    const handleSocketError = (payload: { code: string; message: string }) => {
+      setError(payload.message || "An error occurred. Please try again.");
+    };
+
     socket.on(socketEvents.presenceSync, handlePresenceSync);
     socket.on(socketEvents.userOnline, handleUserOnline);
     socket.on(socketEvents.userOffline, handleUserOffline);
@@ -550,6 +568,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     socket.on(socketEvents.reactionRemoved, handleReactionRemoved);
     socket.on(socketEvents.chatCreated, handleChatCreated);
     socket.on(socketEvents.memberAddedToGroup, handleMemberAddedToGroup);
+    socket.on(socketEvents.socketError, handleSocketError);
 
     return () => {
       socket.off(socketEvents.presenceSync, handlePresenceSync);
@@ -569,6 +588,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       socket.off(socketEvents.reactionRemoved, handleReactionRemoved);
       socket.off(socketEvents.chatCreated, handleChatCreated);
       socket.off(socketEvents.memberAddedToGroup, handleMemberAddedToGroup);
+      socket.off(socketEvents.socketError, handleSocketError);
     };
   }, [
     addNotification,
@@ -603,7 +623,8 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
     try {
       const response = await createChat(token, participantId);
-      upsertChat(response.chat);
+      // Wait for store to update
+      useChatStore.getState().upsertChat(response.chat);
       useChatStore.getState().selectChat(response.chat._id);
       setUserResults([]);
     } catch (createError) {
@@ -814,7 +835,6 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     file,
     content,
     replyToId,
-    waveform,
   }: MediaMessageInput) => {
     if (!token || !selectedChatId || !currentUserId) {
       return;
@@ -823,12 +843,20 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     try {
       failedMediaRef.current = null;
       let fileType: string;
-      if (file.type.startsWith('video/')) {
-        fileType = 'video';
-      } else if (file.type.startsWith('image/')) {
-        fileType = 'image';
+      const mimeType = file.type.toLowerCase();
+      const extension = file.name.split(".").pop()?.toLowerCase() || "";
+      const isImage = mimeType.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(extension);
+      const isVideo = mimeType.startsWith("video/") || ["mp4", "webm", "mov", "ogg"].includes(extension);
+      const isAudio = mimeType.startsWith("audio/") || ["webm", "ogg", "mp3", "wav", "m4a"].includes(extension);
+      
+      if (isImage) {
+        fileType = "image";
+      } else if (isVideo) {
+        fileType = "video";
+      } else if (isAudio) {
+        fileType = "voice";
       } else {
-        fileType = 'file';
+        fileType = "file";
       }
       setMediaTransfer({
         isUploading: true,
@@ -860,7 +888,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       );
       const media = {
         ...uploadResponse.media,
-        waveform: waveform?.length ? waveform : uploadResponse.media.waveform,
+        resourceType: uploadResponse.media.resourceType === "video" ? "raw" : uploadResponse.media.resourceType,
       };
       const type = media.messageType as Exclude<MessageType, "text">;
       const optimisticId = `temp-media-${Date.now()}`;
@@ -934,10 +962,9 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         file,
         content,
         replyToId,
-        waveform,
       };
       setError(message);
-      const errorFileType = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : 'file';
+      const errorFileType = file.type.startsWith('image/') ? 'image' : 'file';
       setMediaTransfer({
         isUploading: false,
         progress: 0,
@@ -1083,16 +1110,14 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       r => r.userId === currentUserId && r.emoji === emoji
     );
 
-    try {
-      const socket = getSocketClient(token);
-      if (hasReacted) {
-        socket.emit(socketEvents.reactionRemoved, { messageId, emoji });
-      } else {
-        socket.emit(socketEvents.reactionAdded, { messageId, emoji });
+    const socket = getSocketClient(token);
+    const eventName = hasReacted ? socketEvents.reactionRemoved : socketEvents.reactionAdded;
+
+    socket.emit(eventName, { messageId, emoji }, (acknowledgement: { ok: boolean; error?: string }) => {
+      if (!acknowledgement?.ok) {
+        setError(acknowledgement.error || "Failed to update reaction");
       }
-    } catch (reactionError) {
-      setError(reactionError instanceof Error ? reactionError.message : "Failed to update reaction");
-    }
+    });
   };
 
   const markSelectedChatRead = async (chatId: string) => {
@@ -1129,6 +1154,9 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     try {
       await deleteChat(token, chatId);
       removeChat(chatId);
+      if (selectedChatId === chatId) {
+        selectChat(null);
+      }
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to remove chat");
     }

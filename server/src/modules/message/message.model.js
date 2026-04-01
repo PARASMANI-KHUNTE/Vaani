@@ -12,7 +12,7 @@ const mediaSchema = new mongoose.Schema(
     },
     resourceType: {
       type: String,
-      enum: ["image", "video", "raw"],
+      enum: ["image", "raw"],
       required: true,
     },
     mimeType: {
@@ -79,7 +79,7 @@ const messageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["text", "image", "video", "voice", "file"],
+      enum: ["text", "image", "file", "video", "voice"],
       default: "text",
     },
     media: {
@@ -136,6 +136,10 @@ const messageSchema = new mongoose.Schema(
       default: null,
     },
     isSystem: {
+      type: Boolean,
+      default: false,
+    },
+    edited: {
       type: Boolean,
       default: false,
     },

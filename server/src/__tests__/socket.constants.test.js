@@ -61,20 +61,6 @@ describe('Socket Constants', () => {
     });
   });
 
-  describe('Call Events', () => {
-    it('should have CALL_USER event', () => {
-      expect(SOCKET_EVENTS.CALL_USER).toBe('CALL_USER');
-    });
-
-    it('should have ACCEPT_CALL event', () => {
-      expect(SOCKET_EVENTS.ACCEPT_CALL).toBe('ACCEPT_CALL');
-    });
-
-    it('should have END_CALL event', () => {
-      expect(SOCKET_EVENTS.END_CALL).toBe('END_CALL');
-    });
-  });
-
   describe('Friend Request Events', () => {
     it('should have FRIEND_REQUEST_RECEIVED event', () => {
       expect(SOCKET_EVENTS.FRIEND_REQUEST_RECEIVED).toBe('FRIEND_REQUEST_RECEIVED');

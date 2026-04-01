@@ -8,6 +8,8 @@ const {
   uploadMediaForMessage,
   addReaction: addReactionToMessage,
   removeReaction: removeReactionFromMessage,
+  editMessage: editMessageService,
+  forwardMessage: forwardMessageService,
 } = require("./message.service");
 
 const getMessages = asyncHandler(async (req, res) => {
@@ -91,6 +93,28 @@ const removeReaction = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Reaction removed successfully", { message });
 });
 
+const editMessage = asyncHandler(async (req, res) => {
+  const message = await editMessageService({
+    messageId: req.params.messageId,
+    chatId: req.body.chatId,
+    currentUserId: req.user._id.toString(),
+    content: req.body.content,
+  });
+
+  return sendSuccess(res, 200, "Message edited successfully", { message });
+});
+
+const forwardMessage = asyncHandler(async (req, res) => {
+  const message = await forwardMessageService({
+    messageId: req.params.messageId,
+    chatId: req.body.chatId,
+    currentUserId: req.user._id.toString(),
+    targetChatId: req.body.targetChatId,
+  });
+
+  return sendSuccess(res, 201, "Message forwarded successfully", { message });
+});
+
 module.exports = {
   getMessages,
   postMessage,
@@ -99,4 +123,6 @@ module.exports = {
   removeReaction,
   createUploadSignature,
   uploadMedia,
+  editMessage,
+  forwardMessage,
 };

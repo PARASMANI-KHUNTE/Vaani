@@ -3,7 +3,6 @@ import {
   acceptMobileFriendRequest,
   blockMobileUser,
   createMobileChat,
-  getMobileCallHistory,
   getMobileExploreUsers,
   getMobileProfile,
   rejectMobileFriendRequest,
@@ -13,7 +12,7 @@ import {
   unfriendMobileUser,
   updateMobileProfile,
 } from "@/lib/api/client";
-import { ChatParticipant, MobileCallHistoryItem, MobileProfile } from "@/lib/types";
+import { ChatParticipant, MobileProfile } from "@/lib/types";
 
 type UseMobileSocialParams = {
   token?: string;
@@ -22,7 +21,6 @@ type UseMobileSocialParams = {
 
 export const useMobileSocial = ({ token, query }: UseMobileSocialParams) => {
   const [profile, setProfile] = useState<MobileProfile | null>(null);
-  const [callHistory, setCallHistory] = useState<MobileCallHistoryItem[]>([]);
   const [directoryUsers, setDirectoryUsers] = useState<ChatParticipant[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
@@ -31,7 +29,6 @@ export const useMobileSocial = ({ token, query }: UseMobileSocialParams) => {
   useEffect(() => {
     if (!token) {
       setProfile(null);
-      setCallHistory([]);
       return;
     }
 
@@ -40,14 +37,10 @@ export const useMobileSocial = ({ token, query }: UseMobileSocialParams) => {
     const loadProfile = async () => {
       try {
         setIsLoadingProfile(true);
-        const [profileResponse, historyResponse] = await Promise.all([
-          getMobileProfile(token),
-          getMobileCallHistory(token, 12),
-        ]);
+        const response = await getMobileProfile(token);
 
         if (active) {
-          setProfile(profileResponse.profile);
-          setCallHistory(historyResponse.history);
+          setProfile(response.profile);
           setError(null);
         }
       } catch (loadError) {
@@ -196,7 +189,6 @@ export const useMobileSocial = ({ token, query }: UseMobileSocialParams) => {
 
   return {
     profile,
-    callHistory,
     directoryUsers,
     isLoadingProfile,
     isLoadingDirectory,

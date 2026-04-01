@@ -1,7 +1,7 @@
 const Chat = require("../chat/chat.model");
-const User = require("../user/user.model");
 const { getChatSummary } = require("../chat/chat.service");
 const logger = require("../../utils/logger");
+const { assertSafeMessageContent } = require("../../utils/contentSafety");
 const {
   createMessage,
   deleteMessage,
@@ -20,20 +20,52 @@ const {
   removeOnlineUser,
 } = require("./socket.service");
 const { sendUserPushNotification } = require("./socket.notifications");
-const { handleCallDisconnect, registerCallHandlers } = require("./call.handler");
+
+const emitToUser = (io, userId, event, data) => {
+  io.to(getUserRoom(userId)).emit(event, data);
+};
 
 const emitPresence = (io, eventName, userId) => {
-  io.emit(eventName, {
-    userId,
+  io.emit(eventName, { userId });
+};
+
+const emitSocketError = (socket, message, code = "UNKNOWN_ERROR") => {
+  socket.emit(SOCKET_EVENTS.ERROR, {
+    code,
+    message,
+    timestamp: new Date().toISOString(),
   });
 };
 
-const emitFriendRequestNotification = (io, targetUserId, payload) => {
-  io.to(getUserRoom(targetUserId)).emit(payload.event, payload.data);
+const handleSocketError = (socket, error, context = "operation") => {
+  logger.error(`Socket error in ${context}`, {
+    userId: socket.user?._id?.toString(),
+    error: error.message,
+    stack: error.stack,
+  });
+
+  let message = "An error occurred. Please try again.";
+  let code = "INTERNAL_ERROR";
+
+  if (error.statusCode === 403 || error.message?.includes("not authorized")) {
+    message = "You don't have permission for this action.";
+    code = "FORBIDDEN";
+  } else if (error.statusCode === 404) {
+    message = "The requested item was not found.";
+    code = "NOT_FOUND";
+  } else if (error.statusCode === 429) {
+    message = "Too many requests. Please slow down.";
+    code = "RATE_LIMITED";
+  } else if (error.message) {
+    message = error.message;
+  }
+
+  emitSocketError(socket, message, code);
 };
 
 const registerSocketHandlers = (io, socket) => {
   const currentUserId = socket.user._id.toString();
+  const currentUserName = socket.user.name;
 
   addOnlineUser(currentUserId, socket.id);
   socket.join(getUserRoom(currentUserId));
@@ -42,11 +74,11 @@ const registerSocketHandlers = (io, socket) => {
     onlineUserIds: getOnlineUserIds(),
   });
   emitPresence(io, SOCKET_EVENTS.USER_ONLINE, currentUserId);
-  registerCallHandlers(io, socket);
 
   socket.on(SOCKET_EVENTS.JOIN_CHAT, async ({ chatId }) => {
     try {
       if (!chatId) {
+        emitSocketError(socket, "chatId is required", "INVALID_PAYLOAD");
         return;
       }
 
@@ -56,6 +88,8 @@ const registerSocketHandlers = (io, socket) => {
       }).lean();
 
       if (!chat) {
+        logger.warn(`User ${currentUserId} attempted to join unauthorized chat ${chatId}`);
+        emitSocketError(socket, "Chat not found or access denied", "CHAT_NOT_FOUND");
         return;
       }
 
@@ -73,22 +107,22 @@ const registerSocketHandlers = (io, socket) => {
           .map((participantId) => participantId.toString())
           .filter((participantId) => participantId !== currentUserId)
           .forEach((participantId) => {
-            io.to(getUserRoom(participantId)).emit(SOCKET_EVENTS.MESSAGE_SEEN, {
+            emitToUser(io, participantId, SOCKET_EVENTS.MESSAGE_SEEN, {
               chatId,
               seenByUserId: currentUserId,
               count: seenCount,
             });
-            io.to(getUserRoom(participantId)).emit(SOCKET_EVENTS.CHAT_UPDATED, {
+            emitToUser(io, participantId, SOCKET_EVENTS.CHAT_UPDATED, {
               chat: updatedChat,
             });
           });
 
-        io.to(getUserRoom(currentUserId)).emit(SOCKET_EVENTS.CHAT_UPDATED, {
+        emitToUser(io, currentUserId, SOCKET_EVENTS.CHAT_UPDATED, {
           chat: updatedChat,
         });
       }
     } catch (error) {
-      logger.error("JOIN_CHAT failed", { error: error.message, stack: error.stack });
+      handleSocketError(socket, error, "JOIN_CHAT");
     }
   });
 
@@ -97,22 +131,45 @@ const registerSocketHandlers = (io, socket) => {
       const { chatId, content = "", type = "text", media = null, clientTempId, replyToId = null } = payload || {};
 
       if (!chatId) {
-        throw new Error("chatId is required");
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "chatId is required" });
+        }
+        return;
+      }
+
+      const trimmedContent = (content || "").trim();
+      if (type === "text" && !trimmedContent && !media) {
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "Message content cannot be empty" });
+        }
+        return;
+      }
+
+      if (trimmedContent) {
+        assertSafeMessageContent(trimmedContent);
       }
 
       let message = await createMessage({
         chatId,
         senderId: currentUserId,
-        content,
+        content: trimmedContent,
         type,
         replyToId,
         media,
       });
 
       const chat = await Chat.findById(chatId).lean();
+      if (!chat || !chat.participants.some((p) => p.toString() === currentUserId)) {
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "Chat not found or access denied" });
+        }
+        return;
+      }
+
       const participantIds = chat.participants.map((participantId) => participantId.toString());
       const receiverIds = participantIds.filter((participantId) => participantId !== currentUserId);
       const deliveredToOnlineUser = receiverIds.some((participantId) => isUserOnline(participantId));
+
       if (deliveredToOnlineUser && message.status === "sent") {
         message = await markMessageAsDelivered({
           messageId: message._id,
@@ -122,17 +179,16 @@ const registerSocketHandlers = (io, socket) => {
       await Promise.all(
         participantIds.map(async (participantId) => {
           const chatSummary = await getChatSummary(chatId, participantId);
-
-        io.to(getUserRoom(participantId)).emit(SOCKET_EVENTS.NEW_MESSAGE, {
-          message,
-          chat: chatSummary,
-          clientTempId: participantId === currentUserId ? clientTempId : undefined,
-        });
+          emitToUser(io, participantId, SOCKET_EVENTS.NEW_MESSAGE, {
+            message,
+            chat: chatSummary,
+            clientTempId: participantId === currentUserId ? clientTempId : undefined,
+          });
         })
       );
 
       if (deliveredToOnlineUser) {
-        io.to(getUserRoom(currentUserId)).emit(SOCKET_EVENTS.MESSAGE_DELIVERED, {
+        emitToUser(io, currentUserId, SOCKET_EVENTS.MESSAGE_DELIVERED, {
           chatId,
           messageId: message._id,
         });
@@ -143,11 +199,8 @@ const registerSocketHandlers = (io, socket) => {
           .filter((participantId) => !isUserOnline(participantId))
           .map((participantId) =>
             sendUserPushNotification(participantId, {
-              title: socket.user.name,
-              body:
-                type === "text"
-                  ? content || "Sent you a message"
-                  : `Sent a ${type === "voice" ? "voice note" : type} message`,
+              title: currentUserName,
+              body: type === "text" ? trimmedContent || "Sent you a message" : `Sent a ${type === "voice" ? "voice note" : type} message`,
               data: {
                 kind: "message",
                 chatId,
@@ -158,17 +211,12 @@ const registerSocketHandlers = (io, socket) => {
       );
 
       if (typeof acknowledgement === "function") {
-        acknowledgement({
-          ok: true,
-          messageId: message._id,
-        });
+        acknowledgement({ ok: true, messageId: message._id });
       }
     } catch (error) {
+      logger.error("SEND_MESSAGE failed", { userId: currentUserId, error: error.message });
       if (typeof acknowledgement === "function") {
-        acknowledgement({
-          ok: false,
-          error: error.message || "Failed to send message",
-        });
+        acknowledgement({ ok: false, error: error.message || "Failed to send message" });
       }
     }
   });
@@ -178,7 +226,10 @@ const registerSocketHandlers = (io, socket) => {
       const { messageId, scope } = payload || {};
 
       if (!messageId || !scope) {
-        throw new Error("messageId and scope are required");
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "messageId and scope are required" });
+        }
+        return;
       }
 
       const result = await deleteMessage({
@@ -187,18 +238,18 @@ const registerSocketHandlers = (io, socket) => {
         scope,
       });
 
-      if (scope === "everyone") {
-        const chatId = result.message.chatId.toString();
-        const chat = await Chat.findById(chatId).lean();
+      const chat = await Chat.findById(result.message.chatId).lean();
+
+      if (scope === "everyone" && chat) {
         chat.participants.forEach((participantId) => {
-          io.to(getUserRoom(participantId.toString())).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
+          emitToUser(io, participantId.toString(), SOCKET_EVENTS.MESSAGE_DELETED, {
             scope,
             message: result.message,
-            chatId,
+            chatId: result.message.chatId.toString(),
           });
         });
       } else {
-        io.to(getUserRoom(currentUserId)).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
+        emitToUser(io, currentUserId, SOCKET_EVENTS.MESSAGE_DELETED, {
           scope,
           messageId: result.messageId,
           chatId: result.chatId,
@@ -209,11 +260,9 @@ const registerSocketHandlers = (io, socket) => {
         acknowledgement({ ok: true });
       }
     } catch (error) {
+      logger.error("DELETE_MESSAGE failed", { userId: currentUserId, error: error.message });
       if (typeof acknowledgement === "function") {
-        acknowledgement({
-          ok: false,
-          error: error.message || "Failed to delete message",
-        });
+        acknowledgement({ ok: false, error: error.message || "Failed to delete message" });
       }
     }
   });
@@ -223,7 +272,10 @@ const registerSocketHandlers = (io, socket) => {
       const { messageId, emoji } = payload || {};
 
       if (!messageId || !emoji) {
-        throw new Error("messageId and emoji are required");
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "messageId and emoji are required" });
+        }
+        return;
       }
 
       const message = await addReaction({
@@ -233,19 +285,22 @@ const registerSocketHandlers = (io, socket) => {
       });
 
       const chat = await Chat.findById(message.chatId).lean();
-      chat.participants.forEach((participantId) => {
-        io.to(getUserRoom(participantId.toString())).emit(SOCKET_EVENTS.REACTION_ADDED, {
-          message,
-          userId: currentUserId,
-          userName: socket.user.name,
-          emoji,
+      if (chat) {
+        chat.participants.forEach((participantId) => {
+          emitToUser(io, participantId.toString(), SOCKET_EVENTS.REACTION_ADDED, {
+            message,
+            userId: currentUserId,
+            userName: currentUserName,
+            emoji,
+          });
         });
-      });
+      }
 
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: true, message });
       }
     } catch (error) {
+      logger.error("REACTION_ADDED failed", { userId: currentUserId, error: error.message });
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: false, error: error.message || "Failed to add reaction" });
       }
@@ -257,7 +312,10 @@ const registerSocketHandlers = (io, socket) => {
       const { messageId, emoji } = payload || {};
 
       if (!messageId || !emoji) {
-        throw new Error("messageId and emoji are required");
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "messageId and emoji are required" });
+        }
+        return;
       }
 
       const message = await removeReaction({
@@ -267,18 +325,21 @@ const registerSocketHandlers = (io, socket) => {
       });
 
       const chat = await Chat.findById(message.chatId).lean();
-      chat.participants.forEach((participantId) => {
-        io.to(getUserRoom(participantId.toString())).emit(SOCKET_EVENTS.REACTION_REMOVED, {
-          message,
-          userId: currentUserId,
-          emoji,
+      if (chat) {
+        chat.participants.forEach((participantId) => {
+          emitToUser(io, participantId.toString(), SOCKET_EVENTS.REACTION_REMOVED, {
+            message,
+            userId: currentUserId,
+            emoji,
+          });
         });
-      });
+      }
 
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: true, message });
       }
     } catch (error) {
+      logger.error("REACTION_REMOVED failed", { userId: currentUserId, error: error.message });
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: false, error: error.message || "Failed to remove reaction" });
       }
@@ -303,11 +364,11 @@ const registerSocketHandlers = (io, socket) => {
       socket.to(getChatRoom(chatId)).emit(SOCKET_EVENTS.TYPING, {
         chatId,
         userId: currentUserId,
-        userName: socket.user.name,
+        userName: currentUserName,
         isTyping: true,
       });
     } catch (error) {
-      logger.error("TYPING failed", { error: error.message, stack: error.stack });
+      logger.error("TYPING failed", { userId: currentUserId, error: error.message });
     }
   });
 
@@ -326,24 +387,28 @@ const registerSocketHandlers = (io, socket) => {
         return;
       }
 
-      socket.to(getChatRoom(chatId)).emit(SOCKET_EVENTS.TYPING, {
+      socket.to(getChatRoom(chatId)).emit(SOCKET_EVENTS.STOP_TYPING, {
         chatId,
         userId: currentUserId,
-        userName: socket.user.name,
+        userName: currentUserName,
         isTyping: false,
       });
     } catch (error) {
-      logger.error("STOP_TYPING failed", { error: error.message, stack: error.stack });
+      logger.error("STOP_TYPING failed", { userId: currentUserId, error: error.message });
     }
   });
 
   socket.on("disconnect", () => {
     const becameOffline = removeOnlineUser(currentUserId, socket.id);
-    handleCallDisconnect(io, currentUserId);
 
     if (becameOffline) {
       emitPresence(io, SOCKET_EVENTS.USER_OFFLINE, currentUserId);
     }
+  });
+
+  socket.on("error", (error) => {
+    logger.error("Socket error", { userId: currentUserId, error: error.message });
+    emitSocketError(socket, "Connection error occurred", "CONNECTION_ERROR");
   });
 };
 

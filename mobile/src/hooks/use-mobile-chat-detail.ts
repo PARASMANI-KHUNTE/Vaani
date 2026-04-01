@@ -6,10 +6,11 @@ import { MobileChat, MobileMessage } from "@/lib/types";
 
 type UseMobileChatDetailParams = {
   token?: string;
+  userId?: string;
   chat: MobileChat | null;
 };
 
-export const useMobileChatDetail = ({ token, chat }: UseMobileChatDetailParams) => {
+export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetailParams) => {
   const [messages, setMessages] = useState<MobileMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -181,7 +182,7 @@ export const useMobileChatDetail = ({ token, chat }: UseMobileChatDetailParams) 
     const optimisticMessage: MobileMessage = {
       _id: tempId,
       chatId: chat._id,
-      senderId: token,
+      senderId: userId || "",
       content: content.trim(),
       type: "text",
       status: "sent",
@@ -198,23 +199,46 @@ export const useMobileChatDetail = ({ token, chat }: UseMobileChatDetailParams) 
 
     try {
       setIsSending(true);
-      const response = await postMobileMessage(token, {
-        chatId: chat._id,
-        content: content.trim(),
-        replyToId: replyToId || null,
-      });
-
-      setMessages((current) => {
-        return current.map((msg) =>
-          msg._id === tempId ? response.message : msg
+      const socket = getMobileSocket(token);
+      
+      return new Promise<void>((resolve) => {
+        socket.emit(
+          mobileSocketEvents.sendMessage,
+          {
+            chatId: chat._id,
+            content: content.trim(),
+            type: "text",
+            replyToId: replyToId || null,
+            clientTempId: tempId,
+          },
+          (acknowledgement: { ok: boolean; error?: string }) => {
+            if (!acknowledgement?.ok) {
+              throw new Error(acknowledgement.error || "Failed to send message");
+            }
+            resolve();
+          }
         );
       });
-      setError(null);
-    } catch (sendError) {
-      setMessages((current) => current.filter((msg) => msg._id !== tempId));
-      setError(sendError instanceof Error ? sendError.message : "Failed to send message");
-    } finally {
-      setIsSending(false);
+    } catch {
+      try {
+        const response = await postMobileMessage(token, {
+          chatId: chat._id,
+          content: content.trim(),
+          replyToId: replyToId || null,
+        });
+
+        setMessages((current) => {
+          return current.map((msg) =>
+            msg._id === tempId ? response.message : msg
+          );
+        });
+        setError(null);
+      } catch (fallbackError) {
+        setMessages((current) => current.filter((msg) => msg._id !== tempId));
+        setError(fallbackError instanceof Error ? fallbackError.message : "Failed to send message");
+      } finally {
+        setIsSending(false);
+      }
     }
   };
 

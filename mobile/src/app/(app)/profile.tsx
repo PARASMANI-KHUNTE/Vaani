@@ -10,7 +10,7 @@ export default function ProfileScreen() {
   const session = useSessionStore((state) => state.session);
   const clearSession = useSessionStore((state) => state.clearSession);
   const token = useSessionStore((state) => state.session?.accessToken);
-  const { profile, callHistory, saveProfile, isLoadingProfile, error } = useMobileSocial({ token });
+  const { profile, saveProfile, isLoadingProfile, error } = useMobileSocial({ token });
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [bio, setBio] = useState("");
@@ -22,19 +22,11 @@ export default function ProfileScreen() {
     setBio(profile.bio || "");
   }, [profile]);
 
-  const formatDuration = (durationSeconds: number) => {
-    if (!durationSeconds) return "0m";
-    const mins = Math.floor(durationSeconds / 60);
-    const secs = durationSeconds % 60;
-    if (!mins) return `${secs}s`;
-    return secs ? `${mins}m ${secs}s` : `${mins}m`;
-  };
-
   return (
     <ScreenShell
       eyebrow="Profile"
       title={profile?.name || session?.user?.name || "Your profile"}
-      subtitle={error || "Edit your profile and review recent audio/video calls from the Android app."}
+      subtitle={error || "Edit your profile information below."}
     >
       <ScrollView contentContainerStyle={styles.stack}>
         <View style={styles.card}>
@@ -67,24 +59,6 @@ export default function ProfileScreen() {
           <Pressable style={styles.primaryButton} onPress={() => void saveProfile({ name, tagline, bio })}>
             <Text style={styles.primaryButtonText}>{isLoadingProfile ? "Saving..." : "Save profile"}</Text>
           </Pressable>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Recent calls</Text>
-          {callHistory.length === 0 ? (
-            <Text style={styles.listItem}>Call history will appear here once you start using audio or video calls.</Text>
-          ) : (
-            callHistory.map((entry) => (
-              <View key={entry._id} style={styles.historyItem}>
-                <Text style={styles.historyTitle}>
-                  {entry.otherUser?.name || "Unknown"} • {entry.direction} {entry.callType}
-                </Text>
-                <Text style={styles.historyMeta}>
-                  {entry.status} • {formatDuration(entry.durationSeconds)}
-                </Text>
-              </View>
-            ))
-          )}
         </View>
 
         <View style={styles.card}>
@@ -167,27 +141,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "700",
-  },
-  listItem: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#475569",
-  },
-  historyItem: {
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    padding: 12,
-    marginTop: 8,
-  },
-  historyTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  historyMeta: {
-    marginTop: 4,
-    fontSize: 12,
-    color: "#64748b",
   },
   signOutButton: {
     borderRadius: 999,

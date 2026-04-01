@@ -15,76 +15,12 @@ export type BackendUser = {
   hasBlocked?: boolean;
 };
 
-export type MessageType = "text" | "image" | "video" | "voice" | "file";
-export type CallType = "audio" | "video";
-export type CallStatus = "idle" | "calling" | "ringing" | "connecting" | "connected" | "ended";
-
-export type CallPeerUser = {
-  _id: string;
-  name: string;
-  avatar: string | null;
-  username?: string;
-};
-
-export type CallSession = {
-  callId: string;
-  chatId: string;
-  callType: CallType;
-  callerId: string;
-  receiverId: string;
-  status: "pending" | "active";
-  createdAt: string;
-  acceptedAt: string | null;
-  caller: CallPeerUser;
-  receiver: CallPeerUser;
-  reason?: string;
-  endedByUserId?: string;
-};
-
-export type GroupCallParticipantState = {
-  userId: string;
-  name: string;
-  avatar: string | null;
-  username?: string;
-  joinedAt: string | null;
-  leftAt: string | null;
-  isMuted: boolean;
-  isVideoOn: boolean;
-  isSpeaking: boolean;
-  connectionState: "invited" | "connected" | "left" | "disconnected" | string;
-};
-
-export type GroupCallSession = {
-  callId: string;
-  chatId: string;
-  callType: CallType;
-  startedBy: string;
-  startedAt: string;
-  endedAt: string | null;
-  status: "active" | "ended" | "failed";
-  participants: GroupCallParticipantState[];
-  activeSpeakerUserId: string | null;
-};
-
-export type CallHistoryItem = {
-  _id: string;
-  callId: string;
-  chatId: string;
-  callType: CallType;
-  status: "missed" | "rejected" | "completed" | "cancelled" | "failed";
-  endedReason: "rejected" | "ended" | "timeout" | "disconnected" | "busy" | "failed";
-  startedAt: string;
-  answeredAt: string | null;
-  endedAt: string;
-  durationSeconds: number;
-  direction: "incoming" | "outgoing";
-  otherUser: CallPeerUser | null;
-};
+export type MessageType = "text" | "image" | "file" | "video" | "voice";
 
 export type MediaAttachment = {
   url: string;
   publicId: string;
-  resourceType: "image" | "video" | "raw";
+  resourceType: "image" | "raw";
   mimeType?: string | null;
   originalName?: string | null;
   format?: string | null;
@@ -151,6 +87,7 @@ export type Message = {
     metadata?: Record<string, unknown> | null;
   } | null;
   optimistic?: boolean;
+  edited?: boolean;
 };
 
 export type SocketNewMessagePayload = {
@@ -175,11 +112,6 @@ export type NotificationItem = {
     username?: string;
     avatar?: string | null;
   };
-};
-
-export type CallConfiguration = {
-  iceServers: RTCIceServer[];
-  callTimeoutMs: number;
 };
 
 export type UserProfile = BackendUser & {

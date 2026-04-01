@@ -34,8 +34,40 @@ const groupMutationRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const uploadRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: {
+    success: false,
+    message: "Too many uploads. Please wait before uploading again.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const userId = req.user?._id?.toString();
+    return userId || ipKeyGenerator(req.ip || req.headers["x-forwarded-for"] || "unknown");
+  },
+});
+
+const messageRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: {
+    success: false,
+    message: "Too many messages sent. Please slow down.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const userId = req.user?._id?.toString();
+    return userId || ipKeyGenerator(req.ip || req.headers["x-forwarded-for"] || "unknown");
+  },
+});
+
 module.exports = {
   authRateLimiter,
   apiRateLimiter,
   groupMutationRateLimiter,
+  uploadRateLimiter,
+  messageRateLimiter,
 };

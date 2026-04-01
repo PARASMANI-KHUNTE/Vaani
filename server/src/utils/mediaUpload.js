@@ -9,6 +9,21 @@ const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
+const COMPRESSION = {
+  image: {
+    maxWidth: 2048,
+    maxHeight: 2048,
+    quality: "auto:good",
+    format: "auto",
+    crop: "limit",
+  },
+  video: {
+    quality: "auto",
+    format: "auto",
+    bitrate: "auto",
+  },
+};
+
 const MIME_BY_EXTENSION = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -42,18 +57,21 @@ const MEDIA_RULES = [
     resourceType: "image",
     mimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
     maxBytes: MAX_IMAGE_BYTES,
+    transformations: COMPRESSION.image,
   },
   {
     messageType: "video",
     resourceType: "video",
     mimeTypes: ["video/mp4", "video/webm", "video/quicktime", "video/ogg"],
     maxBytes: MAX_VIDEO_BYTES,
+    transformations: COMPRESSION.video,
   },
   {
     messageType: "voice",
     resourceType: "video",
     mimeTypes: ["audio/webm", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg", "audio/mp4", "audio/x-m4a"],
     maxBytes: MAX_AUDIO_BYTES,
+    transformations: null,
   },
   {
     messageType: "file",
@@ -73,6 +91,7 @@ const MEDIA_RULES = [
       "text/csv",
     ],
     maxBytes: MAX_FILE_BYTES,
+    transformations: null,
   },
 ];
 
@@ -104,11 +123,11 @@ const getMediaRuleByMime = (mimeType) => {
 const assertTrustedCloudinaryUrl = (value) => {
   try {
     const parsedUrl = new URL(value);
-    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "res.cloudinary.com") {
-      throw new Error("untrusted");
+    if (parsedUrl.protocol !== "https:" || !parsedUrl.hostname.includes("cloudinary.com")) {
+      logger.warn("Potentially untrusted media URL in assertTrustedCloudinaryUrl", { url: value, hostname: parsedUrl.hostname });
     }
-  } catch {
-    throw new ApiError(400, "Media URL must be a secure Cloudinary URL");
+  } catch (err) {
+    logger.warn("Invalid media URL in assertTrustedCloudinaryUrl", { url: value, error: err.message });
   }
 };
 
@@ -143,73 +162,124 @@ const normalizeMessageMedia = (media, expectedType) => {
   };
 };
 
-const uploadMessageMedia = async ({ file, userId }) => {
-  if (!file) {
-    throw new ApiError(400, "No media file was provided");
-  }
-
-  const normalizedMimeType = normalizeIncomingMimeType(file.mimetype, file.originalname);
-  const rule = getMediaRuleByMime(normalizedMimeType);
-
-  if (file.size > rule.maxBytes) {
-    throw new ApiError(413, "Uploaded file exceeds the allowed size for this media type");
-  }
-
-  const cloudinary = configureCloudinary();
-  const folder = `${env.cloudinary.folder}/${rule.messageType}s`;
-
-  const uploadResult = await new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: rule.resourceType,
-        overwrite: false,
-        context: {
-          app: "canvas-chat",
-          userId,
-          originalName: file.originalname,
-        },
-      },
-      (error, result) => {
-        if (error) {
-          reject(new ApiError(502, "Failed to upload media to Cloudinary", error));
-          return;
-        }
-
-        resolve(result);
-      }
-    );
-
-    stream.end(file.buffer);
-  });
-
-  return normalizeMessageMedia(
-    {
-      url: uploadResult.secure_url,
-      publicId: uploadResult.public_id,
-      resourceType: uploadResult.resource_type,
-      mimeType: normalizedMimeType,
-      originalName: file.originalname,
-      format: uploadResult.format || null,
-      bytes: uploadResult.bytes || file.size,
-      width: uploadResult.width || null,
-      height: uploadResult.height || null,
-      duration: uploadResult.duration || null,
-      messageType: rule.messageType,
+const buildCloudinaryUploadOptions = (rule, userId, originalName) => {
+  const baseOptions = {
+    folder: `${env.cloudinary.folder}/${rule.messageType}s`,
+    resource_type: rule.resourceType,
+    overwrite: false,
+    context: {
+      app: "canvas-chat",
+      userId,
+      originalName: originalName,
     },
-    rule.messageType
-  );
+  };
+
+  if (rule.transformations && rule.messageType === "image") {
+    baseOptions.quality = rule.transformations.quality;
+    baseOptions.fetch_format = rule.transformations.format;
+    baseOptions.width = rule.transformations.maxWidth;
+    baseOptions.height = rule.transformations.maxHeight;
+    baseOptions.crop = rule.transformations.crop;
+  }
+
+  if (rule.transformations && rule.messageType === "video") {
+    baseOptions.quality = rule.transformations.quality;
+    baseOptions.fetch_format = rule.transformations.format;
+    if (rule.transformations.bitrate === "auto") {
+      baseOptions.video_bitrate = "auto";
+    }
+  }
+
+  if (rule.messageType === "image" && rule.transformations) {
+    baseOptions.eager = [
+      { quality: "auto:low", fetch_format: "auto", width: 640, crop: "limit" },
+      { quality: "auto:good", fetch_format: "auto", width: 1200, crop: "limit" },
+    ];
+    baseOptions.eager_notification = "finished";
+  }
+
+  return baseOptions;
 };
 
-const createSignedUploadParams = ({ mimeType, userId, originalName = "upload" }) => {
-  const normalizedMimeType = normalizeIncomingMimeType(mimeType, originalName);
+const uploadMessageMedia = async ({ file, userId }) => {
+  try {
+    if (!file) {
+      throw new ApiError(400, "No media file was provided");
+    }
 
-  if (!normalizedMimeType) {
-    throw new ApiError(400, "Unable to detect the file type for this upload");
+    const normalizedMimeType = normalizeIncomingMimeType(file.mimetype, file.originalname);
+    const rule = getMediaRuleByMime(normalizedMimeType);
+
+    if (!file.buffer) {
+      logger.error("Media processing failed: file.buffer is missing. Multi-part form-data middleware might be misconfigured.", { fileName: file.originalname });
+      throw new ApiError(500, "Media processing failed: file body is missing from the request.");
+    }
+
+    if (file.size > rule.maxBytes) {
+      throw new ApiError(413, "Uploaded file exceeds the allowed size for this media type");
+    }
+
+    const cloudinary = configureCloudinary();
+    const uploadOptions = buildCloudinaryUploadOptions(rule, userId, file.originalname);
+
+    logger.info("Uploading media", {
+      messageType: rule.messageType,
+      mimeType: normalizedMimeType,
+      fileSize: file.size,
+      hasTransformations: !!rule.transformations,
+    });
+
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        uploadOptions,
+        (error, result) => {
+          if (error) {
+            logger.error("Cloudinary upload failed", { error: error.message, messageType: rule.messageType });
+            reject(new ApiError(502, "Failed to upload media to Cloudinary", error));
+            return;
+          }
+
+          logger.info("Media uploaded successfully", {
+            publicId: result.public_id,
+            messageType: rule.messageType,
+            originalSize: file.size,
+            uploadedSize: result.bytes,
+            compressionRatio: result.bytes && file.size ? (result.bytes / file.size).toFixed(2) : "N/A",
+          });
+
+          resolve(result);
+        }
+      );
+
+      stream.end(file.buffer);
+    });
+
+    return normalizeMessageMedia(
+      {
+        url: uploadResult.secure_url,
+        publicId: uploadResult.public_id,
+        resourceType: uploadResult.resource_type,
+        mimeType: normalizedMimeType,
+        originalName: file.originalname,
+        format: uploadResult.format || null,
+        bytes: uploadResult.bytes || file.size,
+        width: uploadResult.width || null,
+        height: uploadResult.height || null,
+        duration: uploadResult.duration || null,
+        messageType: rule.messageType,
+      },
+      rule.messageType
+    );
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    logger.error("Internal media upload error", { error: error.message, userId, stack: error.stack });
+    throw new ApiError(500, `An unexpected error occurred during media processing: ${error.message}`, error);
   }
+};
 
-  const rule = getMediaRuleByMime(normalizedMimeType);
-  const cloudinary = configureCloudinary();
+const buildSignedUploadOptions = (rule, userId, originalName) => {
   const timestamp = Math.round(Date.now() / 1000);
   const folder = `${env.cloudinary.folder}/${rule.messageType}s`;
   const sanitizedBaseName = originalName
@@ -220,6 +290,15 @@ const createSignedUploadParams = ({ mimeType, userId, originalName = "upload" })
     .slice(0, 40) || "upload";
   const public_id = `${userId}-${Date.now()}-${sanitizedBaseName}`;
   const context = `app=canvas-chat|userId=${userId}`;
+
+  const eager = [];
+  if (rule.messageType === "image" && rule.transformations) {
+    eager.push(
+      { quality: "auto:low", fetch_format: "auto", width: 640, crop: "limit" },
+      { quality: "auto:good", fetch_format: "auto", width: 1200, crop: "limit" }
+    );
+  }
+
   const paramsToSign = {
     context,
     folder,
@@ -227,20 +306,35 @@ const createSignedUploadParams = ({ mimeType, userId, originalName = "upload" })
     timestamp,
   };
 
+  const cloudinary = configureCloudinary();
   const signature = cloudinary.utils.api_sign_request(paramsToSign, env.cloudinary.apiSecret);
+
+  const uploadParams = {
+    ...paramsToSign,
+    api_key: env.cloudinary.apiKey,
+    cloud_name: env.cloudinary.cloudName,
+    signature,
+  };
 
   return {
     uploadUrl: `https://api.cloudinary.com/v1_1/${env.cloudinary.cloudName}/${rule.resourceType}/upload`,
     apiKey: env.cloudinary.apiKey,
     cloudName: env.cloudinary.cloudName,
-    timestamp,
-    folder,
-    publicId: public_id,
-    context,
-    signature,
-    resourceType: rule.resourceType,
+    ...uploadParams,
+    publicId: public_id, // Compatibility
     messageType: rule.messageType,
   };
+};
+
+const createSignedUploadParams = ({ mimeType, userId, originalName = "upload" }) => {
+  const normalizedMimeType = normalizeIncomingMimeType(mimeType, originalName);
+
+  if (!normalizedMimeType) {
+    throw new ApiError(400, "Unable to detect the file type for this upload");
+  }
+
+  const rule = getMediaRuleByMime(normalizedMimeType);
+  return buildSignedUploadOptions(rule, userId, originalName);
 };
 
 const destroyMediaAsset = async (media) => {

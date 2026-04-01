@@ -27,6 +27,75 @@ const visibleMessageFilter = (userId) => ({
   deletedFor: { $ne: userId },
 });
 
+const editMessage = async ({ messageId, chatId, currentUserId, content }) => {
+  const chat = await ensureChatMember(chatId, currentUserId);
+
+  const message = await Message.findOne({
+    _id: messageId,
+    chatId,
+    senderId: currentUserId,
+    deletedForEveryone: false,
+    deletedFor: { $ne: currentUserId },
+  });
+
+  if (!message) {
+    throw new ApiError(404, "Message not found or you don't have permission to edit it");
+  }
+
+  if (message.type !== "text") {
+    throw new ApiError(400, "Only text messages can be edited");
+  }
+
+  const safeContent = assertSafeMessageContent(content.trim());
+  if (!safeContent) {
+    throw new ApiError(400, "Message content cannot be empty");
+  }
+
+  message.content = safeContent;
+  message.edited = true;
+  await message.save();
+
+  return Message.findById(message._id)
+    .populate(basePopulate)
+    .lean();
+};
+
+const forwardMessage = async ({ messageId, chatId, currentUserId, targetChatId }) => {
+  const sourceChat = await ensureChatMember(chatId, currentUserId);
+  const targetChat = await ensureChatMember(targetChatId, currentUserId);
+
+  const message = await Message.findOne({
+    _id: messageId,
+    chatId,
+    deletedForEveryone: false,
+    deletedFor: { $ne: currentUserId },
+  }).populate(basePopulate).lean();
+
+  if (!message) {
+    throw new ApiError(404, "Message not found");
+  }
+
+  const forwardedContent = message.content
+    ? `${message.content}`
+    : `Forwarded ${message.type}`;
+
+  const forwarded = await Message.create({
+    chatId: targetChatId,
+    senderId: currentUserId,
+    content: forwardedContent,
+    type: message.type,
+    media: message.media,
+    replyTo: null,
+    status: "sent",
+    deletedForEveryone: false,
+    deletedFor: [],
+  });
+
+  return Message.findById(forwarded._id)
+    .populate(basePopulate)
+    .lean();
+};
+
 const getChatUserState = (chat, userId) =>
   (chat.userStates || []).find((entry) => entry.userId?.toString() === userId?.toString()) || null;
 

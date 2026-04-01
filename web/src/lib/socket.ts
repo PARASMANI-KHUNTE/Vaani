@@ -8,19 +8,6 @@ export const socketEvents = {
   typing: "TYPING",
   stopTyping: "STOP_TYPING",
   deleteMessage: "DELETE_MESSAGE",
-  callUser: "CALL_USER",
-  acceptCall: "ACCEPT_CALL",
-  rejectCall: "REJECT_CALL",
-  offer: "OFFER",
-  answer: "ANSWER",
-  iceCandidate: "ICE_CANDIDATE",
-  endCall: "END_CALL",
-  groupCallStart: "GROUP_CALL_START",
-  groupCallJoin: "GROUP_CALL_JOIN",
-  groupCallLeave: "GROUP_CALL_LEAVE",
-  groupCallEnd: "GROUP_CALL_END",
-  groupCallSignal: "GROUP_CALL_SIGNAL",
-  groupCallStateUpdate: "GROUP_CALL_STATE_UPDATE",
   newMessage: "NEW_MESSAGE",
   messageDelivered: "MESSAGE_DELIVERED",
   messageSeen: "MESSAGE_SEEN",
@@ -28,14 +15,6 @@ export const socketEvents = {
   chatUpdated: "CHAT_UPDATED",
   chatRemoved: "CHAT_REMOVED",
   chatCreated: "CHAT_CREATED",
-  incomingCall: "INCOMING_CALL",
-  callAccepted: "CALL_ACCEPTED",
-  callRejected: "CALL_REJECTED",
-  callEnded: "CALL_ENDED",
-  groupCallStarted: "GROUP_CALL_STARTED",
-  groupCallParticipantsUpdated: "GROUP_CALL_PARTICIPANTS_UPDATED",
-  groupCallSignalled: "GROUP_CALL_SIGNALLED",
-  groupCallEnded: "GROUP_CALL_ENDED",
   userOnline: "USER_ONLINE",
   userOffline: "USER_OFFLINE",
   presenceSync: "PRESENCE_SYNC",
@@ -45,7 +24,14 @@ export const socketEvents = {
   reactionAdded: "REACTION_ADDED",
   reactionRemoved: "REACTION_REMOVED",
   memberAddedToGroup: "MEMBER_ADDED_TO_GROUP",
+  socketError: "SOCKET_ERROR",
 } as const;
+
+export type SocketErrorPayload = {
+  code: string;
+  message: string;
+  timestamp: string;
+};
 
 export const getSocketClient = (token: string) => {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -54,6 +40,10 @@ export const getSocketClient = (token: string) => {
     socketInstance = io(apiUrl, {
       autoConnect: false,
       transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
   }
 

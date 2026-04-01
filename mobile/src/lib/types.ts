@@ -34,7 +34,7 @@ export type MobileChat = {
   lastMessage:
     | {
         content?: string;
-        type: "text" | "image" | "video" | "voice" | "file";
+        type: "text" | "image" | "file";
         createdAt: string;
       }
     | null;
@@ -56,7 +56,7 @@ export type MobileMessage = {
         avatar?: string | null;
       };
   content: string;
-  type: "text" | "image" | "video" | "voice" | "file";
+  type: "text" | "image" | "file";
   status: "sent" | "delivered" | "seen";
   createdAt: string;
   deliveredAt?: string;
@@ -68,7 +68,6 @@ export type MobileMessage = {
     publicId?: string;
     mimeType?: string;
     fileSize?: number;
-    duration?: number;
   };
   replyTo?: {
     _id: string;
@@ -96,20 +95,6 @@ export type MobileProfile = {
   hasBlocked: boolean;
 };
 
-export type MobileCallHistoryItem = {
-  _id: string;
-  callId: string;
-  chatId: string;
-  callType: "audio" | "video";
-  status: "missed" | "rejected" | "completed" | "cancelled" | "failed";
-  endedReason: "rejected" | "ended" | "timeout" | "disconnected" | "busy" | "failed";
-  startedAt: string;
-  answeredAt: string | null;
-  endedAt: string;
-  durationSeconds: number;
-  direction: "incoming" | "outgoing";
-  otherUser: ChatParticipant | null;
-};
 
 export type MobileNotificationItem = {
   id: string;
@@ -119,7 +104,7 @@ export type MobileNotificationItem = {
   chatId?: string;
   userId?: string;
   read: boolean;
-  kind: "message" | "presence" | "friend_request" | "call" | "reaction";
+  kind: "message" | "presence" | "friend_request" | "reaction";
   action?: "received" | "accepted" | "rejected";
   fromUser?: {
     _id: string;

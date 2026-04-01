@@ -1,5 +1,5 @@
-const STORAGE_KEY = "vaani-web-session";
-const USE_SESSION_ONLY_KEY = "vaani-session-mode";
+const STORAGE_KEY = "linkup-web-session";
+const USE_SESSION_ONLY_KEY = "linkup-session-mode";
 
 const encode = (data: unknown): string => {
   try {

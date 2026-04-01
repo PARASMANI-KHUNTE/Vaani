@@ -1,28 +1,21 @@
-﻿# Status Report
-
-## Current Status
-
-The project is actively running on a React + Vite web frontend with a modular Express backend.
+# Status Report
 
 ## Completed
 
-- Web migration to Vite completed
-- Realtime chat and socket lifecycle integrated
-- Social workflows implemented (request/accept/reject/unfriend/block)
-- Media upload pipeline with progress + fallback
-- Voice notes with waveform
-- Audio/video calling with WebRTC signaling
-- Notification surfaces and profile management
-- Account disable/delete APIs and UI actions
+- Web frontend migration to Vite
+- Realtime messaging and presence
+- Social relationship workflows
+- Media upload pipeline and voice notes
+- Group chat management
+- Profile management and account lifecycle controls
 
 ## In Progress
 
-- Production hardening for large media and edge networking
-- Mobile app parity and deep-link flows
+- Production hardening for media-heavy use
+- Mobile parity and deep-link flows
+- Broader automated test coverage
 
-## Pending
+## Risks
 
-- TURN server strategy for challenging networks
-- Advanced group-call UX polish (multi-stream layout, participant tiles)
-- Push notification production stack
-- Full e2e automation coverage
+- Push notification rollout still needs production-ready infrastructure.
+- Horizontal scaling needs adapter and deployment support.

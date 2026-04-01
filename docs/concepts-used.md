@@ -1,37 +1,17 @@
-﻿# Concepts Used
+# Concepts Used
 
-## Realtime Communication
+## Realtime Messaging
 
-- Socket.IO rooms for per-user and per-chat targeting
-- Event-driven state updates in React and Zustand
-
-## Media and Uploads
-
-- Signed direct Cloudinary uploads
-- Backend upload fallback path
-- Progress and cancellation controls via XHR
-
-## WebRTC Calling
-
-- Server as signaling channel only
-- Peer-to-peer media stream transport
-- Call lifecycle state in hooks + socket events
+Socket.IO rooms deliver targeted updates for messages, typing, presence, and notifications.
 
 ## State Management
 
-- Auth/session context
-- Chat/global realtime state in Zustand
-- Feature hooks for chat, social, and calls
+React context handles auth/session concerns. Zustand manages chat, message, and realtime UI state.
 
-## UI/UX System
+## Media Uploads
 
-- Tailwind utility-first styling
-- Glassmorphism + dark premium theme
-- Motion interactions with Framer Motion
-- Responsive layout with desktop/mobile behavior
+The app uses signed Cloudinary uploads with a backend fallback path for reliability.
 
-## Security and Access
+## Security
 
-- JWT for API and socket authentication
-- Request validation and auth middleware
-- User-level permission checks in services
+JWT authentication protects REST and Socket.IO access. Validation and service-level permission checks protect mutations.

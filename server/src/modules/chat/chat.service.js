@@ -118,6 +118,22 @@ const createOrGetDirectChat = async (currentUserId, participantId) => {
       .lean();
   } else {
     await ensureChatUserState(chat);
+    
+    // Unhide the chat if it was hidden
+    const normalizedUserId = normalizeId(currentUserId);
+    await Chat.findOneAndUpdate(
+      {
+        _id: chat._id,
+        "userStates.userId": normalizedUserId,
+        "userStates.hidden": true,
+      },
+      {
+        $set: {
+          "userStates.$.hidden": false,
+          "userStates.$.clearedAt": null,
+        },
+      }
+    );
   }
 
   return await formatChatForList(chat, currentUserId);
@@ -253,8 +269,11 @@ const formatChatForList = async (chat, currentUserId) => {
 };
 
 const listUserChats = async (currentUserId) => {
+  const normalizedUserId = normalizeId(currentUserId);
   const chats = await Chat.find({
     participants: currentUserId,
+    "userStates.userId": normalizedUserId,
+    "userStates.hidden": { $ne: true },
   })
     .sort({ updatedAt: -1, createdAt: -1 })
     .populate("participants", "username name email avatar tagline bio lastSeen friends createdAt")

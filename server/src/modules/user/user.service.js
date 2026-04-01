@@ -1,7 +1,6 @@
 const User = require("./user.model");
 const Chat = require("../chat/chat.model");
 const Message = require("../message/message.model");
-const CallLog = require("../call/call.model");
 const ApiError = require("../../utils/apiError");
 const { isExpoPushToken } = require("../../utils/pushNotifications");
 const { destroyMediaAssets } = require("../../utils/mediaUpload");
@@ -103,9 +102,7 @@ const findOrCreateUser = async ({ email, name, avatar }) => {
       throw new ApiError(403, "This account has been deleted");
     }
 
-    if (existingUser.accountStatus === "disabled") {
-      throw new ApiError(403, "This account is disabled");
-    }
+    const shouldReactivate = existingUser.accountStatus !== "active";
 
     user = await User.findOneAndUpdate(
       { email: normalizedEmail },
@@ -114,8 +111,7 @@ const findOrCreateUser = async ({ email, name, avatar }) => {
           name: name.trim(),
           avatar: avatar || null,
           lastSeen: new Date(),
-          accountStatus: "active",
-          disabledAt: null,
+          ...(shouldReactivate ? { accountStatus: "active", disabledAt: null } : {}),
         },
       },
       {
@@ -295,10 +291,8 @@ const getProfileByUserId = async ({ userId, currentUserId }) => {
   ]);
 
   if (!profile) {
-    throw new ApiError(404, "Profile not found");
+    throw new ApiError(404, "User not found");
   }
-
-  assertAccountIsActive(profile, "Profile is unavailable");
 
   return mapUserProfile(profile, currentUserId, currentUser);
 };
@@ -318,10 +312,8 @@ const getProfileByUsername = async ({ username, currentUserId }) => {
   ]);
 
   if (!profile) {
-    throw new ApiError(404, "Profile not found");
+    throw new ApiError(404, "User not found");
   }
-
-  assertAccountIsActive(profile, "Profile is unavailable");
 
   return mapUserProfile(profile, currentUserId, currentUser);
 };
@@ -547,6 +539,27 @@ const unblockUser = async ({ currentUserId, targetUserId }) => {
   });
 };
 
+const getBlockedUsers = async ({ userId }) => {
+  const user = await User.findById(userId)
+    .select("blockedUsers")
+    .populate("blockedUsers", "username name avatar tagline bio lastSeen")
+    .lean();
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return (user.blockedUsers || []).map((blockedUser) => ({
+    _id: blockedUser._id,
+    username: blockedUser.username,
+    name: blockedUser.name,
+    avatar: blockedUser.avatar,
+    tagline: blockedUser.tagline,
+    bio: blockedUser.bio,
+    lastSeen: blockedUser.lastSeen,
+  }));
+};
+
 const assertUsersCanInteract = async ({ currentUserId, targetUserId }) => {
   const [currentUser, targetUser] = await Promise.all([
     User.findById(currentUserId).select("blockedUsers").lean(),
@@ -614,9 +627,6 @@ const deleteOwnAccount = async ({ userId }) => {
         },
       }
     ),
-    CallLog.deleteMany({
-      $or: [{ callerId: userId }, { receiverId: userId }],
-    }),
   ]);
 
   const deletedEmail = `deleted-${Date.now()}-${String(userId).slice(-6)}@deleted.local`;
@@ -657,6 +667,7 @@ module.exports = {
   getProfileByUserId,
   getProfileByUsername,
   getUserPushTokens,
+  getBlockedUsers,
   mapUserProfile,
   registerPushToken,
   rejectFriendRequest,

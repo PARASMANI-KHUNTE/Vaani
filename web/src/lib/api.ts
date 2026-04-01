@@ -1,7 +1,5 @@
 import {
   BackendUser,
-  CallConfiguration,
-  CallHistoryItem,
   Chat,
   MediaAttachment,
   Message,
@@ -66,7 +64,7 @@ const uploadWithProgress = async <T>(
         reject(new Error(errorMessage));
       } catch (err) {
         onXhrChange?.(null);
-        reject(new Error(`Request failed with status ${xhr.status}: ${err instanceof Error ? err.message : 'Unknown error'}`));
+        reject(new Error(`Request failed with status ${xhr.status}: ${err instanceof Error ? err.message : "Unknown error"}`));
       }
     };
 
@@ -102,7 +100,7 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     payload = await response.json();
   } catch (err) {
-    throw new Error(`Request failed with status ${response.status}: ${err instanceof Error ? err.message : 'Invalid JSON response'}`);
+    throw new Error(`Request failed with status ${response.status}: ${err instanceof Error ? err.message : "Invalid JSON response"}`);
   }
 
   if (!response.ok) {
@@ -155,18 +153,6 @@ export const getChats = async (token: string) =>
 
 export const getChatById = async (token: string, chatId: string) =>
   request<{ chat: Chat }>(`/chats/${encodeURIComponent(chatId)}`, {
-    method: "GET",
-    token,
-  });
-
-export const getCallConfiguration = async (token: string) =>
-  request<{ config: CallConfiguration }>("/calls/config", {
-    method: "GET",
-    token,
-  });
-
-export const getCallHistory = async (token: string, limit = 12) =>
-  request<{ history: CallHistoryItem[] }>(`/calls/history?limit=${limit}`, {
     method: "GET",
     token,
   });
@@ -456,12 +442,25 @@ export const uploadMessageMedia = async (
 
   const directUploadBody = new FormData();
   directUploadBody.append("file", file);
-  directUploadBody.append("api_key", signedUpload.signature.apiKey);
-  directUploadBody.append("timestamp", String(signedUpload.signature.timestamp));
-  directUploadBody.append("folder", signedUpload.signature.folder);
-  directUploadBody.append("public_id", signedUpload.signature.publicId);
-  directUploadBody.append("context", signedUpload.signature.context);
-  directUploadBody.append("signature", signedUpload.signature.signature);
+  
+  // Dynamically append all received signature fields (except binary/metadata fields)
+  // This ensures the frontend sends exactly what the backend signed.
+  Object.entries(signedUpload.signature).forEach(([key, value]) => {
+    if (["uploadUrl", "apiKey", "cloudName", "messageType", "publicId"].includes(key)) return;
+    if (value !== undefined && value !== null) {
+      directUploadBody.append(key, String(value));
+    }
+  });
+
+  // Ensure public_id is definitely present (fallback to publicId if necessary)
+  if (!directUploadBody.has("public_id") && (signedUpload.signature as any).publicId) {
+    directUploadBody.append("public_id", (signedUpload.signature as any).publicId);
+  }
+
+  // api_key must be exactly 'api_key' for Cloudinary
+  if (!directUploadBody.has("api_key")) {
+    directUploadBody.append("api_key", signedUpload.signature.apiKey);
+  }
 
   try {
     const payload = await uploadWithProgress<{
@@ -507,9 +506,9 @@ export const uploadMessageMedia = async (
         message?: string;
       }>(`${apiBaseUrl}/messages/upload`, {
         body: formData,
-        headers: {
+        headers: token ? {
           Authorization: `Bearer ${token}`,
-        },
+        } : {},
         onProgress,
         onXhrChange,
       });
@@ -519,8 +518,11 @@ export const uploadMessageMedia = async (
     } catch (fallbackError) {
       const directMessage =
         directUploadError instanceof Error ? directUploadError.message : "Direct upload failed";
-      const fallbackMessage =
-        fallbackError instanceof Error ? fallbackError.message : "Fallback upload failed";
+      
+      let fallbackMessage = "Fallback upload failed";
+      if (typeof fallbackError === 'object' && fallbackError !== null && 'message' in fallbackError) {
+        fallbackMessage = String(fallbackError.message);
+      }
 
       throw new Error(`${fallbackMessage}. Direct upload also failed: ${directMessage}`);
     }
@@ -542,6 +544,18 @@ export const deleteMessage = async (
     token,
   });
 
+export const editMessage = async (
+  token: string,
+  messageId: string,
+  chatId: string,
+  content: string
+) =>
+  request<{ message: Message }>(`/messages/${messageId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ chatId, content }),
+  });
+
 export const addReaction = async (
   token: string,
   messageId: string,
@@ -560,5 +574,26 @@ export const removeReaction = async (
 ) =>
   request<{ message: Message }>(`/messages/${messageId}/reaction?emoji=${encodeURIComponent(emoji)}`, {
     method: "DELETE",
+    token,
+  });
+
+export const registerPushToken = async (token: string, pushToken: string, platform: "web" | "android" | "ios") =>
+  request<{ success: boolean }>("/users/push-token", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ pushToken, platform }),
+  });
+
+export const unregisterPushToken = async (token: string) =>
+  request<{ success: boolean }>("/users/push-token", {
+    method: "DELETE",
+    token,
+  });
+
+export const getBlockedUsers = async (token: string) =>
+  request<{
+    blockedUsers: BackendUser[];
+  }>("/users/me/blocked", {
+    method: "GET",
     token,
   });

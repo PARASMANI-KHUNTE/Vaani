@@ -9,6 +9,7 @@ const {
   getOwnProfile,
   getProfileByUserId,
   getProfileByUsername,
+  getBlockedUsers,
   registerPushToken,
   rejectFriendRequest,
   removeFriend,
@@ -188,6 +189,16 @@ const deleteAccount = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Account deleted successfully", result);
 });
 
+const getBlocked = asyncHandler(async (req, res) => {
+  const blockedUsers = await getBlockedUsers({
+    userId: req.user._id.toString(),
+  });
+
+  return sendSuccess(res, 200, "Blocked users fetched successfully", {
+    blockedUsers,
+  });
+});
+
 module.exports = {
   acceptFriend,
   block,
@@ -205,4 +216,5 @@ module.exports = {
   updateMe,
   disableAccount,
   deleteAccount,
+  getBlocked,
 };

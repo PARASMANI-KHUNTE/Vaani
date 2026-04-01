@@ -21,6 +21,7 @@ const idempotency = createIdempotencyMiddleware();
 router.use(authMiddleware);
 
 router.get("/", chatController.getChats);
+router.get("/:chatId", chatIdParamValidator, validateRequest, chatController.getChat);
 router.post(
   "/",
   groupMutationRateLimiter,

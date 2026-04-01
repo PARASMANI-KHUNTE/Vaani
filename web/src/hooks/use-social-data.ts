@@ -7,7 +7,6 @@ import {
   deleteMyAccount,
   disableMyAccount,
   exploreUsers,
-  getCallHistory,
   getMyProfile,
   getProfileByUsername,
   rejectFriendRequest,
@@ -17,7 +16,7 @@ import {
   unblockUser,
   updateMyProfile,
 } from "@/lib/api";
-import { BackendUser, CallHistoryItem, UserProfile } from "@/lib/types";
+import { BackendUser, UserProfile } from "@/lib/types";
 
 type UseSocialDataParams = {
   token?: string;
@@ -27,7 +26,6 @@ type UseSocialDataParams = {
 export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [directoryUsers, setDirectoryUsers] = useState<BackendUser[]>([]);
-  const [callHistory, setCallHistory] = useState<CallHistoryItem[]>([]);
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +33,6 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
   useEffect(() => {
     if (!token) {
       setProfile(null);
-      setCallHistory([]);
       return;
     }
 
@@ -44,14 +41,10 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
     const loadProfile = async () => {
       try {
         setIsLoadingProfile(true);
-        const [profileResponse, historyResponse] = await Promise.all([
-          getMyProfile(token),
-          getCallHistory(token, 12),
-        ]);
+        const profileResponse = await getMyProfile(token);
 
         if (active) {
           setProfile(profileResponse.profile);
-          setCallHistory(historyResponse.history);
         }
       } catch (loadError) {
         if (active) {
@@ -266,7 +259,6 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
 
   return {
     directoryUsers,
-    callHistory,
     error,
     fetchSharedProfile,
     isLoadingDirectory,

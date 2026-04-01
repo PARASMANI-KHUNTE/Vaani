@@ -12,8 +12,6 @@ const getNotificationIcon = (kind: string) => {
       return "person-add";
     case "reaction":
       return "heart";
-    case "call":
-      return "call";
     case "message":
     default:
       return "chatbubble";
@@ -26,8 +24,6 @@ const getNotificationColor = (kind: string) => {
       return "#155e75";
     case "reaction":
       return "#dc2626";
-    case "call":
-      return "#22c55e";
     case "message":
     default:
       return "#155e75";
@@ -105,7 +101,7 @@ export default function NotificationsScreen() {
           <View style={styles.emptyCard}>
             <Ionicons name="notifications-outline" size={48} color="#94a3b8" />
             <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptyBody}>Messages, friend requests, and call alerts will land here.</Text>
+            <Text style={styles.emptyBody}>Messages, friend requests, and reactions will land here.</Text>
           </View>
         }
       />

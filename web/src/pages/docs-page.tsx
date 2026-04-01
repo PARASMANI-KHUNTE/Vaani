@@ -97,7 +97,7 @@ const OverviewSection = () => (
     <Body>
       Canvas Chat is a production-oriented realtime chat platform with a React + Vite web frontend
       and an Express + Socket.IO backend. It delivers fast, polished, responsive communication
-      with media sharing, WebRTC calling, and a social relationship system.
+      with media sharing and a social relationship system.
     </Body>
 
     <SubHeading>Repository Structure</SubHeading>
@@ -114,11 +114,9 @@ const OverviewSection = () => (
         "1-to-1 conversations",
         "Realtime messaging with typing and presence",
         "Message replies, reactions, and delete scopes",
-        "Image/video/file/voice note sharing",
+        "Image and file sharing",
         "Read/delivered message state",
-        "Friend requests, block/unblock, unfriend",
-        "1-to-1 audio and video calls",
-        "Call history and profile management",
+        "Friend requests, block/unblock, unfriend",        "Profile management",
         "Account disable and delete",
       ].map((cap) => (
         <div key={cap} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 dark:border-white/5">
@@ -156,7 +154,7 @@ const ArchitectureSection = () => (
     <div className="mb-6 space-y-3">
       {[
         { icon: Globe, label: "React + Vite Web App", desc: "REST API + Socket.IO for realtime events and signaling" },
-        { icon: Server, label: "Express Server", desc: "REST controllers, Socket.IO handlers, MongoDB, Cloudinary, WebRTC signaling" },
+        { icon: Server, label: "Express Server", desc: "REST controllers, Socket.IO handlers, MongoDB, and Cloudinary" },
       ].map(({ icon: Icon, label, desc }) => (
         <div key={label} className="flex items-start gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4 dark:border-white/5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lagoon/10 dark:bg-teal/10">
@@ -174,9 +172,9 @@ const ArchitectureSection = () => (
     <CodeBlock>{`web/src/
   main.tsx          app bootstrap and providers
   App.tsx           route map
-  components/       chat shell, sidebar, chat window, panels, call UI
-  hooks/            use-chat-data, use-social-data, use-call
-  lib/              API client, auth context, socket, WebRTC, utils
+  components/       chat shell, sidebar, chat window, panels
+  hooks/            use-chat-data, use-social-data
+  lib/              API client, auth context, socket, utils
   store/            Zustand chat state
   pages/            route pages`}</CodeBlock>
 
@@ -186,14 +184,13 @@ const ArchitectureSection = () => (
   user/             profiles, social graph
   chat/             conversation CRUD
   message/          messages, media, reactions
-  call/             WebRTC signaling config
   socket/           realtime event handlers`}</CodeBlock>
 
     <SubHeading>Realtime Model</SubHeading>
     <Body>
       Per-user room <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">user:{'{userId}'}</code> and
       per-chat room <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">chat:{'{chatId}'}</code> handle
-      message delivery, typing, read/delivered updates, presence, notifications, and WebRTC signaling.
+      message delivery, typing, read/delivered updates, presence, and notifications.
     </Body>
 
     <SubHeading>Auth Model</SubHeading>
@@ -275,12 +272,6 @@ const ApiSection = () => (
       <Endpoint method="POST" path="/messages/upload" desc="Fallback upload" />
     </div>
 
-    <SubHeading>Calls</SubHeading>
-    <div className="space-y-2">
-      <Endpoint method="GET" path="/calls/config" />
-      <Endpoint method="GET" path="/calls/history?limit=" />
-    </div>
-
     <SubHeading>Socket.IO Events</SubHeading>
     <div className="space-y-2">
       <Endpoint method="SOCKET" path="message:send / message:new" desc="Message lifecycle" />
@@ -288,7 +279,6 @@ const ApiSection = () => (
       <Endpoint method="SOCKET" path="typing:start / typing:stop" desc="Typing indicators" />
       <Endpoint method="SOCKET" path="presence:update" desc="Online/offline status" />
       <Endpoint method="SOCKET" path="notification:new" desc="Push notifications" />
-      <Endpoint method="SOCKET" path="call:offer / call:answer / call:ice" desc="WebRTC signaling" />
     </div>
   </div>
 );
@@ -347,17 +337,15 @@ const ConceptsSection = () => (
       Signed direct Cloudinary uploads keep media off the core server. A backend fallback path handles
       edge cases. Progress and cancellation controls are managed via XHR for responsive feedback.
     </Body>
-
-    <SubHeading>WebRTC Calling</SubHeading>
-    <Body>
-      The server acts as a signaling channel only. Peer-to-peer media streams are transported directly
-      between clients. Call lifecycle state is managed in hooks and synchronized via socket events.
-    </Body>
-
-    <SubHeading>State Management</SubHeading>
+    <SubHeading>Realtime Messaging</SubHeading>
     <Body>
       Auth/session is managed via React context. Global realtime state (chats, messages, typing, presence)
       lives in Zustand. Feature-specific orchestration happens in dedicated hooks.
+    </Body>
+    <SubHeading>State Management</SubHeading>
+    <Body>
+      Zustand provides lightweight, scalable state management with persistence middleware for offline
+      capability. React Query-like patterns handle server state synchronization.
     </Body>
 
     <SubHeading>UI/UX System</SubHeading>
@@ -385,9 +373,9 @@ const FeaturesSection = () => (
       {[
         { title: "Authentication", items: ["Google sign-in", "JWT session management", "Mobile auth code flow", "Account disable/delete"] },
         { title: "Messaging", items: ["Realtime send/receive", "Message replies", "Emoji reactions", "Delete for me/everyone", "Read/delivered status"] },
-        { title: "Media", items: ["Image upload", "Video upload", "File attachment", "Voice notes with waveform", "Drag-and-drop support", "Upload progress + cancel"] },
+        { title: "Media", items: ["Image upload", "File attachment", "Drag-and-drop support", "Upload progress + cancel"] },
         { title: "Social", items: ["Friend requests", "Accept/reject", "Block/unblock", "Unfriend", "User directory / explore"] },
-        { title: "Calling", items: ["1-to-1 audio calls", "1-to-1 video calls", "Call controls (mute/video)", "Call history", "WebRTC peer-to-peer"] },
+        
         { title: "UI/UX", items: ["Dark theme", "Glassmorphism surfaces", "Motion animations", "Responsive layout", "Typing indicators", "Presence dots", "Notification toasts"] },
       ].map(({ title, items }) => (
         <div key={title} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 dark:border-white/5">
@@ -413,9 +401,7 @@ const LimitsSection = () => (
     <SubHeading>Technical</SubHeading>
     <div className="mb-4 space-y-2">
       {[
-        "No TURN relay support yet for difficult NAT environments",
-        "Group calls are implemented at signaling/session layer; advanced multi-tile UI is still evolving",
-        "Push notifications are not finalized for production scale",
+                "Push notifications are not finalized for production scale",
         "Large-file behavior depends on Cloudinary and client network",
       ].map((item) => (
         <div key={item} className="flex items-start gap-2 rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-2.5 dark:border-amber-500/10 dark:bg-amber-500/5">
@@ -449,8 +435,6 @@ const StatusSection = () => (
         "Realtime chat and socket lifecycle integrated",
         "Social workflows (request/accept/reject/unfriend/block)",
         "Media upload pipeline with progress + fallback",
-        "Voice notes with waveform visualization",
-        "Audio/video calling with WebRTC signaling",
         "Notification surfaces and profile management",
         "Account disable/delete APIs and UI",
       ].map((item) => (
@@ -477,9 +461,7 @@ const StatusSection = () => (
     <SubHeading>Pending</SubHeading>
     <div className="space-y-1.5">
       {[
-        "TURN server strategy for challenging networks",
-        "Advanced group-call UI polish",
-        "Push notification production stack",
+                "Push notification production stack",
         "Full e2e automation coverage",
       ].map((item) => (
         <div key={item} className="flex items-center gap-2">
@@ -531,7 +513,7 @@ export default function DocsPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-lagoon to-teal">
                 <MessageSquare className="h-4 w-4 text-white" />
               </div>
-              <span className="soft-heading text-lg font-semibold text-ink dark:text-slate-100">Vaani</span>
+              <span className="soft-heading text-lg font-semibold text-ink dark:text-slate-100">LinkUp</span>
             </button>
             <span className="text-ink/30 dark:text-slate-600">/</span>
             <span className="text-sm font-medium text-ink/60 dark:text-slate-400">Docs</span>

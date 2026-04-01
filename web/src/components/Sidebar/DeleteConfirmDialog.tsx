@@ -6,14 +6,14 @@ import { AlertTriangle, Trash2, X } from "lucide-react";
 
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
-  chatName: string;
+  chatName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 export const DeleteConfirmDialog = ({
   isOpen,
-  chatName,
+  chatName = "this user",
   onConfirm,
   onCancel,
 }: DeleteConfirmDialogProps) => {

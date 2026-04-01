@@ -4,7 +4,7 @@ import type { CredentialResponse } from "@react-oauth/google";
 import { issueMobileAuthCode } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
-const ALLOWED_SCHEMES = new Set(["vaani", "canvaschat"]);
+const ALLOWED_SCHEMES = new Set(["linkup", "canvaschat"]);
 
 const buildDeepLink = (scheme: string, code: string) => {
   const normalizedScheme = scheme.replace(/:\/?\/?$/, "");
@@ -18,8 +18,8 @@ export const MobileAuthPage = () => {
 
   const appScheme = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    const scheme = params.get("appScheme") || "vaani";
-    return ALLOWED_SCHEMES.has(scheme) ? scheme : "vaani";
+    const scheme = params.get("appScheme") || "linkup";
+    return ALLOWED_SCHEMES.has(scheme) ? scheme : "linkup";
   }, []);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export const MobileAuthPage = () => {
     <main className="flex min-h-screen items-center justify-center bg-shell px-6 py-10 text-ink">
       <div className="w-full max-w-lg rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">
-          Vaani
+          LinkUp
         </p>
         <h1 className="mt-3 font-display text-4xl text-ink">
           Finishing your mobile sign-in
@@ -79,7 +79,7 @@ export const MobileAuthPage = () => {
           {bridgeError
             ? bridgeError
             : status === "authenticated"
-            ? "Redirecting back to Vaani now..."
+            ? "Redirecting back to LinkUp now..."
             : "Complete Google sign-in to continue..."}
         </div>
 

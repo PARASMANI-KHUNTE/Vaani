@@ -1,52 +1,36 @@
-﻿# Tech Information
+# Tech Info
 
-## Runtime
-
-- Node.js (LTS recommended)
-- npm 10+
-
-## Web Stack
+## Frontend
 
 - React 19
-- Vite 8
 - TypeScript 5
+- Vite 8
 - Tailwind CSS 3
 - React Router 7
 - Framer Motion
-- Google Identity Services via `@react-oauth/google`
 - Zustand
 - Socket.IO client
 
-## Backend Stack
+## Backend
 
+- Node.js
 - Express 5
 - Socket.IO 4
 - Mongoose
-- JWT (`jsonwebtoken`)
-- Cloudinary SDK
+- JWT
+- Cloudinary
 - Multer
 
-## Data and Infra
-
-- MongoDB
-- Cloudinary (media)
-- Optional Redis-ready patterns for scaling presence/events
-
-## Build Commands
-
-### Web
+## Common Commands
 
 ```powershell
 cd web
 npm run dev
 npm run build
 npm run preview
-```
 
-### Server
-
-```powershell
-cd server
+cd ../server
 npm run dev
-npm run test
+npm run check
+npm test
 ```

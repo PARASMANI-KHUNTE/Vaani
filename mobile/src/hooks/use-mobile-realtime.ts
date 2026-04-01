@@ -15,10 +15,6 @@ const getNotificationPreview = (message: MobileMessage) => {
     return message.content || "Sent you a message";
   }
 
-  if (message.type === "voice") {
-    return "Sent a voice note";
-  }
-
   return `Sent a ${message.type} message`;
 };
 

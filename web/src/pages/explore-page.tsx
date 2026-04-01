@@ -15,7 +15,6 @@ export const ExplorePage = () => {
 
   const {
     startChatWithUser,
-    createGroupConversation,
     error: chatError,
     clearError: clearChatError,
     isSearchingUsers,
@@ -38,7 +37,7 @@ export const ExplorePage = () => {
   });
 
   return (
-    <main className="ambient-grid h-dvh overflow-hidden p-2 sm:p-3 lg:p-4">
+    <main className="h-dvh overflow-hidden">
       {chatError || socialError ? (
         <Toast
           message={chatError || socialError || ""}
@@ -49,7 +48,7 @@ export const ExplorePage = () => {
         />
       ) : null}
 
-      <div className="mx-auto h-full w-full max-w-6xl">
+      <div className="h-full w-full">
         <ExplorePanel
           variant="page"
           isOpen
@@ -60,10 +59,6 @@ export const ExplorePage = () => {
           onQueryChange={setQuery}
           onStartChat={async (userId) => {
             await startChatWithUser(userId);
-            navigate("/");
-          }}
-          onCreateGroup={async (groupName, participantIds) => {
-            await createGroupConversation(groupName, participantIds);
             navigate("/");
           }}
           onSendRequest={(user) => void sendRequest(user)}

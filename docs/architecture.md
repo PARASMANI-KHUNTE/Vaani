@@ -1,72 +1,31 @@
-﻿# Architecture
+# Architecture
 
-## High-Level Architecture
+Canvas Chat uses a React + Vite frontend and an Express + Socket.IO backend.
 
-```text
-React + Vite Web App
-  -> REST API for auth, chat, users, media, calls
-  -> Socket.IO for realtime events and signaling
+## Frontend
 
-Express Server
-  -> REST controllers/services
-  -> Socket.IO handlers
-  -> MongoDB persistence
-  -> Cloudinary media storage
-  -> WebRTC signaling coordination
-```
+- React 19 with TypeScript
+- Zustand for chat state
+- Framer Motion for UI transitions
+- Route-level pages under web/src/pages
+- Shared UI and chat surfaces under web/src/components
 
-## Frontend Architecture (`web/`)
+## Backend
 
-- `src/main.tsx`: app bootstrap and providers
-- `src/App.tsx`: route map
-- `src/components/`: chat shell, sidebar, chat window, profile/explore/notifications, call UI
-- `src/hooks/`: feature orchestration (`use-chat-data`, `use-social-data`, `use-call`)
-- `src/lib/`: API client, auth context, socket client, WebRTC helper, utilities, theme context
-- `src/store/`: Zustand chat state
-- `src/pages/`: route pages (`/`, `/profile/:username`, `/mobile-auth`, fallback)
-
-## Backend Architecture (`server/`)
-
-- Modular monolith under `server/src/modules`
-- Active modules:
-  - `auth`
-  - `user`
-  - `chat`
-  - `message`
-  - `call`
-  - `socket`
-- Supporting layers:
-  - `config`
-  - `middlewares`
-  - `utils`
+- Express for REST APIs
+- Socket.IO for realtime messaging and presence
+- MongoDB with Mongoose models
+- Cloudinary-backed media uploads
+- Modular feature layout under server/src/modules
 
 ## Realtime Model
 
-- Per-user room: `user:{userId}`
-- Per-chat room: `chat:{chatId}`
-- Socket events cover:
-  - message delivery
-  - typing
-  - read/delivered updates
-  - presence
-  - notifications
-  - WebRTC signaling (offer/answer/ICE)
+- user:{userId} rooms for personal notifications and presence updates
+- chat:{chatId} rooms for chat-specific realtime events
 
-## Auth Model
+## Current Focus
 
-1. Web app gets Google identity token (GIS).
-2. Token is exchanged with backend `/auth/login`.
-3. Backend returns app JWT.
-4. JWT authenticates REST + Socket.IO.
-
-## Media Model
-
-- Primary upload path uses signed Cloudinary direct upload.
-- Fallback path uploads through backend endpoint when needed.
-- Chat payload stores normalized media metadata.
-
-## Scalability Notes
-
-- Current deployment is single-node friendly.
-- Socket room design is compatible with horizontal scaling.
-- Presence/call state patterns are ready for Redis-backed distribution.
+- Messaging reliability
+- Media workflow stability
+- Social graph and moderation controls
+- Mobile parity over time

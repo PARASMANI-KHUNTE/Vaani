@@ -11,7 +11,7 @@ type ScreenShellProps = PropsWithChildren<{
 export const ScreenShell = ({ eyebrow, title, subtitle, children }: ScreenShellProps) => {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f7f2e8" />
       <View style={styles.container}>
         <View style={styles.header}>
           {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}

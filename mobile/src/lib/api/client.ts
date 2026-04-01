@@ -1,7 +1,6 @@
 import { mobileConfig } from "@/lib/config";
 import {
   ChatParticipant,
-  MobileCallHistoryItem,
   MobileChat,
   MobileMessage,
   MobileProfile,
@@ -207,11 +206,6 @@ export const markMobileChatRead = (token: string, chatId: string) =>
     token,
   });
 
-export const getMobileCallHistory = (token: string, limit = 12) =>
-  apiRequest<{ history: MobileCallHistoryItem[] }>(`/calls/history?limit=${limit}`, {
-    method: "GET",
-    token,
-  });
 
 export const addMobileReaction = (token: string, messageId: string, emoji: string) =>
   apiRequest<{ message: MobileMessage }>(`/messages/${messageId}/reaction`, {
@@ -234,7 +228,11 @@ export const deleteMobileMessage = (token: string, messageId: string, scope: "me
 
 export const uploadMobileMedia = async (token: string, file: { uri: string; type: string; name: string }) => {
   const formData = new FormData();
-  formData.append("file", file as unknown as Blob);
+  formData.append("file", {
+    uri: file.uri,
+    type: file.type,
+    name: file.name,
+  } as unknown as Blob);
 
   const response = await fetch(`${mobileConfig.apiUrl}/messages/upload`, {
     method: "POST",
@@ -255,7 +253,7 @@ export const uploadMobileMedia = async (token: string, file: { uri: string; type
 
 export const sendMobileMediaMessage = (
   token: string,
-  input: { chatId: string; type: "image" | "video" | "voice" | "file"; media: MobileMessage["media"]; content?: string }
+  input: { chatId: string; type: "image" | "file"; media: MobileMessage["media"]; content?: string }
 ) =>
   apiRequest<{ message: MobileMessage }>("/messages", {
     method: "POST",

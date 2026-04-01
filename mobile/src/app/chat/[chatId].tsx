@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -68,18 +69,16 @@ export default function ChatDetailScreen() {
 
   const { messages, isLoading, isSending, error, sendMessage, toggleReaction, deleteMessage } = useMobileChatDetail({
     token: session?.accessToken,
+    userId: session?.user?.userId,
     chat,
   });
 
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<{ uri: string; type: "image" | "video" } | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{ uri: string; type: "image"; width?: number; height?: number } | null>(null);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<MobileMessage | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [isSendingVoice, setIsSendingVoice] = useState(false);
 
   useEffect(() => {
     if (!session?.accessToken || !chatId) return;
@@ -152,11 +151,23 @@ export default function ChatDetailScreen() {
           text: "Photo Library",
           onPress: async () => {
             try {
-              const result = await fetch("https://picsum.photos/400/300", { method: "GET" });
-              const uri = result.url;
-              setSelectedMedia({ uri, type: "image" });
+              const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!permissionResult.granted) {
+                Alert.alert("Permission required", "Please allow access to your photo library.");
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ["images"],
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const asset = result.assets[0];
+                setSelectedMedia({ uri: asset.uri, type: "image", width: asset.width, height: asset.height });
+              }
             } catch (error) {
               console.log("Media selection error:", error);
+              Alert.alert("Error", "Failed to select image");
             }
           },
         },
@@ -164,11 +175,22 @@ export default function ChatDetailScreen() {
           text: "Camera",
           onPress: async () => {
             try {
-              const result = await fetch("https://picsum.photos/400/300", { method: "GET" });
-              const uri = result.url;
-              setSelectedMedia({ uri, type: "image" });
+              const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+              if (!permissionResult.granted) {
+                Alert.alert("Permission required", "Please allow access to your camera.");
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const asset = result.assets[0];
+                setSelectedMedia({ uri: asset.uri, type: "image", width: asset.width, height: asset.height });
+              }
             } catch (error) {
               console.log("Camera error:", error);
+              Alert.alert("Error", "Failed to take photo");
             }
           },
         },
@@ -205,50 +227,7 @@ export default function ChatDetailScreen() {
     setSelectedMedia(null);
   }, []);
 
-  const handleStartRecording = useCallback(() => {
-    setIsRecording(true);
-    setRecordingDuration(0);
-  }, []);
 
-  const handleStopRecording = useCallback(async () => {
-    if (!chatId || !session?.accessToken) return;
-    
-    try {
-      setIsSendingVoice(true);
-      const socket = getMobileSocket(session.accessToken);
-      socket.emit(mobileSocketEvents.sendMessage, {
-        chatId,
-        type: "voice",
-        media: {
-          url: `https://example.com/voice-${Date.now()}.m4a`,
-          duration: recordingDuration,
-        },
-      });
-    } catch (error) {
-      console.log("Send voice error:", error);
-    } finally {
-      setIsRecording(false);
-      setRecordingDuration(0);
-      setIsSendingVoice(false);
-    }
-  }, [chatId, session?.accessToken, recordingDuration]);
-
-  const handleCancelRecording = useCallback(() => {
-    setIsRecording(false);
-    setRecordingDuration(0);
-  }, []);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRecording]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -275,7 +254,7 @@ export default function ChatDetailScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {isLoading && messages.length === 0 ? (
@@ -316,30 +295,6 @@ export default function ChatDetailScreen() {
                           {item.content}
                         </Text>
                       ) : null}
-                    </View>
-                  );
-                }
-                if (item.type === "video" && item.media?.url) {
-                  return (
-                    <View>
-                      <View style={styles.videoContainer}>
-                        <Ionicons name="play-circle" size={40} color={isOwn ? "#ffffff" : "#155e75"} />
-                      </View>
-                      {item.content ? (
-                        <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
-                          {item.content}
-                        </Text>
-                      ) : null}
-                    </View>
-                  );
-                }
-                if (item.type === "voice" && item.media?.url) {
-                  return (
-                    <View style={styles.voiceContainer}>
-                      <Ionicons name="mic" size={20} color={isOwn ? "#ffffff" : "#155e75"} />
-                      <Text style={[styles.voiceDuration, isOwn ? styles.ownText : styles.otherText]}>
-                        {item.media.duration ? `${Math.floor(item.media.duration / 60)}:${String(item.media.duration % 60).padStart(2, "0")}` : "0:00"}
-                      </Text>
                     </View>
                   );
                 }
@@ -465,46 +420,19 @@ export default function ChatDetailScreen() {
                 onSubmitEditing={handleSend}
                 blurOnSubmit={false}
               />
-              {isRecording ? (
-                <View style={styles.recordingContainer}>
-                  <View style={styles.recordingIndicator}>
-                    <View style={styles.recordingDot} />
-                    <Text style={styles.recordingTime}>
-                      {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, "0")}
-                    </Text>
-                  </View>
-                  <Pressable style={styles.cancelRecordingButton} onPress={handleCancelRecording} disabled={isSendingVoice}>
-                    <Ionicons name="close" size={20} color="#ffffff" />
-                  </Pressable>
-                  <Pressable style={[styles.sendRecordingButton, isSendingVoice && styles.sendButtonDisabled]} onPress={handleStopRecording} disabled={isSendingVoice}>
-                    {isSendingVoice ? (
+                {draft.trim() ? (
+                  <Pressable
+                    style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+                    disabled={isSending}
+                    onPress={handleSend}
+                  >
+                    {isSending ? (
                       <ActivityIndicator size="small" color="#ffffff" />
                     ) : (
                       <Ionicons name="send" size={18} color="#ffffff" />
                     )}
                   </Pressable>
-                </View>
-              ) : (
-                <>
-                  {draft.trim() ? (
-                    <Pressable
-                      style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
-                      disabled={isSending}
-                      onPress={handleSend}
-                    >
-                      {isSending ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                      ) : (
-                        <Ionicons name="send" size={18} color="#ffffff" />
-                      )}
-                    </Pressable>
-                  ) : (
-                    <Pressable style={styles.micButton} onPress={handleStartRecording}>
-                      <Ionicons name="mic" size={22} color="#ffffff" />
-                    </Pressable>
-                  )}
-                </>
-              )}
+                ) : null}
             </>
           )}
         </View>
@@ -896,24 +824,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 4,
   },
-  videoContainer: {
-    width: 200,
-    height: 150,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  voiceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  voiceDuration: {
-    fontSize: 12,
-  },
   fileContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -982,54 +892,5 @@ const styles = StyleSheet.create({
   replyIndicatorContent: {
     fontSize: 11,
     flex: 1,
-  },
-  recordingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  recordingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#dc2626",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#ffffff",
-  },
-  recordingTime: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  cancelRecordingButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#64748b",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendRecordingButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#155e75",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  micButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#155e75",
-    justifyContent: "center",
-    alignItems: "center",
   },
 });

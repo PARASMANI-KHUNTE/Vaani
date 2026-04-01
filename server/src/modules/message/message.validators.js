@@ -25,8 +25,8 @@ const createMessageValidator = [
     .withMessage("content must be 5000 characters or fewer"),
   body("type")
     .optional()
-    .isIn(["text", "image", "video", "voice", "file"])
-    .withMessage("type must be text, image, video, voice, or file"),
+    .isIn(["text", "image", "file", "video", "voice"])
+    .withMessage("type must be text, image, file, video, or voice"),
   body("media").optional().isObject().withMessage("media must be an object"),
   body().custom((value) => {
     const type = value.type || "text";
@@ -37,7 +37,7 @@ const createMessageValidator = [
     }
 
     if (type !== "text" && !value.media?.url) {
-      throw new Error("media is required for image, video, and voice messages");
+      throw new Error(`media is required for ${type} messages`);
     }
 
     return true;
@@ -51,8 +51,24 @@ const deleteMessageValidator = [
     .withMessage("scope must be either me or everyone"),
 ];
 
+const reactionValidator = [
+  param("messageId").isMongoId().withMessage("messageId must be a valid id"),
+];
+
+const removeReactionValidator = [
+  param("messageId").isMongoId().withMessage("messageId must be a valid id"),
+  query("emoji")
+    .trim()
+    .notEmpty()
+    .withMessage("emoji is required")
+    .isLength({ max: 20 })
+    .withMessage("emoji must be 20 characters or fewer"),
+];
+
 module.exports = {
   createMessageValidator,
   deleteMessageValidator,
   getMessagesValidator,
+  reactionValidator,
+  removeReactionValidator,
 };

@@ -18,7 +18,10 @@ const getPreview = (content?: string, type?: string) => {
     return content || "No messages yet";
   }
 
-  return `${type[0].toUpperCase()}${type.slice(1)} message`;
+  if (type === "image") return "Sent an image";
+  if (type === "file") return "Sent a file";
+
+  return "Sent a message";
 };
 
 const formatChatTime = (value?: string) => {

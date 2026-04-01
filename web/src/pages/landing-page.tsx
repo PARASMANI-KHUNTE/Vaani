@@ -8,6 +8,10 @@ import {
   Zap,
   Shield,
   Sparkles,
+  Users,
+  Image as ImageIcon,
+  Mic,
+  ArrowRight,
 } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
@@ -17,21 +21,39 @@ import { useAuth } from "@/lib/auth-context";
 const features = [
   {
     icon: Zap,
-    title: "Lightning Fast",
-    description: "Real-time messaging with zero lag. Built for speed.",
-    gradient: "from-amber-400 to-ember",
+    title: "Real-time Messaging",
+    description: "Instant delivery powered by WebSockets. Your messages arrive before you blink.",
+    color: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
   },
   {
     icon: Shield,
-    title: "End-to-End Encrypted",
-    description: "Your conversations are private and secure.",
-    gradient: "from-jade to-teal",
+    title: "Secure & Private",
+    description: "Your conversations are encrypted and protected. Privacy by design.",
+    color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400",
+  },
+  {
+    icon: Users,
+    title: "Group Chats",
+    description: "Create groups with admin controls, invite links, and media galleries.",
+    color: "bg-blue-50 text-[#6d7af7] dark:bg-blue-900/20 dark:text-blue-400",
+  },
+  {
+    icon: ImageIcon,
+    title: "Rich Media",
+    description: "Share images, videos, and files seamlessly with smart previews.",
+    color: "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400",
+  },
+  {
+    icon: Mic,
+    title: "Voice Notes",
+    description: "Record and send voice messages with a beautiful waveform player.",
+    color: "bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400",
   },
   {
     icon: Moon,
     title: "Focus Mode",
-    description: "Smart notifications that respect your flow state.",
-    gradient: "from-violet-400 to-purple-500",
+    description: "Smart notifications that respect your flow state. No more chaos.",
+    color: "bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400",
   },
 ];
 
@@ -43,20 +65,17 @@ const FeatureCard = ({ feature, index }: { feature: typeof features[0]; index: n
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 40, scale: 0.95 }}
-      animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-      transition={{ duration: 0.6, delay: index * 0.15, type: "spring", stiffness: 100 }}
-      whileHover={{ y: -6, transition: { duration: 0.2 } }}
-      className="group relative"
+      initial={{ opacity: 0, y: 30 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      className="group"
     >
-      <div className="absolute -inset-0.5 rounded-3xl bg-gradient-to-r from-lagoon/40 via-teal/40 to-jade/40 opacity-0 blur transition duration-500 group-hover:opacity-100" />
-      <div className="surface-card relative rounded-3xl p-8">
-        <div className={`mb-6 inline-flex rounded-2xl bg-gradient-to-br ${feature.gradient} p-4 shadow-lg`}>
-          <Icon className="h-7 w-7 text-white" />
+      <div className="surface-panel rounded-3xl p-7 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <div className={`mb-5 inline-flex rounded-2xl p-3.5 ${feature.color}`}>
+          <Icon className="h-6 w-6" />
         </div>
-        <h3 className="soft-heading mb-3 text-xl font-semibold text-slate-100">{feature.title}</h3>
-        <p className="text-sm leading-relaxed text-slate-400">{feature.description}</p>
-        <div className="mt-6 h-1 w-0 rounded-full bg-gradient-to-r from-lagoon to-teal transition-all duration-500 group-hover:w-16" />
+        <h3 className="soft-heading mb-2 text-lg text-slate-900 dark:text-slate-100">{feature.title}</h3>
+        <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{feature.description}</p>
       </div>
     </motion.div>
   );
@@ -72,8 +91,8 @@ const LandingPage = () => {
   });
 
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 1], [1, 0.85]);
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, 80]);
+  const heroScale = useTransform(scrollYProgress, [0, 1], [1, 0.92]);
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, 60]);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -86,33 +105,34 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="ambient-grid relative min-h-dvh overflow-hidden">
-      {/* Ambient background orbs — match ChatApp */}
-      <div className="animate-drift absolute left-[-7rem] top-[-6rem] h-72 w-72 rounded-full bg-sky-400/20 blur-3xl dark:bg-sky-500/15" />
-      <div className="animate-drift absolute right-[-8rem] top-24 h-80 w-80 rounded-full bg-teal-400/18 blur-3xl [animation-delay:1.2s] dark:bg-teal-400/14" />
-      <div className="animate-drift absolute bottom-[-8rem] left-[20%] h-72 w-72 rounded-full bg-orange-300/18 blur-3xl [animation-delay:2.2s] dark:bg-orange-400/12" />
-      <div className="absolute inset-x-0 top-0 h-44 bg-[linear-gradient(180deg,rgba(255,255,255,0.52),transparent)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.55),transparent)]" />
+    <div className="relative min-h-dvh overflow-y-auto" style={{ backgroundColor: 'var(--bg-soft)' }}>
+      {/* Subtle ambient blobs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#6d7af7]/8 blur-[100px]" />
+        <div className="absolute -right-32 top-48 h-[500px] w-[500px] rounded-full bg-[#6d7af7]/5 blur-[120px]" />
+        <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-purple-400/5 blur-[100px]" />
+      </div>
 
       {/* Nav */}
-      <nav className="relative z-50 flex items-center justify-between px-6 py-5 sm:px-8 sm:py-6">
+      <nav className="relative z-50 flex items-center justify-between px-6 py-5 sm:px-10">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
           className="flex items-center gap-3"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-lagoon to-teal shadow-lg shadow-lagoon/30 sm:h-12 sm:w-12">
-            <MessageSquare className="h-5 w-5 text-white sm:h-6 sm:w-6" />
+          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl shadow-md shadow-[#6d7af7]/20 bg-white">
+            <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
           </div>
-          <span className="soft-heading text-xl font-semibold tracking-tight text-ink dark:text-slate-100 sm:text-2xl">Vaani</span>
+          <span className="soft-heading text-xl tracking-tight text-slate-900 dark:text-slate-100">LinkUp</span>
         </motion.div>
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="hidden items-center gap-4 sm:flex"
+          className="hidden items-center gap-6 sm:flex"
         >
-          <a href="/docs" className="text-sm font-medium text-ink/50 transition-colors hover:text-ink dark:text-slate-400 dark:hover:text-slate-100">Docs</a>
+          <a href="/docs" className="text-sm font-medium text-slate-400 transition-colors hover:text-[#6d7af7]">Docs</a>
         </motion.div>
       </nav>
 
@@ -120,44 +140,18 @@ const LandingPage = () => {
       <motion.section
         ref={heroRef}
         style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
-        className="relative z-10 flex min-h-[75vh] flex-col items-center justify-center px-6"
+        className="relative z-10 flex min-h-[80vh] flex-col items-center justify-center px-6"
       >
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="h-64 w-64 rounded-full bg-gradient-to-br from-lagoon/15 to-teal/15 blur-3xl" />
-        </div>
-
-        {/* Logo with glow */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="relative mb-8"
-        >
-          <motion.div
-            animate={{
-              boxShadow: [
-                "0 0 60px rgba(21, 94, 117, 0.3)",
-                "0 0 100px rgba(13, 148, 136, 0.35)",
-                "0 0 60px rgba(21, 94, 117, 0.3)",
-              ],
-            }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-lagoon to-teal shadow-2xl shadow-lagoon/40 sm:h-20 sm:w-20"
-          >
-            <MessageSquare className="h-8 w-8 text-white sm:h-10 sm:w-10" />
-          </motion.div>
-        </motion.div>
-
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1 }}
-          className="mb-6"
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-lagoon/20 bg-lagoon/5 px-5 py-2.5">
-            <Sparkles className="h-4 w-4 text-lagoon" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-lagoon">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#6d7af7]/15 bg-[#6d7af7]/5 px-5 py-2.5 backdrop-blur-sm">
+            <Sparkles className="h-4 w-4 text-[#6d7af7]" />
+            <span className="text-xs font-bold uppercase tracking-[0.15em] text-[#6d7af7]">
               Now in Beta
             </span>
           </div>
@@ -167,37 +161,35 @@ const LandingPage = () => {
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
+          transition={{ duration: 0.7, delay: 0.2 }}
           className="mb-6 text-center"
         >
-          <span className="soft-heading text-5xl font-semibold tracking-tight text-ink dark:text-slate-100 sm:text-6xl lg:text-7xl">
-            <span className="text-gradient">Vaani</span>
+          <span className="soft-heading block text-5xl tracking-tight text-slate-900 dark:text-white sm:text-6xl lg:text-7xl">
+            Chat that feels
           </span>
-          <br />
-          <span className="mt-2 block text-2xl font-light text-ink/60 dark:text-slate-300 sm:text-3xl lg:text-4xl">
-            where conversations feel right
+          <span className="soft-heading block text-5xl tracking-tight sm:text-6xl lg:text-7xl" style={{ color: 'var(--primary-blue)' }}>
+            effortless.
           </span>
         </motion.h1>
 
         {/* Subtitle */}
         <motion.p
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="mb-10 max-w-xl text-center text-base text-ink/55 dark:text-slate-400 sm:text-lg"
+          transition={{ duration: 0.7, delay: 0.3 }}
+          className="mb-12 max-w-lg text-center text-lg text-slate-500 dark:text-slate-400"
         >
-          A calmer, smarter space for real-time conversations.
+          A clean, focused space for real-time conversations.
           <br />
-          Built for focus. Designed with purpose.
+          No clutter. No noise. Just you and your people.
         </motion.p>
 
         {/* CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.9 }}
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.4, type: "spring" }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.6, delay: 0.4, type: "spring" }}
+          className="mb-20"
         >
           <GoogleLogin
             theme="filled_blue"
@@ -209,54 +201,80 @@ const LandingPage = () => {
           />
         </motion.div>
 
-        {/* Chat preview mockup */}
+        {/* Chat Preview Mockup */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="mt-16 w-full max-w-3xl px-4"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.8, type: "spring", stiffness: 60 }}
+          className="w-full max-w-3xl"
         >
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-            className="surface-panel relative mx-auto overflow-hidden rounded-3xl"
-          >
-            <div className="flex h-56 sm:h-64">
-              {/* Sidebar mock */}
-              <div className="hidden w-16 flex-col items-center gap-3 border-r border-white/5 bg-white/3 py-4 dark:border-white/5 dark:bg-white/[0.02] sm:flex">
-                {["bg-lagoon", "bg-teal", "bg-ember", "bg-jade"].map((bg, i) => (
-                  <div key={i} className={`h-10 w-10 rounded-xl ${bg} opacity-40`} />
-                ))}
+          <div className="surface-panel overflow-hidden rounded-3xl">
+            {/* Window chrome */}
+            <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
+              <div className="h-3 w-3 rounded-full bg-red-400/70" />
+              <div className="h-3 w-3 rounded-full bg-amber-400/70" />
+              <div className="h-3 w-3 rounded-full bg-emerald-400/70" />
+              <div className="ml-3 flex h-7 items-center rounded-lg bg-slate-50 px-3 dark:bg-slate-800">
+                <span className="text-[11px] font-medium text-slate-400">linkup.chat</span>
               </div>
-              {/* Chat mock */}
-              <div className="flex-1 p-4">
+            </div>
+
+            <div className="flex h-72 sm:h-80">
+              {/* Sidebar mock */}
+              <div className="hidden w-56 flex-col border-r border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50 sm:flex">
+                <div className="p-4">
+                  <div className="mb-4 h-9 w-full rounded-xl bg-slate-100 dark:bg-slate-800" />
+                  {[
+                    { name: "Design Team", unread: 3, active: true },
+                    { name: "Sarah Chen", unread: 0, active: false },
+                    { name: "Dev Channel", unread: 12, active: false },
+                  ].map((chat, i) => (
+                    <motion.div
+                      key={chat.name}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8 + i * 0.1 }}
+                      className={`mb-1 flex items-center justify-between rounded-xl px-3 py-2.5 ${
+                        chat.active ? "bg-white shadow-sm dark:bg-slate-800" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#6d7af7] to-[#8b96f9]" />
+                        <span className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{chat.name}</span>
+                      </div>
+                      {chat.unread > 0 && (
+                        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#6d7af7] px-1.5 text-[10px] font-bold text-white">
+                          {chat.unread}
+                        </span>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat area mock */}
+              <div className="flex flex-1 flex-col justify-end p-5">
                 <div className="space-y-3">
                   {[
-                    { name: "Sarah", color: "from-pink-500 to-rose-500", msg: "Hey! How's the new design coming?", time: "2:34 PM", sent: false },
-                    { name: "You", color: "from-lagoon to-teal", msg: "Almost done! It's looking great", time: "2:35 PM", sent: true },
-                    { name: "Sarah", color: "from-pink-500 to-rose-500", msg: "Can't wait to see it!", time: "2:36 PM", sent: false },
+                    { name: "Alex", msg: "The new UI is looking amazing! 🎨", time: "2:34 PM", sent: false },
+                    { name: "You", msg: "Thanks! Just pushed the final tweaks", time: "2:35 PM", sent: true },
+                    { name: "Alex", msg: "Can't wait to ship this 🚀", time: "2:36 PM", sent: false },
                   ].map((msg, i) => (
                     <motion.div
                       key={i}
-                      initial={{ opacity: 0, x: msg.sent ? 20 : -20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 1 + i * 0.2 }}
-                      className={`flex items-start gap-3 ${msg.sent ? "flex-row-reverse" : ""}`}
+                      className={`flex ${msg.sent ? "justify-end" : "justify-start"}`}
                     >
-                      <div className={`h-8 w-8 shrink-0 rounded-full bg-gradient-to-br ${msg.color}`} />
-                      <div className={`max-w-[65%] ${msg.sent ? "text-right" : ""}`}>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-sm font-semibold text-ink dark:text-slate-200">{msg.name}</span>
-                          <span className="text-xs text-ink/40 dark:text-slate-500">{msg.time}</span>
-                        </div>
-                        <div className={`mt-1 inline-block rounded-2xl px-3 py-2 text-sm ${
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
                           msg.sent
-                            ? "bg-gradient-to-br from-lagoon to-teal text-white rounded-br-md"
-                            : "bg-white/60 text-ink/80 dark:bg-white/5 dark:text-slate-300 rounded-bl-md"
-                        }`}>
-                          {msg.msg}
-                        </div>
+                            ? "rounded-br-lg bg-[#6d7af7] text-white"
+                            : "rounded-bl-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        }`}
+                      >
+                        {msg.msg}
                       </div>
                     </motion.div>
                   ))}
@@ -264,115 +282,108 @@ const LandingPage = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1.8 }}
-                    className="flex items-center gap-2 text-sm text-ink/50 dark:text-slate-400"
+                    className="flex items-center gap-2 text-sm text-slate-400"
                   >
-                    <span className="font-medium text-lagoon dark:text-teal">Sarah</span>
+                    <span className="font-semibold text-[#6d7af7]">Alex</span>
                     <span>is typing</span>
-                    <div className="typing-indicator inline-flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-lagoon dark:bg-teal" />
-                      <span className="h-1.5 w-1.5 rounded-full bg-lagoon dark:bg-teal" />
-                      <span className="h-1.5 w-1.5 rounded-full bg-lagoon dark:bg-teal" />
-                    </div>
+                    <span className="flex gap-0.5">
+                      {[0, 1, 2].map((d) => (
+                        <motion.span
+                          key={d}
+                          className="h-1.5 w-1.5 rounded-full bg-[#6d7af7]"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1.2, repeat: Infinity, delay: d * 0.2 }}
+                        />
+                      ))}
+                    </span>
                   </motion.div>
                 </div>
               </div>
             </div>
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white/60 to-transparent dark:from-slate-900/60" />
-          </motion.div>
+          </div>
         </motion.div>
       </motion.section>
 
       {/* Features */}
       <section className="relative z-10 px-6 py-24 sm:py-32">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8 }}
-          className="mx-auto max-w-5xl text-center"
-        >
-          <h2 className="soft-heading mb-4 text-3xl font-semibold text-ink dark:text-slate-100 sm:text-4xl lg:text-5xl">
-            Built different.
-            <br />
-            <span className="text-gradient">Designed for you.</span>
-          </h2>
-          <p className="mx-auto mb-16 max-w-xl text-ink/50 dark:text-slate-400">
-            Experience communication without the noise.
-          </p>
+        <div className="mx-auto max-w-5xl">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="mb-16 text-center"
+          >
+            <h2 className="soft-heading mb-4 text-3xl text-slate-900 dark:text-white sm:text-4xl">
+              Everything you need,{" "}
+              <span style={{ color: 'var(--primary-blue)' }}>nothing you don't.</span>
+            </h2>
+            <p className="mx-auto max-w-md text-slate-500 dark:text-slate-400">
+              Built for clarity. Designed to get out of your way.
+            </p>
+          </motion.div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature, index) => (
               <FeatureCard key={feature.title} feature={feature} index={index} />
             ))}
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* CTA Section */}
-      <section className="relative z-10 px-6 py-20 sm:py-24">
+      <section className="relative z-10 px-6 py-20">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.97 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="mx-auto max-w-4xl"
+          transition={{ duration: 0.6 }}
+          className="mx-auto max-w-3xl"
         >
-          <div className="surface-panel relative overflow-hidden rounded-[40px] p-8 sm:p-12">
-            <div className="absolute inset-0 bg-gradient-to-br from-lagoon/5 via-transparent to-teal/5 pointer-events-none" />
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-lagoon/10 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-teal/10 blur-3xl pointer-events-none" />
-
+          <div className="surface-panel overflow-hidden rounded-[32px] p-10 text-center sm:p-14">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl blue-gradient-header shadow-lg shadow-[#6d7af7]/20">
+              <MessageSquare className="h-8 w-8 text-white" />
+            </div>
+            <h2 className="soft-heading mb-3 text-3xl text-slate-900 dark:text-white sm:text-4xl">
+              Ready to start?
+            </h2>
+            <p className="mx-auto mb-10 max-w-sm text-slate-500 dark:text-slate-400">
+              Join the beta and experience conversations without the chaos.
+            </p>
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative text-center"
+              className="inline-flex"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <h2 className="soft-heading text-3xl font-semibold text-ink dark:text-slate-100 sm:text-4xl lg:text-5xl">
-                Ready to communicate
-                <br />
-                <span className="text-gradient">without the chaos?</span>
-              </h2>
-              <p className="mx-auto mt-6 max-w-lg text-ink/50 dark:text-slate-400">
-                Join the beta and be among the first to experience a calmer way to connect.
-              </p>
-
-              <motion.div
-                className="mt-10"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <GoogleLogin
-                  theme="filled_blue"
-                  shape="pill"
-                  size="large"
-                  text="signin_with"
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => console.error("Login failed")}
-                />
-              </motion.div>
+              <GoogleLogin
+                theme="filled_blue"
+                shape="pill"
+                size="large"
+                text="continue_with"
+                onSuccess={handleGoogleSuccess}
+                onError={() => console.error("Login failed")}
+              />
             </motion.div>
           </div>
         </motion.div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-ink/8 py-10 backdrop-blur-xl dark:border-white/5 sm:py-12">
+      <footer className="relative z-10 border-t border-slate-100 py-10 dark:border-slate-800">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-lagoon to-teal">
-              <MessageSquare className="h-4 w-4 text-white" />
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white">
+              <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
             </div>
-            <span className="soft-heading font-semibold text-ink dark:text-slate-100">Vaani</span>
+            <span className="soft-heading text-slate-900 dark:text-white">LinkUp</span>
           </div>
-          <div className="flex gap-8 text-sm text-ink/40 dark:text-slate-400">
-            <a href="#" className="transition-colors hover:text-lagoon dark:hover:text-teal">Privacy</a>
-            <a href="#" className="transition-colors hover:text-lagoon dark:hover:text-teal">Terms</a>
-            <a href="#" className="transition-colors hover:text-lagoon dark:hover:text-teal">Contact</a>
+          <div className="flex gap-8 text-sm text-slate-400">
+            <a href="#" className="transition-colors hover:text-[#6d7af7]">Privacy</a>
+            <a href="#" className="transition-colors hover:text-[#6d7af7]">Terms</a>
+            <a href="#" className="transition-colors hover:text-[#6d7af7]">Contact</a>
           </div>
-          <p className="text-sm text-ink/30 dark:text-slate-500">
-            &copy; {new Date().getFullYear()} Vaani
+          <p className="text-sm text-slate-300 dark:text-slate-600">
+            &copy; {new Date().getFullYear()} LinkUp
           </p>
         </div>
       </footer>

@@ -43,6 +43,14 @@ const getChats = asyncHandler(async (req, res) => {
   });
 });
 
+const getChat = asyncHandler(async (req, res) => {
+  const chat = await getChatSummary(req.params.chatId, req.user._id.toString());
+
+  return sendSuccess(res, 200, "Chat fetched successfully", {
+    chat,
+  });
+});
+
 const createChat = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id.toString();
   const chat = req.body.isGroup
@@ -297,6 +305,7 @@ module.exports = {
   clearChatMessages,
   createChat,
   demoteAdmin,
+  getChat,
   getChats,
   createInviteLink,
   leaveGroupChat,
