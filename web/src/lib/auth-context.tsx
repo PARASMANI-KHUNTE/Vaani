@@ -93,8 +93,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setStatus("authenticated");
       },
       logout: () => {
-        if (session?.backendAccessToken) {
-          void unregisterPushToken(session.backendAccessToken).catch(console.error);
+        const token = session?.backendAccessToken;
+        const endpoint = token ? localStorage.getItem("webPushEndpoint") : null;
+        if (token && endpoint) {
+          void unregisterPushToken(token, endpoint).catch(console.error);
+          localStorage.removeItem("webPushEndpoint");
         }
         secureStorage.remove();
         setSession(null);

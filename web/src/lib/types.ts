@@ -2,10 +2,12 @@ export type BackendUser = {
   _id: string;
   username?: string;
   name: string;
+  email?: string;
   avatar: string | null;
   tagline?: string;
   bio?: string;
   lastSeen: string | null;
+  isOnline?: boolean;
   createdAt?: string;
   friendsCount?: number;
   isFriend?: boolean;
@@ -83,7 +85,9 @@ export type Message = {
       | "member_left"
       | "admin_promoted"
       | "admin_demoted"
-      | "ownership_transferred";
+      | "ownership_transferred"
+      | "group_wallpaper_updated"
+      | "group_theme_updated";
     metadata?: Record<string, unknown> | null;
   } | null;
   optimistic?: boolean;
@@ -131,6 +135,8 @@ export type Chat = {
   isGroup: boolean;
   groupName?: string | null;
   groupAvatar?: string | null;
+  wallpaper?: string | null;
+  theme?: string;
   createdBy?: string | null;
   adminIds?: string[];
   createdAt: string;

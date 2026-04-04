@@ -5,6 +5,7 @@ type Theme = "light" | "dark";
 type ThemeContextValue = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  isDark: boolean;
 };
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -34,6 +35,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     () => ({
       theme,
       setTheme: (nextTheme: Theme) => setThemeState(nextTheme),
+      isDark: theme === "dark",
     }),
     [theme]
   );

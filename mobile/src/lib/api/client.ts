@@ -228,6 +228,13 @@ export const deleteMobileMessage = (token: string, messageId: string, scope: "me
     token,
   });
 
+export const editMobileMessage = (token: string, messageId: string, input: { chatId: string; content: string }) =>
+  apiRequest<{ message: MobileMessage }>(`/messages/${messageId}`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(input),
+  });
+
 export const uploadMobileMedia = async (token: string, file: { uri: string; type: string; name: string }) => {
   const formData = new FormData();
   formData.append("file", {
@@ -255,7 +262,7 @@ export const uploadMobileMedia = async (token: string, file: { uri: string; type
 
 export const sendMobileMediaMessage = (
   token: string,
-  input: { chatId: string; type: "image" | "file"; media: MobileMessage["media"]; content?: string }
+  input: { chatId: string; type: "image" | "file" | "video" | "voice"; media: MobileMessage["media"]; content?: string }
 ) =>
   apiRequest<{ message: MobileMessage }>("/messages", {
     method: "POST",

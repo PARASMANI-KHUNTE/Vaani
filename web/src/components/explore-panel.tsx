@@ -2,8 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { Ban, ChevronDown, MessageCircle, Search, UserPlus2, UserRoundMinus, Users, X } from "lucide-react";
+import { 
+  Ban, 
+  MessageCircle, 
+  UserPlus2, 
+  UserRoundMinus, 
+  Users, 
+  Search,
+  UserCheck,
+  Wifi,
+  Loader2
+} from "lucide-react";
 import { BackendUser } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type ExplorePanelProps = {
   isOpen: boolean;
@@ -20,6 +31,8 @@ type ExplorePanelProps = {
   onOpenProfile: (user: BackendUser) => void;
 };
 
+type FilterTab = "all" | "friends" | "suggested" | "online";
+
 export const ExplorePanel = ({
   isOpen,
   variant = "overlay",
@@ -35,7 +48,10 @@ export const ExplorePanel = ({
   onOpenProfile,
 }: ExplorePanelProps) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [focusedSearch, setFocusedSearch] = useState(false);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -74,228 +90,363 @@ export const ExplorePanel = ({
     return null;
   }
 
+  const onlineUsers = users.filter(u => u.isOnline);
   const friends = users.filter(u => u.isFriend);
-  const nonFriends = users.filter(u => !u.isFriend);
+  const suggested = users.filter(u => !u.isFriend && !u.requestSent && !u.requestReceived);
 
-  const renderUserCard = (user: BackendUser) => (
+  const getFilteredUsers = () => {
+    switch (activeFilter) {
+      case "online":
+        return onlineUsers;
+      case "friends":
+        return friends;
+      case "suggested":
+        return suggested;
+      default:
+        return users;
+    }
+  };
+
+  const filteredUsers = getFilteredUsers();
+
+  const filterTabs: { id: FilterTab; label: string; count?: number }[] = [
+    { id: "all", label: "All" },
+    { id: "online", label: "Online", count: onlineUsers.length },
+    { id: "friends", label: "Friends", count: friends.length },
+    { id: "suggested", label: "Suggested", count: suggested.length },
+  ];
+
+  const UserCard = ({ user }: { user: BackendUser }) => (
     <div
-      key={user._id}
-      className="surface-card cursor-pointer rounded-[30px] p-4 transition duration-300 hover:-translate-y-0.5"
+      className="group relative rounded-2xl border border-slate-800/50 bg-slate-900/80 p-5 transition-all duration-300 hover:border-slate-700 hover:bg-slate-800/90 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20"
       onClick={() => onOpenProfile(user)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpenProfile(user);
-        }
-      }}
     >
-      <div className="flex items-start gap-4">
-        <div className="relative h-14 w-14">
+      {/* Online Indicator */}
+      {user.isOnline && (
+        <div className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2 py-1">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+          <span className="text-[10px] font-medium text-emerald-400">Online</span>
+        </div>
+      )}
+
+      {/* Avatar */}
+      <div className="flex flex-col items-center">
+        <div className="relative">
           <Avatar
             src={user.avatar}
             name={user.name}
-            className="warm-outline h-full w-full rounded-[18px]"
-            textClassName="text-lg"
+            className="h-20 w-20 rounded-2xl ring-2 ring-slate-700/50 transition-all group-hover:ring-slate-600"
+            textClassName="text-2xl font-bold"
           />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-ink dark:text-slate-100">{user.name}</p>
-              <p className="text-xs text-ink/55 dark:text-slate-400">@{user.username}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-white/85 dark:bg-slate-700/85 px-3 py-1 text-xs text-ink/60 dark:text-slate-300 shadow-soft">
-                {user.friendsCount || 0} friends
-              </span>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setOpenMenuUserId(openMenuUserId === user._id ? null : user._id);
-                }}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 dark:bg-slate-700/80 shadow-soft hover:bg-slate-100 dark:hover:bg-slate-600"
-              >
-                <ChevronDown className="h-4 w-4 text-ink/60 dark:text-slate-400" />
-              </button>
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-ink/70 dark:text-slate-300">{user.tagline || "No tagline yet."}</p>
-          {openMenuUserId === user._id && (
-            <div className="mt-3 rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-slate-800 p-2 shadow-lg">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onStartChat(user._id);
-                  setOpenMenuUserId(null);
-                }}
-                disabled={user.isBlocked || user.hasBlocked}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Message
-              </button>
-              {user.isFriend ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onUnfriend(user);
-                    setOpenMenuUserId(null);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                >
-                  <UserRoundMinus className="h-4 w-4" />
-                  Unfriend
-                </button>
-              ) : (
-                <>
-                  {!user.requestSent && !user.requestReceived ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSendRequest(user);
-                        setOpenMenuUserId(null);
-                      }}
-                      disabled={user.isBlocked || user.hasBlocked}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
-                    >
-                      <UserPlus2 className="h-4 w-4" />
-                      Send request
-                    </button>
-                  ) : null}
-                  {user.requestSent ? (
-                    <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-amber-600">
-                      Request sent
-                    </div>
-                  ) : null}
-                  {user.requestReceived ? (
-                    <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-lagoon">
-                      Check notifications
-                    </div>
-                  ) : null}
-                </>
-              )}
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onOpenProfile(user);
-                  setOpenMenuUserId(null);
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-              >
-                View profile
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggleBlock(user);
-                  setOpenMenuUserId(null);
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                <Ban className="h-4 w-4" />
-                {user.hasBlocked ? "Unblock" : "Block"}
-              </button>
-            </div>
+
+        {/* User Info */}
+        <div className="mt-4 text-center">
+          <h3 className="text-base font-semibold text-white truncate max-w-full">{user.name}</h3>
+          <p className="text-sm text-slate-400">@{user.username}</p>
+          {user.tagline && (
+            <p className="mt-2 text-xs font-medium text-slate-500 uppercase tracking-wider">{user.tagline}</p>
           )}
         </div>
+
+        {/* Friends Count */}
+        <div className="mt-3 flex items-center gap-1.5 text-slate-500">
+          <Users className="h-3.5 w-3.5" />
+          <span className="text-xs">{user.friendsCount || 0} friends</span>
+        </div>
       </div>
+
+      {/* Action Buttons */}
+      <div className="mt-5 flex gap-2">
+        {user.isFriend ? (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); onStartChat(user._id); }}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600/20 px-4 py-2.5 text-sm font-medium text-blue-400 transition-all hover:bg-blue-600/30 active:scale-95"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Message
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onUnfriend(user); }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/50 text-slate-400 transition-all hover:border-rose-500/50 hover:text-rose-400 hover:bg-rose-500/10"
+              title="Unfriend"
+            >
+              <UserRoundMinus className="h-4 w-4" />
+            </button>
+          </>
+        ) : user.requestSent ? (
+          <button
+            disabled
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-medium text-amber-400"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Request Sent
+          </button>
+        ) : user.requestReceived ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSendRequest(user); }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 active:scale-95"
+          >
+            <UserCheck className="h-4 w-4" />
+            Accept Request
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); onSendRequest(user); }}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-blue-500 active:scale-95"
+            >
+              <UserPlus2 className="h-4 w-4" />
+              Add Friend
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onStartChat(user._id); }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/50 text-slate-400 transition-all hover:border-slate-600 hover:text-white hover:bg-slate-700/50"
+              title="Message"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* More Options */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpenMenuUserId(openMenuUserId === user._id ? null : user._id); }}
+        className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-800/80 text-slate-400 opacity-0 transition-all hover:bg-slate-700 hover:text-white group-hover:opacity-100"
+      >
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="12" cy="19" r="2" />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu */}
+      {openMenuUserId === user._id && (
+        <div 
+          className="absolute left-4 top-14 z-50 w-48 rounded-xl border border-slate-700/50 bg-slate-900 p-1.5 shadow-xl shadow-black/20"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenProfile(user); setOpenMenuUserId(null); }}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+          >
+            View Profile
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleBlock(user); setOpenMenuUserId(null); }}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-400 hover:bg-rose-500/10"
+          >
+            <Ban className="h-4 w-4" />
+            {user.hasBlocked ? "Unblock" : "Block"}
+          </button>
+        </div>
+      )}
     </div>
   );
 
   const panelBody = (
     <div
       ref={panelRef}
-      className={
+      className={cn(
+        "flex flex-col",
         variant === "overlay"
-          ? "surface-elevated absolute right-0 top-0 h-full w-full overflow-y-auto border-l border-ink/8 dark:border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:max-w-xl sm:p-6"
-          : "surface-elevated h-full w-full overflow-y-auto rounded-[30px] border border-ink/8 dark:border-white/10 p-4 sm:p-6"
-      }
-      role="dialog"
-      aria-modal="true"
-      aria-label="Explore users panel"
+          ? "absolute right-0 top-0 h-full w-full overflow-hidden border-l border-slate-800/50 bg-[var(--bg-page)] sm:max-w-md"
+          : "h-full w-full overflow-y-auto bg-[var(--bg-page)]"
+      )}
     >
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-lagoon/60 dark:text-lagoon/50">
-            Discover
-          </p>
-          <h2 className="soft-heading mt-1 text-2xl font-semibold text-ink dark:text-slate-100">Explore users</h2>
+      {/* Header */}
+      <div       className="sticky top-0 z-20 border-b border-slate-800/50 bg-[var(--bg-page)]/95 backdrop-blur-xl p-4 sm:p-6">
+        <div className={cn(
+          "mb-5 transition-all duration-300",
+          variant === "page" ? "max-w-5xl mx-auto" : ""
+        )}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white">Explore</h1>
+              <p className="mt-1 text-sm text-slate-400">Discover and connect with new people</p>
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-emerald-500/20 px-3 py-1.5">
+              <Wifi className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-xs font-medium text-emerald-400">{onlineUsers.length} online</span>
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="btn-secondary !py-2.5 !px-2.5"
-          aria-label="Close panel"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
 
-      <div className="mb-5">
-        <label className="flex items-center gap-2 rounded-full border border-ink/8 dark:border-white/10 bg-white/70 dark:bg-slate-800/60 px-4 py-2.5">
-          <Search className="h-4 w-4 text-ink/30 dark:text-slate-400" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search users..."
-            className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink/30 dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-        </label>
-      </div>
-
-      <div className="space-y-3 overflow-y-auto pb-10">
-        {isLoading ? (
-          Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-24 animate-pulse rounded-[26px] bg-white/70 dark:bg-slate-800/50" />
-          ))
-        ) : null}
-
-        {!isLoading && users.length === 0 ? (
-          <div className="rounded-[28px] border border-dashed border-ink/10 dark:border-white/10 bg-white/60 dark:bg-slate-800/40 px-6 py-10 text-center">
-            {query ? (
-              <>
-                <Search className="mx-auto mb-4 h-10 w-10 text-ink/30 dark:text-slate-500" />
-                <p className="text-base font-semibold text-ink dark:text-slate-100">No results found</p>
-                <p className="mt-2 text-sm text-ink/60 dark:text-slate-400">
-                  Try a different search term
-                </p>
-              </>
-            ) : (
-              <>
-                <Users className="mx-auto mb-4 h-10 w-10 text-ink/30 dark:text-slate-500" />
-                <p className="text-base font-semibold text-ink dark:text-slate-100">No users yet</p>
-                <p className="mt-2 text-sm text-ink/60 dark:text-slate-400">
-                  Be the first to join! More users will appear here as they sign up.
-                </p>
-              </>
+        {/* Search */}
+        <div className={cn(
+          "relative transition-all duration-300",
+          variant === "page" ? "max-w-5xl mx-auto" : ""
+        )}>
+          <div className={cn(
+            "relative flex items-center gap-3 rounded-2xl border border-slate-700/50 bg-slate-900/80 px-4 py-3 transition-all duration-300",
+            focusedSearch && "border-blue-500/50 bg-slate-900 shadow-lg shadow-blue-500/10"
+          )}>
+            <Search className={cn(
+              "h-5 w-5 text-slate-500 transition-colors",
+              focusedSearch && "text-blue-400"
+            )} />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              onFocus={() => setFocusedSearch(true)}
+              onBlur={() => setFocusedSearch(false)}
+              placeholder="Search by name or username..."
+              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+            />
+            {query && (
+              <button
+                onClick={() => onQueryChange("")}
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             )}
           </div>
-        ) : null}
+        </div>
 
-        {!isLoading && friends.length > 0 && (
-          <div className="mb-6">
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink/50 dark:text-slate-400">Friends</h3>
-            <div className="space-y-3">
-              {friends.map(renderUserCard)}
-            </div>
+        {/* Filter Tabs */}
+        <div className={cn(
+          "mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide",
+          variant === "page" ? "max-w-5xl mx-auto" : ""
+        )}>
+          {filterTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveFilter(tab.id)}
+              className={cn(
+                "flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all",
+                activeFilter === tab.id
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                  : "bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white"
+              )}
+            >
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px]",
+                  activeFilter === tab.id ? "bg-white/20" : "bg-slate-700"
+                )}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className={cn(
+        "flex-1 overflow-y-auto p-4 sm:p-6",
+        variant === "page" ? "max-w-5xl mx-auto w-full" : ""
+      )}>
+        {/* Sections for "all" filter */}
+        {activeFilter === "all" && !query && (
+          <>
+            {/* Suggested Users */}
+            {suggested.length > 0 && (
+              <section className="mb-8">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+                  <UserPlus2 className="h-5 w-5 text-blue-400" />
+                  Suggested for You
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {suggested.slice(0, 8).map((user) => (
+                    <UserCard key={user._id} user={user} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Online Users */}
+            {onlineUsers.length > 0 && (
+              <section className="mb-8">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                  Online Now
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {onlineUsers.map((user) => (
+                    <UserCard key={user._id} user={user} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* All Users */}
+            {users.length > 0 && (
+              <section>
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+                  <Users className="h-5 w-5 text-slate-400" />
+                  All People
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {users.map((user) => (
+                    <UserCard key={user._id} user={user} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+
+        {/* Filtered/ Search Results */}
+        {(activeFilter !== "all" || query) && (
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-white">
+              {query ? `Search Results` : filterTabs.find(t => t.id === activeFilter)?.label}
+              <span className="ml-2 text-sm font-normal text-slate-400">({filteredUsers.length})</span>
+            </h2>
+            {filteredUsers.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filteredUsers.map((user) => (
+                  <UserCard key={user._id} user={user} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700/50 bg-slate-900/50 py-16 text-center">
+                <Users className="mb-4 h-12 w-12 text-slate-600" />
+                <h3 className="text-lg font-semibold text-slate-300">No users found</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  {query ? "Try searching something else" : "Check back later for more suggestions"}
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="animate-pulse rounded-2xl border border-slate-800/50 bg-slate-900/80 p-5">
+                <div className="flex flex-col items-center">
+                  <div className="h-20 w-20 rounded-2xl bg-slate-800" />
+                  <div className="mt-4 h-4 w-24 rounded bg-slate-800" />
+                  <div className="mt-2 h-3 w-16 rounded bg-slate-800" />
+                  <div className="mt-3 h-6 w-20 rounded-full bg-slate-800" />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {!isLoading && nonFriends.length > 0 && (
-          <div>
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink/50 dark:text-slate-400">People You May Know</h3>
-            <div className="space-y-3">
-              {nonFriends.map(renderUserCard)}
+        {/* Empty State */}
+        {!isLoading && users.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-800/50">
+              <Users className="h-10 w-10 text-slate-600" />
             </div>
+            <h3 className="text-xl font-semibold text-slate-300">No users found</h3>
+            <p className="mt-2 max-w-xs text-sm text-slate-500">
+              {query ? "Try searching something else" : "Be the first to join! More users will appear here."}
+            </p>
           </div>
         )}
       </div>
@@ -303,11 +454,11 @@ export const ExplorePanel = ({
   );
 
   if (variant === "page") {
-    return <div className="h-full min-h-0">{panelBody}</div>;
+    return panelBody;
   }
 
   return (
-    <div className="fixed inset-0 z-[320] bg-ink/20 dark:bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" role="presentation">
+    <div className="fixed inset-0 z-[320] bg-black/60 backdrop-blur-sm">
       {panelBody}
     </div>
   );

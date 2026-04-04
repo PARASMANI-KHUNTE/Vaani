@@ -20,10 +20,10 @@ const {
   promoteGroupAdmin,
   removeGroupMember,
   transferGroupOwnership,
-  updateGroupProfile,
+  updateChatSettings,
 } = require("./chat.service");
 
-const broadcastGroupMutation = async ({ participantIds = [], chatId, auditMessage = null }) => {
+const broadcastChatUpdate = async ({ participantIds = [], chatId, auditMessage = null }) => {
   await Promise.all(
     participantIds.map(async (participantId) => {
       const chat = await getChatSummary(chatId, participantId);
@@ -108,23 +108,25 @@ const clearChatMessages = asyncHandler(async (req, res) => {
   });
 });
 
-const patchGroupProfile = asyncHandler(async (req, res) => {
+const patchChatSettings = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id.toString();
-  const result = await updateGroupProfile({
+  const result = await updateChatSettings({
     chatId: req.params.chatId,
     currentUserId,
     groupName: req.body.groupName,
     groupAvatar: req.body.groupAvatar,
+    wallpaper: req.body.wallpaper,
+    theme: req.body.theme,
   });
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
   });
 
   const chat = await getChatSummary(req.params.chatId, currentUserId);
-  return sendSuccess(res, 200, "Group updated successfully", { chat });
+  return sendSuccess(res, 200, "Settings updated successfully", { chat });
 });
 
 const addMembers = asyncHandler(async (req, res) => {
@@ -135,7 +137,7 @@ const addMembers = asyncHandler(async (req, res) => {
     memberIds: req.body.memberIds || [],
   });
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
@@ -153,7 +155,7 @@ const removeMember = asyncHandler(async (req, res) => {
     memberId: req.params.memberId,
   });
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
@@ -176,7 +178,7 @@ const promoteAdmin = asyncHandler(async (req, res) => {
     memberId: req.params.memberId,
   });
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
@@ -194,7 +196,7 @@ const demoteAdmin = asyncHandler(async (req, res) => {
     memberId: req.params.memberId,
   });
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
@@ -212,7 +214,7 @@ const transferOwnership = asyncHandler(async (req, res) => {
     nextOwnerId: req.body.nextOwnerId,
   });
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
@@ -236,7 +238,7 @@ const leaveGroupChat = asyncHandler(async (req, res) => {
     });
   }
 
-  await broadcastGroupMutation({
+  await broadcastChatUpdate({
     participantIds: result.participantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
@@ -284,7 +286,7 @@ const joinGroupViaInvite = asyncHandler(async (req, res) => {
   });
 
   if (result.auditMessage) {
-    await broadcastGroupMutation({
+    await broadcastChatUpdate({
       participantIds: result.participantIds,
       chatId: result.auditMessage.chatId.toString(),
       auditMessage: result.auditMessage,
@@ -309,7 +311,7 @@ module.exports = {
   getChats,
   createInviteLink,
   leaveGroupChat,
-  patchGroupProfile,
+  patchChatSettings,
   previewInviteLink,
   promoteAdmin,
   joinGroupViaInvite,

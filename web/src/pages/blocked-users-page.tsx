@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ShieldOff, UserMinus, Search } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { NavHeader } from "@/components/nav-header";
 import { getBlockedUsers, unblockUser } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BackendUser } from "@/lib/types";
-import { formatConversationDate } from "@/lib/utils";
 
 export const BlockedUsersPage = () => {
   const { session, status } = useAuth();
@@ -99,17 +99,7 @@ export const BlockedUsersPage = () => {
 
   return (
     <main className="flex h-screen flex-col bg-white dark:bg-slate-950">
-      <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
-        <div className="flex items-center gap-4">
-          <Link to="/me/profile" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="flex items-center gap-3">
-            <ShieldOff className="h-5 w-5 text-slate-400" />
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Blocked Users</h1>
-          </div>
-        </div>
-      </header>
+      <NavHeader title="Blocked Users" showBackButton backTo="/me/profile" showNav={false} />
 
       {error && (
         <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10">

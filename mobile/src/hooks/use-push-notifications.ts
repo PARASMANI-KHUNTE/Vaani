@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import { registerMobilePushToken } from "@/lib/api/client";
+import { useNotificationStore } from "@/store/notification-store";
 import { useSessionStore } from "@/store/session-store";
 
 const isExpoGo =
@@ -19,7 +20,7 @@ const configureNotificationsAsync = async () => {
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
-      shouldPlaySound: true,
+      shouldPlaySound: useNotificationStore.getState().soundEnabled,
       shouldSetBadge: false,
     }),
   });

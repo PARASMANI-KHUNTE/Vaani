@@ -1,0 +1,290 @@
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronRight, Compass, LogOut, Menu, MessageSquare, Settings, UserRound, X } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { NotificationPanel } from "@/components/notification-panel";
+import { useAuth } from "@/lib/auth-context";
+import { acceptFriendRequest, rejectFriendRequest } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useChatStore } from "@/store/chat-store";
+import { useLocalStorageBoolean } from "@/hooks/use-local-storage-boolean";
+
+type NavHeaderProps = {
+  title?: string;
+  showBackButton?: boolean;
+  backTo?: string;
+  showNav?: boolean;
+  rightContent?: React.ReactNode;
+  onLogout?: () => void;
+};
+
+export const NavHeader = ({
+  title = "LinkUp",
+  showBackButton = false,
+  backTo,
+  showNav = true,
+  rightContent,
+  onLogout,
+}: NavHeaderProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { session, logout } = useAuth();
+
+  const notifications = useChatStore((state) => state.notifications);
+  const markNotificationRead = useChatStore((state) => state.markNotificationRead);
+  const markNotificationsRead = useChatStore((state) => state.markNotificationsRead);
+  const selectChat = useChatStore((state) => state.selectChat);
+
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [notificationToneEnabled, setNotificationToneEnabled] = useLocalStorageBoolean("notificationToneEnabled", true);
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const isMessagesPage = location.pathname === "/";
+  const isExplorePage = location.pathname.startsWith("/explore");
+  const isProfilePage = location.pathname.startsWith("/me") || location.pathname.startsWith("/profile");
+  const isSettingsPage = location.pathname.startsWith("/settings");
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!isUserMenuOpen) return;
+      if (userMenuRef.current && userMenuRef.current.contains(e.target as Node)) return;
+      setIsUserMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [isUserMenuOpen]);
+
+  const handleLogout = () => {
+    if (onLogout) onLogout();
+    else logout();
+  };
+
+  const handleAcceptFriendRequest = async (userId: string, notificationId: string) => {
+    if (!session?.backendAccessToken) return;
+    try {
+      await acceptFriendRequest(session.backendAccessToken, userId);
+      markNotificationRead(notificationId);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRejectFriendRequest = async (userId: string, notificationId: string) => {
+    if (!session?.backendAccessToken) return;
+    try {
+      await rejectFriendRequest(session.backendAccessToken, userId);
+      markNotificationRead(notificationId);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <header className="z-50 shrink-0 border-b border-[#374151]/60 bg-[#0f172a]/80 px-4 py-3 text-slate-100 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4">
+        {/* Left */}
+        <div className="flex min-w-0 items-center gap-3">
+          {showBackButton ? (
+            <Link
+              to={backTo || "/"}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-300 transition-all hover:bg-white/5 hover:text-white active:scale-95"
+              aria-label="Back"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </Link>
+          ) : null}
+
+          <Link to="/" className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-white/5" aria-label="Home">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#111827] ring-1 ring-white/10">
+              <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold tracking-tight text-white">LinkUp</p>
+              <p className="truncate text-[11px] font-medium text-slate-400">{title}</p>
+            </div>
+          </Link>
+        </div>
+
+        {/* Center */}
+        {showNav ? (
+          <nav className="hidden items-center gap-6 lg:flex">
+            {[
+              { id: "messages", label: "Messages", icon: MessageSquare, active: isMessagesPage, onClick: () => navigate("/") },
+              { id: "explore", label: "Explore", icon: Compass, active: isExplorePage, onClick: () => navigate("/explore") },
+              { id: "profile", label: "Profile", icon: UserRound, active: isProfilePage, onClick: () => navigate("/me/profile") },
+              { id: "settings", label: "Settings", icon: Settings, active: isSettingsPage, onClick: () => navigate("/settings") },
+            ].map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={t.onClick}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+                    t.active ? "bg-[#111827] text-white ring-1 ring-white/10" : "text-[#9ca3af] hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        ) : null}
+
+        {/* Right */}
+        <div className="flex shrink-0 items-center gap-2">
+          {rightContent}
+
+          {/* Mobile hamburger */}
+          {showNav ? (
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition-all hover:bg-white/5 hover:text-white active:scale-95 lg:hidden"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          ) : null}
+
+          <NotificationPanel
+            notifications={notifications}
+            isOpen={isNotificationPanelOpen}
+            onToggle={() => setIsNotificationPanelOpen((v) => !v)}
+            onOpenChat={(c, n) => {
+              if (n) markNotificationRead(n);
+              if (c) selectChat(c);
+              setIsNotificationPanelOpen(false);
+            }}
+            onMarkAllRead={markNotificationsRead}
+            onMarkRead={markNotificationRead}
+            onAcceptFriendRequest={handleAcceptFriendRequest}
+            onRejectFriendRequest={handleRejectFriendRequest}
+            notificationToneEnabled={notificationToneEnabled}
+            onNotificationToneChange={setNotificationToneEnabled}
+          />
+
+          <div className="relative" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsUserMenuOpen((v) => !v)}
+              className="flex h-9 items-center gap-2 rounded-xl px-2 py-1.5 text-slate-300 transition-all hover:bg-white/5 hover:text-white active:scale-[0.98]"
+              aria-label="User menu"
+              aria-expanded={isUserMenuOpen}
+            >
+              <div className="h-7 w-7 overflow-hidden rounded-xl bg-[#111827] ring-1 ring-white/10">
+                <Avatar
+                  src={session?.backendUser?.avatar || null}
+                  name={session?.backendUser?.name || "Me"}
+                  className="h-7 w-7"
+                  textClassName="text-xs font-bold"
+                />
+              </div>
+              <span className="hidden md:inline text-sm font-semibold text-slate-100">
+                {session?.backendUser?.name?.split(" ")[0]}
+              </span>
+            </button>
+
+            {isUserMenuOpen ? (
+              <div className="absolute right-0 top-full z-[240] mt-2 w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-2xl ring-1 ring-black/30">
+                <div className="px-3 py-2.5">
+                  <p className="truncate text-xs font-semibold text-slate-300">Signed in as</p>
+                  <p className="mt-0.5 truncate text-sm font-bold text-white">{session?.backendUser?.name}</p>
+                </div>
+                <div className="mx-3 h-px bg-white/10" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-semibold text-rose-200 hover:bg-rose-500/10"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMobileMenuOpen ? (
+          <div className="fixed inset-0 z-[9999] lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+              className="absolute left-1/2 top-6 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <p className="text-sm font-bold text-white">Menu</p>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 hover:bg-white/5 hover:text-white active:scale-95"
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-2">
+                {[
+                  { label: "Messages", icon: MessageSquare, onClick: () => navigate("/") },
+                  { label: "Explore", icon: Compass, onClick: () => navigate("/explore") },
+                  { label: "Profile", icon: UserRound, onClick: () => navigate("/me/profile") },
+                  { label: "Settings", icon: Settings, onClick: () => navigate("/settings") },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        item.onClick();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-100 hover:bg-white/5"
+                    >
+                      <Icon className="h-5 w-5 text-slate-300" />
+                      {item.label}
+                      <ChevronRight className="ml-auto h-4 w-4 text-slate-500" />
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        ) : null}
+      </AnimatePresence>
+
+    </header>
+  );
+};

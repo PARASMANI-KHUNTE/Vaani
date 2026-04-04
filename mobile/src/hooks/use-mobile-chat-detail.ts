@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { addMobileReaction, deleteMobileMessage, getMobileMessages, postMobileMessage, removeMobileReaction } from "@/lib/api/client";
+import { addMobileReaction, deleteMobileMessage, editMobileMessage, getMobileMessages, postMobileMessage, removeMobileReaction } from "@/lib/api/client";
 import { getMobileSocket } from "@/lib/socket/client";
 import { mobileSocketEvents } from "@/lib/socket/events";
 import { MobileChat, MobileMessage } from "@/lib/types";
@@ -296,6 +296,22 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     }
   };
 
+  const editMessage = async (messageId: string, content: string) => {
+    if (!token || !chat?._id) {
+      return;
+    }
+
+    try {
+      const response = await editMobileMessage(token, messageId, { chatId: chat._id, content });
+      setMessages((current) =>
+        current.map((msg) => (msg._id === messageId ? response.message : msg))
+      );
+      setError(null);
+    } catch (editError) {
+      setError(editError instanceof Error ? editError.message : "Failed to edit message");
+    }
+  };
+
   return {
     messages: sortedMessages,
     isLoading,
@@ -304,5 +320,6 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     sendMessage,
     toggleReaction,
     deleteMessage,
+    editMessage,
   };
 };

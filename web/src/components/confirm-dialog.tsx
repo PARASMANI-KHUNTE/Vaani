@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertTriangle, Info, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 type ConfirmDialogProps = {
@@ -11,8 +11,12 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   variant?: "danger" | "warning" | "info";
   onConfirm: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  onClose?: () => void;
   isLoading?: boolean;
+  confirmText?: string;
+  loading?: boolean;
+  destructive?: boolean;
 };
 
 const variantStyles = {
@@ -48,10 +52,20 @@ export const ConfirmDialog = ({
   variant = "info",
   onConfirm,
   onCancel,
+  onClose,
   isLoading = false,
+  confirmText,
+  loading,
+  destructive,
 }: ConfirmDialogProps) => {
-  const styles = variantStyles[variant];
   const Icon = variantIcons[variant];
+  
+  // Handle alternate props
+  const finalLoading = loading ?? isLoading;
+  const finalConfirmText = confirmText ?? confirmLabel;
+  const finalDestructive = destructive ?? variant === "danger";
+  const finalOnCancel = onCancel ?? onClose;
+  const finalVariant = finalDestructive ? "danger" : variant;
 
   return (
     <AnimatePresence>
@@ -62,7 +76,7 @@ export const ConfirmDialog = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={onCancel}
+            onClick={finalOnCancel}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -72,7 +86,7 @@ export const ConfirmDialog = ({
             className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800 ring-1 ring-black/5"
           >
             <div className="flex items-start gap-4">
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${styles.icon}`}>
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${variantStyles[finalVariant].icon}`}>
                 <Icon className="h-6 w-6" />
               </div>
               <div className="flex-1">
@@ -80,8 +94,8 @@ export const ConfirmDialog = ({
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message}</p>
               </div>
               <button
-                onClick={onCancel}
-                disabled={isLoading}
+                onClick={finalOnCancel}
+                disabled={finalLoading}
                 className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
               >
                 <X className="h-5 w-5" />
@@ -90,18 +104,18 @@ export const ConfirmDialog = ({
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={onCancel}
-                disabled={isLoading}
-                className={`flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold transition-colors disabled:opacity-50 ${styles.cancel}`}
+                onClick={finalOnCancel}
+                disabled={finalLoading}
+                className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${variantStyles[finalVariant].cancel}`}
               >
                 {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}
-                disabled={isLoading}
-                className={`flex-1 rounded-xl py-3 text-sm font-bold shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 ${styles.confirm}`}
+                disabled={finalLoading}
+                className={`flex-1 rounded-xl py-3 text-sm font-bold shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 ${variantStyles[finalVariant].confirm}`}
               >
-                {isLoading ? "Processing..." : confirmLabel}
+                {finalLoading ? "Processing..." : finalConfirmText}
               </button>
             </div>
           </motion.div>
@@ -115,10 +129,12 @@ type AlertDialogProps = {
   isOpen: boolean;
   title: string;
   message: string;
-  onDismiss: () => void;
+  onDismiss?: () => void;
+  onClose?: () => void;
 };
 
-export const AlertDialog = ({ isOpen, title, message, onDismiss }: AlertDialogProps) => {
+export const AlertDialog = ({ isOpen, title, message, onDismiss, onClose }: AlertDialogProps) => {
+  const finalOnDismiss = onDismiss ?? onClose;
   return (
     <AnimatePresence>
       {isOpen && (
@@ -128,7 +144,7 @@ export const AlertDialog = ({ isOpen, title, message, onDismiss }: AlertDialogPr
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={onDismiss}
+            onClick={finalOnDismiss}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -148,7 +164,7 @@ export const AlertDialog = ({ isOpen, title, message, onDismiss }: AlertDialogPr
             </div>
             <div className="mt-6">
               <button
-                onClick={onDismiss}
+                onClick={finalOnDismiss}
                 className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98]"
               >
                 OK

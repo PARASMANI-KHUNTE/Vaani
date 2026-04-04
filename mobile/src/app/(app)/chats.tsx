@@ -8,6 +8,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { ScreenShell } from "@/components/screen-shell";
@@ -51,6 +52,7 @@ export default function ChatsScreen() {
     token: session?.accessToken,
   });
   const [showNewChat, setShowNewChat] = useState(false);
+  const [query, setQuery] = useState("");
 
   const subtitle = useMemo(() => {
     if (isLoading && chats.length === 0) {
@@ -63,6 +65,18 @@ export default function ChatsScreen() {
 
     return "Your conversations appear here.";
   }, [chats.length, error, isLoading]);
+
+  const filteredChats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return chats;
+
+    return chats.filter((item) => {
+      const displayName = item.isGroup
+        ? item.groupName || "Group"
+        : item.otherParticipant?.name || "Unknown";
+      return displayName.toLowerCase().includes(q);
+    });
+  }, [chats, query]);
 
   return (
     <ScreenShell
@@ -80,16 +94,37 @@ export default function ChatsScreen() {
           <ActivityIndicator size="large" color="#155e75" />
         </View>
       ) : (
-        <FlatList
-          data={chats}
+        <View style={styles.stack}>
+          <View style={styles.searchRow}>
+            <Ionicons name="search" size={18} color="#94a3b8" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search chats..."
+              placeholderTextColor="#94a3b8"
+              style={styles.searchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {query.trim() ? (
+              <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
+                <Ionicons name="close" size={18} color="#64748b" />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <FlatList
+            data={filteredChats}
           keyExtractor={(item) => item._id}
           refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => void refresh()} />}
-          contentContainerStyle={chats.length === 0 ? styles.emptyContent : styles.listContent}
+            contentContainerStyle={filteredChats.length === 0 ? styles.emptyContent : styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No chats yet</Text>
+              <Text style={styles.emptyTitle}>{query.trim() ? "No matches" : "No chats yet"}</Text>
               <Text style={styles.emptyBody}>
-                Start a new conversation by tapping the + button above.
+                  {query.trim()
+                    ? "Try a different search."
+                    : "Start a new conversation by tapping the + button above."}
               </Text>
             </View>
           }
@@ -140,7 +175,8 @@ export default function ChatsScreen() {
               </Pressable>
             );
           }}
-        />
+          />
+        </View>
       )}
       <NewChatModal visible={showNewChat} onClose={() => setShowNewChat(false)} />
     </ScreenShell>
@@ -148,6 +184,7 @@ export default function ChatsScreen() {
 }
 
 const styles = StyleSheet.create({
+  stack: { flex: 1, gap: 14 },
   addButton: {
     width: 40,
     height: 40,
@@ -160,6 +197,30 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#dbe4ef",
+    backgroundColor: "#fffdf8",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#0f172a",
+  },
+  clearButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f1f5f9",
   },
   listContent: {
     paddingBottom: 24,

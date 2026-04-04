@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { 
-  ArrowLeft, Copy, Home, Link as LinkIcon, Shield, Users, Crown, ShieldCheck, 
-  UserPlus, Trash2, LogOut, MoreVertical, Check, X, RefreshCw, UserMinus, ArrowRightCircle,
-  Pencil
+  ArrowLeft, Home, LogOut, Shield, Users, Crown, ShieldCheck,
+  UserPlus, MoreVertical, Check, X, RefreshCw, UserMinus, ArrowRightCircle,
+  Pencil, Palette, Image as ImageIcon
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { NavHeader } from "@/components/nav-header";
 import { 
   getChatById, 
   addGroupMembers, 
@@ -16,8 +17,10 @@ import {
   leaveGroup,
   createGroupInviteLink,
   searchUsers,
-  updateGroupProfile,
+  patchChatSettings,
+  uploadMedia,
 } from "@/lib/api";
+import { ChatAppearanceModal } from "@/components/ChatAppearanceModal";
 import { useAuth } from "@/lib/auth-context";
 import { Chat, BackendUser } from "@/lib/types";
 import { formatConversationDate } from "@/lib/utils";
@@ -47,9 +50,18 @@ export const GroupInfoPage = () => {
 
   // Edit group modal
   const [showEditGroup, setShowEditGroup] = useState(false);
+
+  // Invite link options modal
+  const [showInviteOptions, setShowInviteOptions] = useState(false);
+  const [showAppearanceModal, setShowAppearanceModal] = useState(false);
+  const [inviteExpiresInHours, setInviteExpiresInHours] = useState<number>(24);
+  const [inviteMaxUses, setInviteMaxUses] = useState<number | undefined>(undefined);
   const [editGroupName, setEditGroupName] = useState("");
   const [editGroupAvatar, setEditGroupAvatar] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const currentUserId = session?.backendUser?._id;
   const isOwner = chat?.createdBy === currentUserId;
@@ -124,8 +136,12 @@ export const GroupInfoPage = () => {
 
   const generateNewInviteLink = async () => {
     if (!session?.backendAccessToken || !chat) return;
+    setShowInviteOptions(false);
     try {
-      const response = await createGroupInviteLink(session.backendAccessToken, chatId);
+      await createGroupInviteLink(session.backendAccessToken, chatId, {
+        expiresInHours: inviteExpiresInHours,
+        maxUses: inviteMaxUses,
+      });
       const inviteUrl = `${window.location.origin}/?chat=${chatId}`;
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
@@ -152,16 +168,31 @@ export const GroupInfoPage = () => {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !session?.backendAccessToken) return;
+
+    try {
+      setUploadingAvatar(true);
+      const result = await uploadMedia(session.backendAccessToken, file);
+      setEditGroupAvatar(result.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload avatar");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
   const handleUpdateGroup = async () => {
     if (!session?.backendAccessToken || !editGroupName.trim()) return;
     try {
       setIsSaving(true);
-      await updateGroupProfile(session.backendAccessToken, chatId, {
+      const result = await patchChatSettings(session.backendAccessToken, chatId, {
         groupName: editGroupName.trim(),
         groupAvatar: editGroupAvatar.trim() || null,
       });
-      const response = await getChatById(session.backendAccessToken, chatId);
-      setChat(response.chat);
+      setChat(result.chat);
       setShowEditGroup(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update group");
@@ -337,25 +368,23 @@ export const GroupInfoPage = () => {
 
   return (
     <main className="flex h-screen flex-col bg-white dark:bg-slate-950">
-      <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Group Information</h1>
-          </div>
-          {isAdmin && (
-            <button 
-              onClick={generateNewInviteLink}
+      <NavHeader
+        title="Group Information"
+        showBackButton
+        backTo="/"
+        showNav={false}
+        rightContent={
+          isAdmin && (
+            <button
+              onClick={() => setShowInviteOptions(true)}
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-900 transition-all hover:bg-slate-50 dark:border-slate-800 dark:text-white dark:hover:bg-slate-800 flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
               New Invite
             </button>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       {error && (
         <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10">
@@ -412,13 +441,29 @@ export const GroupInfoPage = () => {
               </div>
 
               {isAdmin && (
-                <button
-                  onClick={() => setShowAddMembers(true)}
-                  className="mt-6 flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-blue-700"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Add Members
-                </button>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowAddMembers(true)}
+                    className="flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-blue-700 shadow-sm shadow-blue-600/20"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Invite
+                  </button>
+                  <button
+                    onClick={() => setShowAppearanceModal(true)}
+                    className="flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    <Palette className="h-4 w-4 text-blue-500" />
+                    Design
+                  </button>
+                  <button
+                    onClick={() => setShowEditGroup(true)}
+                    className="flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    <Pencil className="h-4 w-4 text-emerald-500" />
+                    Edit
+                  </button>
+                </div>
               )}
 
               {isMember && !isOwner && (
@@ -682,14 +727,46 @@ export const GroupInfoPage = () => {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-300">Avatar URL (Optional)</label>
+                <label className="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-300">Avatar</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editGroupAvatar}
+                    onChange={(e) => setEditGroupAvatar(e.target.value)}
+                    className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    placeholder="Avatar URL..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-400"
+                  >
+                    {uploadingAvatar ? <RefreshCw className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
+                  </button>
+                </div>
                 <input
-                  type="text"
-                  value={editGroupAvatar}
-                  onChange={(e) => setEditGroupAvatar(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  placeholder="https://example.com/image.jpg"
+                  type="file"
+                  hidden
+                  ref={avatarInputRef}
+                  accept="image/*"
+                  onChange={handleAvatarChange}
                 />
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Palette className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Design Settings</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Chat theme and wallpaper have been moved to the separate Appearance menu for better control.</p>
+                <button 
+                  type="button"
+                  onClick={() => { setShowEditGroup(false); setShowAppearanceModal(true); }}
+                  className="w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 transition-colors"
+                >
+                  Open Appearance Settings
+                </button>
               </div>
             </div>
 
@@ -710,6 +787,85 @@ export const GroupInfoPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invite Link Options Modal */}
+      {showInviteOptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Invite Link Options</h3>
+              <button onClick={() => setShowInviteOptions(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X className="h-5 w-5 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Expires In
+                </label>
+                <select
+                  value={inviteExpiresInHours}
+                  onChange={(e) => setInviteExpiresInHours(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value={1}>1 hour</option>
+                  <option value={6}>6 hours</option>
+                  <option value={24}>24 hours</option>
+                  <option value={72}>3 days</option>
+                  <option value={168}>7 days</option>
+                  <option value={720}>30 days</option>
+                  <option value={8760}>1 year</option>
+                  <option value={87600}>Never expires</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Max Uses (optional)
+                </label>
+                <select
+                  value={inviteMaxUses ?? ""}
+                  onChange={(e) => setInviteMaxUses(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="">Unlimited</option>
+                  <option value={1}>1 use</option>
+                  <option value={5}>5 uses</option>
+                  <option value={10}>10 uses</option>
+                  <option value={25}>25 uses</option>
+                  <option value={50}>50 uses</option>
+                  <option value={100}>100 uses</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowInviteOptions(false)}
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generateNewInviteLink}
+                className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700"
+              >
+                Generate Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {chat && (
+        <ChatAppearanceModal
+          chat={chat}
+          isOpen={showAppearanceModal}
+          onClose={() => setShowAppearanceModal(false)}
+          onUpdate={(updatedChat) => setChat(updatedChat)}
+        />
       )}
     </main>
   );

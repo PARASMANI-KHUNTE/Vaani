@@ -1,5 +1,6 @@
 import * as Google from "expo-auth-session/providers/google";
 import { router } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import {
@@ -11,15 +12,24 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { loginMobileWithGoogle } from "@/lib/api/client";
+import { getMobileAuthMe, loginMobileWithGoogle, redeemMobileWebAuthCode } from "@/lib/api/client";
 import { mobileConfig } from "@/lib/config";
 import { useSessionStore } from "@/store/session-store";
 
 WebBrowser.maybeCompleteAuthSession();
 
+const getSafeRedirect = (value: unknown) => {
+  if (typeof value !== "string") return "/(app)/chats";
+  if (!value.startsWith("/")) return "/(app)/chats";
+  if (value.startsWith("//")) return "/(app)/chats";
+  return value;
+};
+
 export default function AuthScreen() {
+  const { redirect, code } = useLocalSearchParams<{ redirect?: string; code?: string }>();
   const [error, setError] = useState<string | null>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isCodeLoading, setIsCodeLoading] = useState(false);
   const setSession = useSessionStore((state) => state.setSession);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
@@ -33,6 +43,54 @@ export default function AuthScreen() {
       native: `${mobileConfig.scheme}:/oauthredirect`,
     }
   );
+
+  useEffect(() => {
+    if (!code) {
+      return;
+    }
+
+    let active = true;
+
+    const redeem = async () => {
+      try {
+        setError(null);
+        setIsCodeLoading(true);
+
+        const accessToken = await redeemMobileWebAuthCode(code);
+        const me = await getMobileAuthMe(accessToken);
+
+        await setSession({
+          accessToken,
+          user: {
+            userId: me.user._id,
+            name: me.user.name,
+            email: me.user.email,
+            avatar: me.user.avatar,
+          },
+        });
+
+        if (active) {
+          router.replace(getSafeRedirect(redirect) as any);
+        }
+      } catch (redeemError) {
+        if (!active) return;
+        setError(
+          redeemError instanceof Error
+            ? redeemError.message
+            : "We couldn't redeem the mobile auth code."
+        );
+      } finally {
+        if (!active) return;
+        setIsCodeLoading(false);
+      }
+    };
+
+    void redeem();
+
+    return () => {
+      active = false;
+    };
+  }, [code, redirect, setSession]);
 
   useEffect(() => {
     if (!response) {
@@ -72,7 +130,7 @@ export default function AuthScreen() {
           },
         });
 
-        router.replace("/(app)/chats");
+        router.replace(getSafeRedirect(redirect) as any);
       } catch (authError) {
         setError(
           authError instanceof Error
@@ -134,18 +192,22 @@ export default function AuthScreen() {
             style={({ pressed }) => [
               styles.googleButton,
               pressed && styles.googleButtonPressed,
-              (isGoogleLoading || !request) && styles.googleButtonDisabled,
+              (isGoogleLoading || isCodeLoading || !!code || !request) && styles.googleButtonDisabled,
             ]}
-            disabled={isGoogleLoading || !request}
+            disabled={isGoogleLoading || isCodeLoading || !!code || !request}
             onPress={() => void handleGoogleSignIn()}
           >
             <View style={styles.googleIconWrap}>
               <Text style={styles.googleGlyph}>G</Text>
             </View>
             <Text style={styles.googleButtonText}>
-              {isGoogleLoading ? "Finishing sign-in..." : "Continue with Google"}
+              {isCodeLoading
+                ? "Finishing sign-in..."
+                : isGoogleLoading
+                ? "Finishing sign-in..."
+                : "Continue with Google"}
             </Text>
-            {isGoogleLoading ? (
+            {isGoogleLoading || isCodeLoading ? (
               <ActivityIndicator size="small" color="#155e75" />
             ) : (
               <Text style={styles.arrow}>{"->"}</Text>

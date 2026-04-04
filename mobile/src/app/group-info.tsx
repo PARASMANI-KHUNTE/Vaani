@@ -7,6 +7,7 @@ import {
   FlatList,
   Modal,
   Pressable,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,11 +17,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   addMobileGroupMembers,
+  createMobileGroupInviteLink,
+  demoteMobileGroupAdmin,
   getMobileChats,
   leaveMobileGroup,
+  promoteMobileGroupAdmin,
   removeMobileGroupMember,
+  transferMobileGroupOwnership,
   updateMobileGroupProfile,
 } from "@/lib/api/client";
+import { mobileConfig } from "@/lib/config";
 import { useMobileSocial } from "@/hooks/use-mobile-social";
 import { useSessionStore } from "@/store/session-store";
 import { MobileChat, ChatParticipant } from "@/lib/types";
@@ -38,6 +44,8 @@ export default function GroupInfoScreen() {
   const [error, setError] = useState<string | null>(null);
   const [membersWithActions, setMembersWithActions] = useState<MemberWithAction[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [memberActionsOpen, setMemberActionsOpen] = useState(false);
+  const [memberActionTarget, setMemberActionTarget] = useState<MemberWithAction | null>(null);
 
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,6 +59,11 @@ export default function GroupInfoScreen() {
   const [editGroupName, setEditGroupName] = useState("");
   const [editGroupAvatar, setEditGroupAvatar] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null);
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const { directoryUsers, isLoadingDirectory } = useMobileSocial({ token });
 
@@ -141,6 +154,37 @@ export default function GroupInfoScreen() {
     }
   };
 
+  const handleGenerateInvite = async () => {
+    if (!token || !chatId) return;
+
+    try {
+      setIsGeneratingInvite(true);
+      setInviteError(null);
+      const response = await createMobileGroupInviteLink(token, chatId);
+      setInviteToken(response.invite.token);
+      setInviteExpiresAt(response.invite.expiresAt);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to generate invite link");
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
+  const handleShareInvite = async () => {
+    if (!inviteToken) return;
+
+    const webLink = `${mobileConfig.webUrl}/groups/join/${inviteToken}`;
+    const deepLink = `${mobileConfig.scheme}://groups/join/${inviteToken}`;
+
+    try {
+      await Share.share({
+        message: `Join "${chat?.groupName || "Canvas Chat group"}":\n${webLink}\n\nApp link: ${deepLink}`,
+      });
+    } catch (err) {
+      // ignore share dismissal
+    }
+  };
+
   const handleRemoveMember = async (memberId: string) => {
     if (!token) return;
     try {
@@ -152,6 +196,70 @@ export default function GroupInfoScreen() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const openMemberActions = (member: MemberWithAction) => {
+    setMemberActionTarget(member);
+    setMemberActionsOpen(true);
+  };
+
+  const closeMemberActions = () => {
+    setMemberActionsOpen(false);
+    setMemberActionTarget(null);
+  };
+
+  const handlePromoteAdmin = async (memberId: string) => {
+    if (!token || !chatId) return;
+    try {
+      setActionLoading(memberId);
+      await promoteMobileGroupAdmin(token, chatId, memberId);
+      await loadChat();
+    } catch (err) {
+      Alert.alert("Error", "Failed to promote admin");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDemoteAdmin = async (memberId: string) => {
+    if (!token || !chatId) return;
+    try {
+      setActionLoading(memberId);
+      await demoteMobileGroupAdmin(token, chatId, memberId);
+      await loadChat();
+    } catch (err) {
+      Alert.alert("Error", "Failed to demote admin");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleTransferOwnership = async (memberId: string) => {
+    if (!token || !chatId) return;
+
+    Alert.alert(
+      "Transfer Ownership",
+      "Transfer group ownership to this member? You will lose owner privileges.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Transfer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setActionLoading(memberId);
+              await transferMobileGroupOwnership(token, chatId, memberId);
+              await loadChat();
+              closeMemberActions();
+            } catch (err) {
+              Alert.alert("Error", "Failed to transfer ownership");
+            } finally {
+              setActionLoading(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLeaveGroup = async () => {
@@ -226,6 +334,66 @@ export default function GroupInfoScreen() {
           )}
         </View>
 
+        {isAdmin && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="link" size={16} color="#155e75" />
+              <Text style={styles.sectionTitle}>Invite link</Text>
+            </View>
+            <View style={styles.inviteCard}>
+              <Text style={styles.inviteBody}>
+                Generate a link to invite new members. Links expire automatically.
+              </Text>
+              {inviteError ? <Text style={styles.inviteError}>{inviteError}</Text> : null}
+
+              {inviteToken ? (
+                <View style={styles.inviteDetails}>
+                  <Text style={styles.inviteLink} numberOfLines={2}>
+                    {mobileConfig.webUrl}/groups/join/{inviteToken}
+                  </Text>
+                  {inviteExpiresAt ? (
+                    <Text style={styles.inviteMeta}>
+                      Expires {new Date(inviteExpiresAt).toLocaleString()}
+                    </Text>
+                  ) : null}
+                  <View style={styles.inviteActions}>
+                    <Pressable
+                      style={[styles.inviteSecondaryButton, isGeneratingInvite && styles.inviteButtonDisabled]}
+                      disabled={isGeneratingInvite}
+                      onPress={handleGenerateInvite}
+                    >
+                      {isGeneratingInvite ? (
+                        <ActivityIndicator size="small" color="#155e75" />
+                      ) : (
+                        <Text style={styles.inviteSecondaryText}>Refresh</Text>
+                      )}
+                    </Pressable>
+                    <Pressable style={styles.invitePrimaryButton} onPress={() => void handleShareInvite()}>
+                      <Ionicons name="share-outline" size={18} color="#ffffff" />
+                      <Text style={styles.invitePrimaryText}>Share</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Pressable
+                  style={[styles.invitePrimaryButton, isGeneratingInvite && styles.inviteButtonDisabled]}
+                  disabled={isGeneratingInvite}
+                  onPress={handleGenerateInvite}
+                >
+                  {isGeneratingInvite ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={18} color="#ffffff" />
+                      <Text style={styles.invitePrimaryText}>Generate invite</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Ionicons name="key" size={16} color="#f59e0b" />
@@ -261,15 +429,7 @@ export default function GroupInfoScreen() {
                 {isOwner && (
                   <Pressable
                     style={styles.menuButton}
-                    onPress={() => {
-                      setMembersWithActions((prev) =>
-                        prev.map((m) =>
-                          m._id === admin._id
-                            ? { ...m, actionMenuOpen: !m.actionMenuOpen }
-                            : { ...m, actionMenuOpen: false }
-                        )
-                      );
-                    }}
+                    onPress={() => openMemberActions(admin)}
                   >
                     <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
                   </Pressable>
@@ -296,15 +456,7 @@ export default function GroupInfoScreen() {
               {isAdmin && member._id !== currentUserId && (
                 <Pressable
                   style={styles.menuButton}
-                  onPress={() => {
-                    setMembersWithActions((prev) =>
-                      prev.map((m) =>
-                        m._id === member._id
-                          ? { ...m, actionMenuOpen: !m.actionMenuOpen }
-                          : { ...m, actionMenuOpen: false }
-                      )
-                    );
-                  }}
+                  onPress={() => openMemberActions(member)}
                 >
                   <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
                 </Pressable>
@@ -327,6 +479,99 @@ export default function GroupInfoScreen() {
           </Pressable>
         )}
       </ScrollView>
+
+      <Modal
+        visible={memberActionsOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={closeMemberActions}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeMemberActions}>
+          <Pressable style={styles.actionSheet} onPress={() => undefined}>
+            <View style={styles.actionSheetHeader}>
+              <Text style={styles.actionSheetTitle}>
+                {memberActionTarget?.name || "Member actions"}
+              </Text>
+              <Text style={styles.actionSheetSubtitle}>
+                @{memberActionTarget?.username || "user"}
+              </Text>
+            </View>
+
+            {memberActionTarget &&
+            isAdmin &&
+            !memberActionTarget.isOwner &&
+            memberActionTarget._id !== currentUserId ? (
+              <Pressable
+                style={[styles.actionRow, actionLoading === memberActionTarget._id && styles.actionRowDisabled]}
+                disabled={actionLoading === memberActionTarget._id}
+                onPress={() => {
+                  closeMemberActions();
+                  void handleRemoveMember(memberActionTarget._id);
+                }}
+              >
+                <Ionicons name="person-remove-outline" size={20} color="#dc2626" />
+                <Text style={styles.actionRowDangerText}>Remove from group</Text>
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#dc2626" /> : null}
+              </Pressable>
+            ) : null}
+
+            {memberActionTarget &&
+            isAdmin &&
+            !memberActionTarget.isOwner &&
+            !memberActionTarget.isAdmin ? (
+              <Pressable
+                style={[styles.actionRow, actionLoading === memberActionTarget._id && styles.actionRowDisabled]}
+                disabled={actionLoading === memberActionTarget._id}
+                onPress={() => {
+                  closeMemberActions();
+                  void handlePromoteAdmin(memberActionTarget._id);
+                }}
+              >
+                <Ionicons name="shield-checkmark-outline" size={20} color="#155e75" />
+                <Text style={styles.actionRowText}>Promote to admin</Text>
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#155e75" /> : null}
+              </Pressable>
+            ) : null}
+
+            {memberActionTarget &&
+            isOwner &&
+            !memberActionTarget.isOwner &&
+            memberActionTarget.isAdmin ? (
+              <Pressable
+                style={[styles.actionRow, actionLoading === memberActionTarget._id && styles.actionRowDisabled]}
+                disabled={actionLoading === memberActionTarget._id}
+                onPress={() => {
+                  closeMemberActions();
+                  void handleDemoteAdmin(memberActionTarget._id);
+                }}
+              >
+                <Ionicons name="shield-outline" size={20} color="#155e75" />
+                <Text style={styles.actionRowText}>Demote admin</Text>
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#155e75" /> : null}
+              </Pressable>
+            ) : null}
+
+            {memberActionTarget &&
+            isOwner &&
+            !memberActionTarget.isOwner &&
+            memberActionTarget._id !== currentUserId ? (
+              <Pressable
+                style={[styles.actionRow, actionLoading === memberActionTarget._id && styles.actionRowDisabled]}
+                disabled={actionLoading === memberActionTarget._id}
+                onPress={() => void handleTransferOwnership(memberActionTarget._id)}
+              >
+                <Ionicons name="key-outline" size={20} color="#f59e0b" />
+                <Text style={styles.actionRowText}>Transfer ownership</Text>
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#f59e0b" /> : null}
+              </Pressable>
+            ) : null}
+
+            <Pressable style={styles.actionCancelRow} onPress={closeMemberActions}>
+              <Text style={styles.actionCancelText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={showAddMembers} transparent animationType="slide" onRequestClose={() => setShowAddMembers(false)}>
         <View style={styles.modalOverlay}>
@@ -485,6 +730,18 @@ const styles = StyleSheet.create({
   section: { gap: 8 },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionTitle: { fontSize: 12, fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: 1 },
+  inviteCard: { borderRadius: 18, backgroundColor: "#fffdf8", padding: 14, borderWidth: 1, borderColor: "#e2e8f0", gap: 10 },
+  inviteBody: { fontSize: 13, lineHeight: 18, color: "#64748b" },
+  inviteError: { fontSize: 12, fontWeight: "700", color: "#dc2626" },
+  inviteDetails: { gap: 6 },
+  inviteLink: { fontSize: 13, fontWeight: "700", color: "#0f172a" },
+  inviteMeta: { fontSize: 11, color: "#94a3b8" },
+  inviteActions: { flexDirection: "row", gap: 10, marginTop: 6 },
+  invitePrimaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#155e75", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, flex: 1 },
+  invitePrimaryText: { fontSize: 13, fontWeight: "800", color: "#fff" },
+  inviteSecondaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#e0f2fe", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, width: 110 },
+  inviteSecondaryText: { fontSize: 13, fontWeight: "800", color: "#155e75" },
+  inviteButtonDisabled: { opacity: 0.6 },
   ownerCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fffbeb", padding: 12, borderRadius: 16, borderWidth: 1, borderColor: "#fcd34d" },
   memberCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fffdf8", padding: 12, borderRadius: 16 },
   memberAvatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#cffafe", alignItems: "center", justifyContent: "center" },
@@ -498,6 +755,32 @@ const styles = StyleSheet.create({
   leaveButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fef2f2", paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: "#fecaca" },
   leaveButtonText: { fontSize: 15, fontWeight: "700", color: "#dc2626" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  actionSheet: {
+    backgroundColor: "#fffdf8",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 18,
+    gap: 8,
+  },
+  actionSheetHeader: { gap: 2, paddingBottom: 8 },
+  actionSheetTitle: { fontSize: 18, fontWeight: "900", color: "#0f172a" },
+  actionSheetSubtitle: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  actionRowDisabled: { opacity: 0.6 },
+  actionRowText: { flex: 1, fontSize: 14, fontWeight: "800", color: "#0f172a" },
+  actionRowDangerText: { flex: 1, fontSize: 14, fontWeight: "800", color: "#dc2626" },
+  actionCancelRow: { paddingVertical: 14, alignItems: "center" },
+  actionCancelText: { fontSize: 14, fontWeight: "800", color: "#475569" },
   confirmOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 },
   confirmContent: { backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "100%", maxWidth: 320 },
   confirmTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a", textAlign: "center" },

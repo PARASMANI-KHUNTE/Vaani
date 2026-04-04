@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -21,9 +23,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMobileChatDetail } from "@/hooks/use-mobile-chat-detail";
 import { useMobileChats } from "@/hooks/use-mobile-chats";
 import { useMobileRealtime } from "@/hooks/use-mobile-realtime";
+import { markMobileChatRead, uploadMobileMedia } from "@/lib/api/client";
 import { getMobileSocket } from "@/lib/socket/client";
 import { mobileSocketEvents } from "@/lib/socket/events";
 import { MobileMessage, MobileMessageReaction } from "@/lib/types";
+import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -51,9 +55,19 @@ const StatusIcon = ({ status, isOwn }: { status: string; isOwn: boolean }) => {
   }
 };
 
+type SelectedMedia = {
+  uri: string;
+  type: "image" | "file" | "video" | "voice";
+  name: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+};
+
 export default function ChatDetailScreen() {
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const session = useSessionStore((state) => state.session);
+  const upsertChat = useChatStore((state) => state.upsertChat);
   const { chats } = useMobileChats({
     token: session?.accessToken,
   });
@@ -67,7 +81,19 @@ export default function ChatDetailScreen() {
     [chatId, chats]
   );
 
-  const { messages, isLoading, isSending, error, sendMessage, toggleReaction, deleteMessage } = useMobileChatDetail({
+  useEffect(() => {
+    if (!session?.accessToken || !chatId) return;
+
+    markMobileChatRead(session.accessToken, chatId)
+      .then((response) => {
+        if (response?.chat) {
+          upsertChat(response.chat);
+        }
+      })
+      .catch(() => undefined);
+  }, [chatId, session?.accessToken, upsertChat]);
+
+  const { messages, isLoading, isSending, error, sendMessage, toggleReaction, deleteMessage, editMessage } = useMobileChatDetail({
     token: session?.accessToken,
     userId: session?.user?.userId,
     chat,
@@ -76,9 +102,25 @@ export default function ChatDetailScreen() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<{ uri: string; type: "image"; width?: number; height?: number } | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia | null>(null);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<MobileMessage | null>(null);
+
+  const selectedMessage = useMemo(() => {
+    if (!selectedMessageId) return null;
+    return messages.find((m) => m._id === selectedMessageId) || null;
+  }, [messages, selectedMessageId]);
+
+  const canEditSelected =
+    !!selectedMessage &&
+    (typeof selectedMessage.senderId === "string"
+      ? selectedMessage.senderId === session?.user?.userId
+      : selectedMessage.senderId._id === session?.user?.userId) &&
+    selectedMessage.type === "text" &&
+    !!selectedMessage.content?.trim();
 
   useEffect(() => {
     if (!session?.accessToken || !chatId) return;
@@ -163,7 +205,14 @@ export default function ChatDetailScreen() {
               });
               if (!result.canceled && result.assets[0]) {
                 const asset = result.assets[0];
-                setSelectedMedia({ uri: asset.uri, type: "image", width: asset.width, height: asset.height });
+                setSelectedMedia({
+                  uri: asset.uri,
+                  type: "image",
+                  name: asset.fileName || `image-${Date.now()}.jpg`,
+                  mimeType: asset.mimeType || "image/jpeg",
+                  width: asset.width,
+                  height: asset.height,
+                });
               }
             } catch (error) {
               console.log("Media selection error:", error);
@@ -186,11 +235,92 @@ export default function ChatDetailScreen() {
               });
               if (!result.canceled && result.assets[0]) {
                 const asset = result.assets[0];
-                setSelectedMedia({ uri: asset.uri, type: "image", width: asset.width, height: asset.height });
+                setSelectedMedia({
+                  uri: asset.uri,
+                  type: "image",
+                  name: asset.fileName || `photo-${Date.now()}.jpg`,
+                  mimeType: asset.mimeType || "image/jpeg",
+                  width: asset.width,
+                  height: asset.height,
+                });
               }
             } catch (error) {
               console.log("Camera error:", error);
               Alert.alert("Error", "Failed to take photo");
+            }
+          },
+        },
+        {
+          text: "Video",
+          onPress: async () => {
+            try {
+              const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!permissionResult.granted) {
+                Alert.alert("Permission required", "Please allow access to your photo library.");
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ["videos"],
+                quality: 1,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const asset = result.assets[0];
+                setSelectedMedia({
+                  uri: asset.uri,
+                  type: "video",
+                  name: asset.fileName || `video-${Date.now()}.mp4`,
+                  mimeType: asset.mimeType || "video/mp4",
+                });
+              }
+            } catch (error) {
+              console.log("Video selection error:", error);
+              Alert.alert("Error", "Failed to select video");
+            }
+          },
+        },
+        {
+          text: "File",
+          onPress: async () => {
+            try {
+              const result = await DocumentPicker.getDocumentAsync({
+                type: "*/*",
+                multiple: false,
+                copyToCacheDirectory: true,
+              });
+              if (result.canceled || !result.assets?.[0]) return;
+              const asset = result.assets[0];
+              setSelectedMedia({
+                uri: asset.uri,
+                type: "file",
+                name: asset.name || `file-${Date.now()}`,
+                mimeType: asset.mimeType || "application/octet-stream",
+              });
+            } catch (error) {
+              console.log("File selection error:", error);
+              Alert.alert("Error", "Failed to select file");
+            }
+          },
+        },
+        {
+          text: "Audio (Voice)",
+          onPress: async () => {
+            try {
+              const result = await DocumentPicker.getDocumentAsync({
+                type: "audio/*",
+                multiple: false,
+                copyToCacheDirectory: true,
+              });
+              if (result.canceled || !result.assets?.[0]) return;
+              const asset = result.assets[0];
+              setSelectedMedia({
+                uri: asset.uri,
+                type: "voice",
+                name: asset.name || `voice-${Date.now()}`,
+                mimeType: asset.mimeType || "audio/mpeg",
+              });
+            } catch (error) {
+              console.log("Audio selection error:", error);
+              Alert.alert("Error", "Failed to select audio");
             }
           },
         },
@@ -207,21 +337,43 @@ export default function ChatDetailScreen() {
 
     try {
       setIsSendingMedia(true);
-      const socket = getMobileSocket(session.accessToken);
-      socket.emit(mobileSocketEvents.sendMessage, {
-        chatId,
-        type: selectedMedia.type,
-        media: {
-          url: selectedMedia.uri,
-        },
+
+      const uploadResponse = await uploadMobileMedia(session.accessToken, {
+        uri: selectedMedia.uri,
+        type: selectedMedia.mimeType,
+        name: selectedMedia.name,
       });
+
+      const socket = getMobileSocket(session.accessToken);
+
+      await new Promise<void>((resolve, reject) => {
+        socket.emit(
+          mobileSocketEvents.sendMessage,
+          {
+            chatId,
+            type: selectedMedia.type,
+            media: uploadResponse.media,
+            replyToId: replyToMessage?._id || null,
+          },
+          (ack: { ok: boolean; error?: string }) => {
+            if (!ack?.ok) {
+              reject(new Error(ack?.error || "Failed to send media"));
+              return;
+            }
+            resolve();
+          }
+        );
+      });
+
       setSelectedMedia(null);
+      setReplyToMessage(null);
     } catch (error) {
       console.log("Send media error:", error);
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to send media");
     } finally {
       setIsSendingMedia(false);
     }
-  }, [selectedMedia, chatId, session?.accessToken]);
+  }, [selectedMedia, chatId, session?.accessToken, replyToMessage?._id]);
 
   const handleCancelMedia = useCallback(() => {
     setSelectedMedia(null);
@@ -314,12 +466,41 @@ export default function ChatDetailScreen() {
                 }
                 if (item.type === "file" && item.media?.url) {
                   return (
-                    <View style={styles.fileContainer}>
+                    <Pressable
+                      style={styles.fileContainer}
+                      onPress={() => void Linking.openURL(item.media!.url)}
+                    >
                       <Ionicons name="document-text" size={24} color={isOwn ? "#ffffff" : "#155e75"} />
                       <Text style={[styles.fileName, isOwn ? styles.ownText : styles.otherText]} numberOfLines={1}>
-                        {item.media.publicId || "File"}
+                        {item.media.originalName || item.media.publicId || "File"}
                       </Text>
-                    </View>
+                    </Pressable>
+                  );
+                }
+                if (item.type === "video" && item.media?.url) {
+                  return (
+                    <Pressable
+                      style={styles.fileContainer}
+                      onPress={() => void Linking.openURL(item.media!.url)}
+                    >
+                      <Ionicons name="videocam" size={24} color={isOwn ? "#ffffff" : "#155e75"} />
+                      <Text style={[styles.fileName, isOwn ? styles.ownText : styles.otherText]} numberOfLines={1}>
+                        {item.media.originalName || "Video message"}
+                      </Text>
+                    </Pressable>
+                  );
+                }
+                if (item.type === "voice" && item.media?.url) {
+                  return (
+                    <Pressable
+                      style={styles.fileContainer}
+                      onPress={() => void Linking.openURL(item.media!.url)}
+                    >
+                      <Ionicons name="mic" size={24} color={isOwn ? "#ffffff" : "#155e75"} />
+                      <Text style={[styles.fileName, isOwn ? styles.ownText : styles.otherText]} numberOfLines={1}>
+                        {item.media.originalName || "Voice message"}
+                      </Text>
+                    </Pressable>
                   );
                 }
                 return (
@@ -387,7 +568,31 @@ export default function ChatDetailScreen() {
         <View style={styles.composer}>
           {selectedMedia ? (
             <View style={styles.mediaPreviewContainer}>
-              <Image source={{ uri: selectedMedia.uri }} style={styles.mediaPreview} resizeMode="cover" />
+              {selectedMedia.type === "image" ? (
+                <Image source={{ uri: selectedMedia.uri }} style={styles.mediaPreview} resizeMode="cover" />
+              ) : (
+                <View style={styles.filePreview}>
+                  <Ionicons
+                    name={
+                      selectedMedia.type === "video"
+                        ? "videocam"
+                        : selectedMedia.type === "voice"
+                        ? "mic"
+                        : "document-text"
+                    }
+                    size={22}
+                    color="#155e75"
+                  />
+                  <View style={styles.filePreviewText}>
+                    <Text style={styles.filePreviewTitle} numberOfLines={1}>
+                      {selectedMedia.name}
+                    </Text>
+                    <Text style={styles.filePreviewMeta} numberOfLines={1}>
+                      {selectedMedia.mimeType}
+                    </Text>
+                  </View>
+                </View>
+              )}
               <Pressable style={styles.cancelMediaButton} onPress={handleCancelMedia}>
                 <Ionicons name="close" size={16} color="#ffffff" />
               </Pressable>
@@ -465,9 +670,9 @@ export default function ChatDetailScreen() {
           setShowReactionPicker(false);
           setSelectedMessageId(null);
         }}>
-          <View style={styles.messageOptionsContainer}>
-            <View style={styles.reactionPicker}>
-              {REACTION_EMOJIS.map((emoji) => (
+            <View style={styles.messageOptionsContainer}>
+              <View style={styles.reactionPicker}>
+                {REACTION_EMOJIS.map((emoji) => (
                 <Pressable
                   key={emoji}
                   style={styles.reactionButton}
@@ -481,15 +686,30 @@ export default function ChatDetailScreen() {
                 >
                   <Text style={styles.reactionEmojiButton}>{emoji}</Text>
                 </Pressable>
-              ))}
-            </View>
-            <Pressable
-              style={styles.deleteButton}
-              onPress={() => {
-                setShowReactionPicker(false);
-                setShowDeleteModal(true);
-              }}
-            >
+                ))}
+              </View>
+              {canEditSelected ? (
+                <Pressable
+                  style={styles.editButton}
+                  onPress={() => {
+                    if (!selectedMessageId) return;
+                    setShowReactionPicker(false);
+                    setEditingMessageId(selectedMessageId);
+                    setEditDraft(selectedMessage?.content || "");
+                    setShowEditModal(true);
+                  }}
+                >
+                  <Ionicons name="pencil-outline" size={20} color="#155e75" />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                style={styles.deleteButton}
+                onPress={() => {
+                  setShowReactionPicker(false);
+                  setShowDeleteModal(true);
+                }}
+              >
               <Ionicons name="trash-outline" size={20} color="#dc2626" />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </Pressable>
@@ -536,6 +756,47 @@ export default function ChatDetailScreen() {
             >
               <Text style={styles.cancelOptionText}>Cancel</Text>
             </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowEditModal(false)}>
+          <View style={styles.editModalContent}>
+            <Text style={styles.editModalTitle}>Edit message</Text>
+            <TextInput
+              value={editDraft}
+              onChangeText={setEditDraft}
+              style={styles.editInput}
+              multiline
+              autoFocus
+              placeholder="Update your message..."
+              placeholderTextColor="#94a3b8"
+            />
+            <View style={styles.editActions}>
+              <Pressable style={styles.editCancel} onPress={() => setShowEditModal(false)}>
+                <Text style={styles.editCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.editSave}
+                onPress={() => {
+                  if (!editingMessageId) return;
+                  const next = editDraft.trim();
+                  if (!next) return;
+                  void editMessage(editingMessageId, next);
+                  setShowEditModal(false);
+                  setSelectedMessageId(null);
+                  setEditingMessageId(null);
+                }}
+              >
+                <Text style={styles.editSaveText}>Save</Text>
+              </Pressable>
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -758,6 +1019,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  editButtonText: {
+    color: "#155e75",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   deleteButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -811,6 +1091,37 @@ const styles = StyleSheet.create({
     color: "#64748b",
     textAlign: "center",
   },
+  editModalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
+    width: "88%",
+    maxWidth: 340,
+    gap: 12,
+  },
+  editModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0f172a",
+    textAlign: "center",
+  },
+  editInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#0f172a",
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+  editActions: { flexDirection: "row", gap: 12 },
+  editCancel: { flex: 1, paddingVertical: 12, alignItems: "center", backgroundColor: "#f1f5f9", borderRadius: 12 },
+  editCancelText: { fontSize: 15, fontWeight: "800", color: "#475569" },
+  editSave: { flex: 1, paddingVertical: 12, alignItems: "center", backgroundColor: "#155e75", borderRadius: 12 },
+  editSaveText: { fontSize: 15, fontWeight: "800", color: "#ffffff" },
   attachButton: {
     padding: 8,
   },
@@ -825,6 +1136,21 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 8,
   },
+  filePreview: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  filePreviewText: { flex: 1, gap: 2 },
+  filePreviewTitle: { fontSize: 13, fontWeight: "800", color: "#0f172a" },
+  filePreviewMeta: { fontSize: 11, color: "#64748b" },
   cancelMediaButton: {
     position: "absolute",
     left: 44,

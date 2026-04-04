@@ -9,7 +9,7 @@ const { assertUsersCanInteract, mapUserProfile } = require("../user/user.service
 const { destroyMediaAssets } = require("../../utils/mediaUpload");
 const MAX_GROUP_MEMBERS = 50;
 const DEFAULT_INVITE_EXPIRY_HOURS = 24 * 7;
-const MAX_INVITE_EXPIRY_HOURS = 24 * 30;
+const MAX_INVITE_EXPIRY_HOURS = 24 * 365 * 10;
 
 const normalizeId = (value) => {
   if (!value) {
@@ -530,48 +530,98 @@ const createGroupSystemMessage = async ({
     .lean();
 };
 
-const updateGroupProfile = async ({ chatId, currentUserId, groupName, groupAvatar }) => {
-  const chat = await ensureGroupChatMember(chatId, currentUserId);
-  assertGroupAdmin(chat, currentUserId);
+const updateChatSettings = async ({ chatId, currentUserId, groupName, groupAvatar, wallpaper, theme }) => {
+  const chat = await ensureChatMember(chatId, currentUserId);
+  const isGroup = chat.isGroup;
 
   const nextName = typeof groupName === "string" ? groupName.trim() : undefined;
   const nextAvatar =
     groupAvatar === null ? null : typeof groupAvatar === "string" ? groupAvatar.trim() : undefined;
-
-  if (nextName === undefined && nextAvatar === undefined) {
-    throw new ApiError(400, "Provide groupName or groupAvatar to update");
-  }
-
-  if (nextName !== undefined && (nextName.length < 2 || nextName.length > 60)) {
-    throw new ApiError(400, "groupName must be between 2 and 60 characters");
-  }
+  const nextWallpaper =
+    wallpaper === null ? null : typeof wallpaper === "string" ? wallpaper.trim() : undefined;
+  const nextTheme = typeof theme === "string" ? theme.trim() : undefined;
 
   const update = {};
-  if (nextName !== undefined) {
-    update.groupName = nextName;
+  const changes = [];
+
+  // Group-specific profile updates
+  if (isGroup) {
+    if (nextName !== undefined && nextName !== chat.groupName) {
+      assertGroupAdmin(chat, currentUserId);
+      if (nextName.length < 2 || nextName.length > 60) {
+        throw new ApiError(400, "groupName must be between 2 and 60 characters");
+      }
+      update.groupName = nextName;
+      changes.push("name");
+    }
+
+    if (nextAvatar !== undefined && nextAvatar !== chat.groupAvatar) {
+      assertGroupAdmin(chat, currentUserId);
+      update.groupAvatar = nextAvatar;
+      changes.push("avatar");
+    }
   }
-  if (nextAvatar !== undefined) {
-    update.groupAvatar = nextAvatar || null;
+
+  // Common appearance updates
+  if (nextWallpaper !== undefined && nextWallpaper !== chat.wallpaper) {
+    update.wallpaper = nextWallpaper;
+    changes.push("wallpaper");
+  }
+
+  if (nextTheme !== undefined && nextTheme !== chat.theme) {
+    update.theme = nextTheme;
+    changes.push("theme");
+  }
+
+  if (changes.length === 0) {
+    throw new ApiError(400, "No changes detected");
   }
 
   await Chat.updateOne({ _id: chatId }, { $set: update });
   const actor = await User.findById(currentUserId).select("name").lean();
-  const auditMessage = await createGroupSystemMessage({
-    chatId,
-    actorId: currentUserId,
-    eventType: nextName !== undefined ? "group_renamed" : "group_avatar_updated",
-    content:
-      nextName !== undefined
-        ? `${actor?.name || "Someone"} renamed the group to "${nextName}".`
-        : `${actor?.name || "Someone"} updated the group avatar.`,
-    metadata: {
-      ...(nextName !== undefined ? { groupName: nextName } : {}),
-      ...(nextAvatar !== undefined ? { groupAvatar: nextAvatar || null } : {}),
-    },
-  });
+
+  let auditMessage = null;
+  if (isGroup) {
+    let eventType = "group_updated";
+    let content = `${actor?.name || "Someone"} updated the group profile.`;
+
+    if (changes.length === 1) {
+      const field = changes[0];
+      if (field === "name") {
+        eventType = "group_renamed";
+        content = `${actor?.name || "Someone"} renamed the group to "${nextName}".`;
+      } else if (field === "avatar") {
+        eventType = "group_avatar_updated";
+        content = `${actor?.name || "Someone"} updated the group avatar.`;
+      } else if (field === "wallpaper") {
+        eventType = "group_wallpaper_updated";
+        content = `${actor?.name || "Someone"} updated the group wallpaper.`;
+      } else if (field === "theme") {
+        eventType = "group_theme_updated";
+        content = `${actor?.name || "Someone"} updated the group theme to "${nextTheme}".`;
+      }
+    } else {
+      const changeList = changes.join(", ");
+      content = `${actor?.name || "Someone"} updated the group ${changeList}.`;
+    }
+
+    auditMessage = await createGroupSystemMessage({
+      chatId,
+      actorId: currentUserId,
+      eventType,
+      content,
+      metadata: {
+        ...(update.groupName !== undefined ? { groupName: update.groupName } : {}),
+        ...(update.groupAvatar !== undefined ? { groupAvatar: update.groupAvatar } : {}),
+        ...(update.wallpaper !== undefined ? { wallpaper: update.wallpaper } : {}),
+        ...(update.theme !== undefined ? { theme: update.theme } : {}),
+      },
+    });
+  }
 
   const updatedChat = await Chat.findById(chatId).lean();
   return {
+    chat: updatedChat,
     participantIds: getParticipantIds(updatedChat),
     auditMessage,
   };
@@ -924,7 +974,7 @@ const createGroupInviteLink = async ({
   if (safeExpiryHours < 1 || safeExpiryHours > MAX_INVITE_EXPIRY_HOURS) {
     throw new ApiError(
       400,
-      `expiresInHours must be between 1 and ${MAX_INVITE_EXPIRY_HOURS}`
+      `expiresInHours must be between 1 and ${MAX_INVITE_EXPIRY_HOURS} hours`
     );
   }
 
@@ -1134,5 +1184,4 @@ module.exports = {
   promoteGroupAdmin,
   removeGroupMember,
   transferGroupOwnership,
-  updateGroupProfile,
 };

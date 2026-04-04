@@ -65,6 +65,14 @@ const chatSchema = new mongoose.Schema(
       type: [chatUserStateSchema],
       default: [],
     },
+    wallpaper: {
+      type: String,
+      default: null,
+    },
+    theme: {
+      type: String,
+      default: "default",
+    },
   },
   {
     timestamps: true,

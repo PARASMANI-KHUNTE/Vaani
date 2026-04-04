@@ -886,10 +886,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
           xhrRef.current = xhr;
         }
       );
-      const media = {
-        ...uploadResponse.media,
-        resourceType: uploadResponse.media.resourceType === "video" ? "raw" : uploadResponse.media.resourceType,
-      };
+      const media = uploadResponse.media;
       const type = media.messageType as Exclude<MessageType, "text">;
       const optimisticId = `temp-media-${Date.now()}`;
       const replyToMessage = replyToId

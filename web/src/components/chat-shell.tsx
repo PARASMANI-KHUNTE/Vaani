@@ -1,50 +1,49 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
-import { Compass, LogOut, MailCheck, MailMinus, MessageSquare, Sparkles, Trash2, UserRound } from "lucide-react";
+import { Compass, MailCheck, MailMinus, MessageSquare, Sparkles, Trash2, UserRound } from "lucide-react";
 import { ChatWindow } from "@/components/ChatWindow/ChatWindow";
-import { NotificationPanel } from "@/components/notification-panel";
 import { ConfirmDialog, AlertDialog } from "@/components/confirm-dialog";
 import { NotificationToastStack } from "@/components/notification-toast-stack";
 import { Sidebar } from "@/components/Sidebar/Sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Toast } from "@/components/toast";
+import { KeyboardShortcutsHint, useAppKeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { useChatData } from "@/hooks/use-chat-data";
 import { NewChatModal } from "@/components/new-chat-modal";
 import { useAuth } from "@/lib/auth-context";
-import { acceptFriendRequest, rejectFriendRequest } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { useChatStore } from "@/store/chat-store";
+import { NavHeader } from "@/components/nav-header";
+import { useLocalStorageBoolean } from "@/hooks/use-local-storage-boolean";
+import { cn } from "@/lib/utils";
 
 export const ChatShell = () => {
   const navigate = useNavigate();
-  const { session, status, loginWithGoogleCredential, logout } = useAuth();
+  const { session, status, loginWithGoogleCredential } = useAuth();
   const selectedChatId = useChatStore((state) => state.selectedChatId);
   const selectChat = useChatStore((state) => state.selectChat);
   const notifications = useChatStore((state) => state.notifications);
   const typingByChat = useChatStore((state) => state.typingByChat);
   const onlineUserIds = useChatStore((state) => state.onlineUserIds);
   const markNotificationRead = useChatStore((state) => state.markNotificationRead);
-  const markNotificationsRead = useChatStore((state) => state.markNotificationsRead);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
-  const [notificationToneEnabled, setNotificationToneEnabled] = useState(() => {
-    const stored = localStorage.getItem("notificationToneEnabled");
-    return stored !== null ? JSON.parse(stored) : true;
-  });
-  const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
+  const [notificationToneEnabled] = useLocalStorageBoolean("notificationToneEnabled", true);
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const debouncedSearch = searchTerm.trim().toLowerCase();
 
+  // Enable keyboard shortcuts
+  useAppKeyboardShortcuts();
+
+  // Listen for open-new-chat event
   useEffect(() => {
-    localStorage.setItem("notificationToneEnabled", JSON.stringify(notificationToneEnabled));
-  }, [notificationToneEnabled]);
+    const handleOpenNewChat = () => setIsNewChatModalOpen(true);
+    window.addEventListener("open-new-chat", handleOpenNewChat);
+    return () => window.removeEventListener("open-new-chat", handleOpenNewChat);
+  }, []);
 
   const {
     chats,
@@ -159,26 +158,6 @@ export const ChatShell = () => {
     setBulkDeleteComplete(true);
   }, [deleteSelectedChat, selectedChats]);
 
-  const handleAcceptFriendRequest = useCallback(async (userId: string, notificationId: string) => {
-    if (!session?.backendAccessToken) return;
-    try {
-      await acceptFriendRequest(session.backendAccessToken, userId);
-      markNotificationRead(notificationId);
-    } catch (err) {
-      setFriendRequestError(err instanceof Error ? err.message : "Failed to accept friend request");
-    }
-  }, [session, markNotificationRead]);
-
-  const handleRejectFriendRequest = useCallback(async (userId: string, notificationId: string) => {
-    if (!session?.backendAccessToken) return;
-    try {
-      await rejectFriendRequest(session.backendAccessToken, userId);
-      markNotificationRead(notificationId);
-    } catch (err) {
-      setFriendRequestError(err instanceof Error ? err.message : "Failed to reject friend request");
-    }
-  }, [session, markNotificationRead]);
-
   if (status === "loading") {
     return (
       <div className="flex h-full w-full items-center justify-center bg-base-50 dark:bg-base-950">
@@ -220,7 +199,7 @@ export const ChatShell = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-white dark:bg-slate-950 overflow-hidden relative">
+    <div className="flex h-dvh w-full flex-col bg-[#f8f9fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden relative">
       {error ? (
         <Toast
           message={error}
@@ -229,12 +208,7 @@ export const ChatShell = () => {
           }}
         />
       ) : null}
-      {friendRequestError ? (
-        <Toast
-          message={friendRequestError}
-          onDismiss={() => setFriendRequestError(null)}
-        />
-      ) : null}
+
       
       <NotificationToastStack 
         notifications={notifications} 
@@ -243,58 +217,7 @@ export const ChatShell = () => {
         onMarkRead={markNotificationRead} 
       />
 
-      <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 sm:py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-100 dark:ring-slate-800">
-                <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
-              </div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">LinkUp</h1>
-            </div>
-            
-            <nav className="hidden items-center gap-1 sm:flex">
-              <button 
-                type="button" 
-                className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 transition-all dark:bg-slate-800 dark:text-slate-100"
-              >
-                <div className="relative">
-                  <MessageSquare className="h-4 w-4" />
-                  {totalUnread > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white leading-none">
-                      {totalUnread > 99 ? "99+" : totalUnread}
-                    </span>
-                  )}
-                </div>
-                <span>Messages</span>
-              </button>
-              <button onClick={() => navigate("/explore")} className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"><Compass className="h-4 w-4" /><span>Explore</span></button>
-              <button onClick={() => navigate("/me/profile")} className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"><UserRound className="h-4 w-4" /><span>Profile</span></button>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="mr-2 hidden items-center gap-2 border-r border-slate-200 pr-4 dark:border-slate-800 xs:flex">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{session.backendUser?.name?.split(" ")[0]}</span>
-            </div>
-            <NotificationPanel 
-              notifications={notifications} 
-              isOpen={isNotificationPanelOpen} 
-              onToggle={() => setIsNotificationPanelOpen((v) => !v)} 
-              onOpenChat={(c, n) => { if (n) markNotificationRead(n); if (c) selectChat(c); setIsNotificationPanelOpen(false); }} 
-              onMarkAllRead={markNotificationsRead} 
-              onMarkRead={markNotificationRead} 
-              onAcceptFriendRequest={handleAcceptFriendRequest}
-              onRejectFriendRequest={handleRejectFriendRequest}
-              notificationToneEnabled={notificationToneEnabled} 
-              onNotificationToneChange={setNotificationToneEnabled} 
-            />
-            <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20"><LogOut className="h-4 w-4" /></button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+      <NavHeader title="Messages" showNav />
 
       {isSelectionMode && selectedChatIds.length > 0 && (
         <div className="z-40 flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50/50 px-6 py-2 dark:border-blue-900/30 dark:bg-blue-950/20">
@@ -308,30 +231,28 @@ export const ChatShell = () => {
       )}
 
       <main className="flex min-h-0 flex-1 overflow-hidden pb-safe">
-        <div className={cn("h-full w-full sm:w-[320px] md:w-[360px] lg:w-[400px] border-r border-slate-200 dark:border-slate-800", selectedChatId ? "hidden sm:block" : "block")}>
-          <Sidebar
-            chats={filteredChats}
-            selectedChatId={selectedChatId}
-            onSelectChat={selectChat}
-            onDeleteChat={(chatId) => void deleteSelectedChat(chatId)}
-            onClearChatMessages={(chatId) => void clearSelectedChatMessages(chatId)}
-            onMarkChatRead={(chatId) => void markSelectedChatRead(chatId)}
-            onMarkChatUnread={(chatId) => void markSelectedChatUnread(chatId)}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            isLoading={isLoadingChats}
-            onlineUserIds={onlineUserIds}
-            selectedChatIds={selectedChatIds}
-            onSelectChats={setSelectedChatIds}
-            isSelectionMode={isSelectionMode}
-            onToggleSelectionMode={() => {
-              setIsSelectionMode(!isSelectionMode);
-              if (isSelectionMode) setSelectedChatIds([]);
-            }}
-            onOpenNewChat={() => setIsNewChatModalOpen(true)}
-          />
-        </div>
-        <div className={cn("h-full flex-1", !selectedChatId ? "hidden sm:block" : "block")}>
+        <Sidebar
+          chats={filteredChats}
+          selectedChatId={selectedChatId}
+          onSelectChat={selectChat}
+          onDeleteChat={(chatId) => void deleteSelectedChat(chatId)}
+          onClearChatMessages={(chatId) => void clearSelectedChatMessages(chatId)}
+          onMarkChatRead={(chatId) => void markSelectedChatRead(chatId)}
+          onMarkChatUnread={(chatId) => void markSelectedChatUnread(chatId)}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          isLoading={isLoadingChats}
+          onlineUserIds={onlineUserIds}
+          selectedChatIds={selectedChatIds}
+          onSelectChats={setSelectedChatIds}
+          isSelectionMode={isSelectionMode}
+          onToggleSelectionMode={() => {
+            setIsSelectionMode(!isSelectionMode);
+            if (isSelectionMode) setSelectedChatIds([]);
+          }}
+          onOpenNewChat={() => setIsNewChatModalOpen(true)}
+        />
+        <div className={cn("h-full min-w-0 flex-1", !selectedChatId ? "hidden sm:block" : "block")}>
           <ChatWindow
             chat={activeChat}
             messages={messages}
@@ -352,14 +273,14 @@ export const ChatShell = () => {
             onRetryMedia={retryLastMediaUpload}
             onCancelMedia={cancelMediaUpload}
             onDismissMedia={dismissMediaTransfer}
-            onError={error || undefined}
-            onDismissError={clearError}
             onLeaveGroup={async (chatId) => {
               await leaveGroup(chatId);
               selectChat(null);
             }}
             onOpenGroupInfo={(chatId) => navigate(`/group/${chatId}`)}
             onClearChat={(chatId) => clearSelectedChatMessages(chatId)}
+            onOpenNewChat={() => setIsNewChatModalOpen(true)}
+            navigate={navigate}
           />
         </div>
       </main>
@@ -429,6 +350,9 @@ export const ChatShell = () => {
         message="Selected chats have been removed."
         onDismiss={() => setBulkDeleteComplete(false)}
       />
+
+      {/* Keyboard shortcuts hint */}
+      <KeyboardShortcutsHint />
     </div>
   );
 };

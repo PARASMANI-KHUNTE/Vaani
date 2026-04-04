@@ -5,12 +5,15 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenShell } from "@/components/screen-shell";
 import { useMobileSocial } from "@/hooks/use-mobile-social";
+import { useNotificationStore } from "@/store/notification-store";
 import { useSessionStore } from "@/store/session-store";
 
 export default function ProfileScreen() {
   const session = useSessionStore((state) => state.session);
   const clearSession = useSessionStore((state) => state.clearSession);
   const token = useSessionStore((state) => state.session?.accessToken);
+  const soundEnabled = useNotificationStore((state) => state.soundEnabled);
+  const setSoundEnabled = useNotificationStore((state) => state.setSoundEnabled);
   const { profile, saveProfile, isLoadingProfile, error } = useMobileSocial({ token });
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -64,6 +67,21 @@ export default function ProfileScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Settings</Text>
+          <Pressable
+            style={styles.linkRow}
+            onPress={() => setSoundEnabled(!soundEnabled)}
+          >
+            <View style={styles.linkIconContainer}>
+              <Ionicons name={soundEnabled ? "volume-high-outline" : "volume-mute-outline"} size={20} color="#155e75" />
+            </View>
+            <View style={styles.linkContent}>
+              <Text style={styles.linkTitle}>Notification sound</Text>
+              <Text style={styles.linkSubtitle}>{soundEnabled ? "Sound is enabled" : "Sound is muted"}</Text>
+            </View>
+            <View style={[styles.toggleTrack, soundEnabled && styles.toggleTrackOn]}>
+              <View style={[styles.toggleThumb, soundEnabled && styles.toggleThumbOn]} />
+            </View>
+          </Pressable>
           <Pressable style={styles.linkRow} onPress={() => router.push("/blocked-users" as any)}>
             <View style={styles.linkIconContainer}>
               <Ionicons name="shield-checkmark-outline" size={20} color="#155e75" />
@@ -182,6 +200,27 @@ const styles = StyleSheet.create({
   linkSubtitle: {
     fontSize: 12,
     color: "#64748b",
+  },
+  toggleTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 999,
+    backgroundColor: "#e2e8f0",
+    padding: 3,
+    justifyContent: "center",
+  },
+  toggleTrackOn: {
+    backgroundColor: "#155e75",
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
+    transform: [{ translateX: 0 }],
+  },
+  toggleThumbOn: {
+    transform: [{ translateX: 20 }],
   },
   signOutButton: {
     borderRadius: 999,

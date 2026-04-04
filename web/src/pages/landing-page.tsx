@@ -11,7 +11,6 @@ import {
   Users,
   Image as ImageIcon,
   Mic,
-  ArrowRight,
 } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";

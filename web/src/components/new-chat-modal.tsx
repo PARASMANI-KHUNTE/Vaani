@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { X, Search, MessageSquare, Plus, Check, Users } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { BackendUser } from "@/lib/types";
 import { useSocialData } from "@/hooks/use-social-data";
 import { cn } from "@/lib/utils";
 

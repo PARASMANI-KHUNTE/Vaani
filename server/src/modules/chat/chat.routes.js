@@ -44,7 +44,7 @@ router.patch(
   idempotency,
   updateGroupProfileValidator,
   validateRequest,
-  chatController.patchGroupProfile
+  chatController.patchChatSettings
 );
 router.post(
   "/:chatId/invite-link",

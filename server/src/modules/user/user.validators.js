@@ -21,8 +21,8 @@ const registerPushTokenValidator = [
 const unregisterPushTokenValidator = [
   body("token")
     .trim()
-    .matches(/^ExponentPushToken\[[A-Za-z0-9+\-_=]+\]$/)
-    .withMessage("token must be a valid Expo push token"),
+    .notEmpty()
+    .withMessage("token is required"),
 ];
 
 module.exports = {

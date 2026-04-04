@@ -1,9 +1,15 @@
 import { create } from "zustand";
+import * as SecureStore from "expo-secure-store";
 import { MobileNotificationItem } from "@/lib/types";
+
+const SOUND_PREF_KEY = "canvas-chat-mobile-pref-sound-enabled";
 
 type NotificationState = {
   notifications: MobileNotificationItem[];
   onlineUserIds: string[];
+  soundEnabled: boolean;
+  hydratePreferences: () => Promise<void>;
+  setSoundEnabled: (enabled: boolean) => void;
   addNotification: (notification: MobileNotificationItem) => void;
   markRead: (notificationId: string) => void;
   markAllRead: () => void;
@@ -11,9 +17,19 @@ type NotificationState = {
   setUserOnlineState: (userId: string, isOnline: boolean) => void;
 };
 
-export const useNotificationStore = create<NotificationState>((set) => ({
+export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   onlineUserIds: [],
+  soundEnabled: true,
+  hydratePreferences: async () => {
+    const raw = await SecureStore.getItemAsync(SOUND_PREF_KEY);
+    if (!raw) return;
+    set({ soundEnabled: raw !== "false" });
+  },
+  setSoundEnabled: (enabled) => {
+    set({ soundEnabled: enabled });
+    void SecureStore.setItemAsync(SOUND_PREF_KEY, enabled ? "true" : "false").catch(() => undefined);
+  },
   addNotification: (notification) =>
     set((state) => {
       const existing = state.notifications.find((entry) => entry.id === notification.id);

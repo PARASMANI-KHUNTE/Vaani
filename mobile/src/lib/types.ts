@@ -40,7 +40,7 @@ export type MobileChat = {
   lastMessage:
     | {
         content?: string;
-        type: "text" | "image" | "file";
+        type: "text" | "image" | "file" | "video" | "voice";
         createdAt: string;
       }
     | null;
@@ -62,7 +62,7 @@ export type MobileMessage = {
         avatar?: string | null;
       };
   content: string;
-  type: "text" | "image" | "file";
+  type: "text" | "image" | "file" | "video" | "voice";
   status: "sent" | "delivered" | "seen";
   createdAt: string;
   deliveredAt?: string;

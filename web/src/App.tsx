@@ -10,6 +10,7 @@ import { SharedProfilePage } from "@/pages/shared-profile-page";
 import LandingPage from "@/pages/landing-page";
 import DocsPage from "@/pages/docs-page";
 import { BlockedUsersPage } from "@/pages/blocked-users-page";
+import { SettingsPage } from "@/pages/settings-page";
 import { useAuth } from "@/lib/auth-context";
 
 const ChatApp = () => <ChatShell />;
@@ -52,8 +53,9 @@ export default function App() {
         }
       />
       <Route path="/mobile-auth" element={<MobileAuthPage />} />
+      <Route path="/settings" element={session?.backendAccessToken ? <SettingsPage /> : <Navigate to="/landing" replace />} />
+      <Route path="/settings/blocked" element={session?.backendAccessToken ? <BlockedUsersPage /> : <Navigate to="/landing" replace />} />
       <Route path="/me/profile" element={session?.backendAccessToken ? <MyProfilePage /> : <Navigate to="/landing" replace />} />
-      <Route path="/me/blocked" element={session?.backendAccessToken ? <BlockedUsersPage /> : <Navigate to="/landing" replace />} />
       <Route path="/profile/:username" element={session?.backendAccessToken ? <SharedProfilePage /> : <Navigate to="/landing" replace />} />
       <Route path="/profile/user/:userId" element={session?.backendAccessToken ? <SharedProfilePage /> : <Navigate to="/landing" replace />} />
       <Route path="/group/:chatId" element={<GroupInfoPage />} />

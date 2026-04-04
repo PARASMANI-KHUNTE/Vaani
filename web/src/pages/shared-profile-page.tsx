@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Home, MessageSquare, UserRound, Users } from "lucide-react";
+import { ArrowLeft, Home, MessageSquare, UserRound } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { NavHeader } from "@/components/nav-header";
 import { getProfileByUserId, getProfileByUsername } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { UserProfile } from "@/lib/types";
@@ -120,17 +121,20 @@ export const SharedProfilePage = () => {
 
   return (
     <main className="flex min-h-dvh w-full flex-col bg-white dark:bg-slate-950">
-      <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">User Profile</h1>
-          </div>
-          <Link to="/" className="rounded-lg px-4 py-2 text-sm font-bold text-slate-900 border border-slate-200 transition-all hover:bg-slate-50 dark:text-white dark:border-slate-800 dark:hover:bg-slate-800">Open App</Link>
-        </div>
-      </header>
+      <NavHeader
+        title="User Profile"
+        showBackButton
+        backTo="/"
+        showNav={false}
+        rightContent={
+          <button
+            onClick={() => navigate("/")}
+            className="rounded-lg px-4 py-2 text-sm font-bold text-slate-900 border border-slate-200 transition-all hover:bg-slate-50 dark:text-white dark:border-slate-800 dark:hover:bg-slate-800"
+          >
+            Open App
+          </button>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto">
         <div className="grid border-b border-slate-200 dark:border-slate-800 lg:grid-cols-[400px_1fr]">

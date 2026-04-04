@@ -9,22 +9,22 @@ import {
   ImagePlus,
   SendHorizonal,
   X,
-  MessageCircle,
   Search,
   SmilePlus,
   RefreshCw,
   AlertCircle,
-  CheckCircle2,
-  Check,
+  CheckSquare,
   Trash2,
   MoreVertical,
   Mic,
-  MicOff,
   Paperclip,
   Square,
   Video,
   Images,
   Plus,
+  Users,
+  LogOut,
+  MessageCircle,
 } from "lucide-react";
 import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -71,18 +71,12 @@ type ChatWindowProps = {
   onLeaveGroup?: (chatId: string) => Promise<void>;
   onOpenGroupInfo?: (chatId: string) => void;
   onClearChat?: (chatId: string) => void;
+  onOpenNewChat?: () => void;
+  navigate?: (path: string) => void;
   selectedMessageIds?: string[];
   onSelectMessage?: (messageId: string, selected: boolean) => void;
   onClearSelectedMessages?: () => void;
 };
-
-const TypingDots = () => (
-  <div className="flex items-center gap-1 px-1">
-    <span className="h-1 w-1 rounded-full bg-blue-500/60 animate-bounce" />
-    <span className="h-1 w-1 rounded-full bg-blue-500/60 animate-bounce [animation-delay:0.2s]" />
-    <span className="h-1 w-1 rounded-full bg-blue-500/60 animate-bounce [animation-delay:0.4s]" />
-  </div>
-);
 
 const getSenderId = (senderId: string | { _id: string }) =>
   typeof senderId === "string" ? senderId : senderId._id;
@@ -105,23 +99,20 @@ export const ChatWindow = ({
   onOpenUserProfile,
   mediaTransfer,
   onRetryMedia,
-  onCancelMedia,
   onDismissMedia,
-  onError,
-  onDismissError,
   onLeaveGroup,
   onOpenGroupInfo,
   onClearChat,
+  onOpenNewChat,
+  navigate,
 }: ChatWindowProps) => {
   const [draft, setDraft] = useState("");
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [localError, setLocalError] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -130,8 +121,45 @@ export const ChatWindow = ({
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   
+  const themeConfig: Record<string, string> = {
+    default: "bg-[#6d7af7]",
+    emerald: "bg-emerald-500",
+    rose: "bg-rose-500",
+    amber: "bg-amber-500",
+    violet: "bg-violet-500",
+    cyan: "bg-cyan-500",
+    dark: "bg-slate-900",
+  };
+
+  const currentTheme = chat?.theme || localStorage.getItem("chatTheme") || "default";
+  const currentThemeClass = themeConfig[currentTheme] || themeConfig.default;
+  const isDarkMode = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+
+  const getWallpaperStyle = () => {
+    const wallpaper = chat?.wallpaper || localStorage.getItem("chatWallpaper") || "none";
+    if (!wallpaper || wallpaper === "none") return {};
+    if (wallpaper.startsWith("http")) {
+      return {
+        backgroundImage: `url("${wallpaper}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      };
+    }
+    return {};
+  };
+
+  const currentWallpaper = chat?.wallpaper || localStorage.getItem("chatWallpaper") || "none";
+  
+  const wallpaperOverlayClass = cn(
+    "absolute inset-0 pointer-events-none opacity-40 dark:opacity-20",
+    currentWallpaper === "mesh" && "bg-gradient-to-tr from-blue-400/20 via-purple-400/20 to-rose-400/20",
+    currentWallpaper === "abstract" && "bg-[#6d7af7]/10",
+    currentWallpaper === "doodles" && "bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-repeat opacity-[0.03] dark:opacity-[0.07]"
+  );
+
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -148,16 +176,22 @@ export const ChatWindow = ({
   }, [showSearch]);
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (groupMenuRef.current && !groupMenuRef.current.contains(event.target as Node)) {
+        setShowGroupMenu(false);
+      }
+    };
+    if (showGroupMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showGroupMenu]);
+
+  useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [messages]);
-
-  useEffect(() => {
-    if (onError) {
-      setLocalError(onError);
-    }
-  }, [onError]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -301,8 +335,28 @@ export const ChatWindow = ({
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <MessageCircle className="h-10 w-10 text-slate-300" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Inbox</h2>
-        <p className="mt-2 max-w-[240px] text-sm text-slate-500">Pick a chat to start messaging.</p>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Welcome to your inbox</h2>
+        <p className="mt-2 max-w-[240px] text-sm text-slate-500 mb-6">Select a conversation from the sidebar to start messaging.</p>
+        <div className="flex gap-3">
+          {onOpenNewChat && (
+            <button 
+              onClick={onOpenNewChat}
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </button>
+          )}
+          {navigate && (
+            <button 
+              onClick={() => navigate?.("/group/create")}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+            >
+              <MessageCircle className="h-4 w-4" />
+              New Group
+            </button>
+          )}
+        </div>
       </section>
     );
   }
@@ -311,23 +365,23 @@ export const ChatWindow = ({
   const chatAvatar = chat.isGroup ? chat.groupAvatar : chat.otherParticipant?.avatar;
 
   return (
-    <section className="relative flex h-full flex-col bg-[#F8F9FF] dark:bg-slate-900 overflow-hidden border-none sm:border-solid border-l border-slate-100 dark:border-slate-800">
-      <header className={cn(
-        "blue-gradient-header relative shrink-0 flex flex-col justify-end px-4 pb-4 shadow-lg transition-all duration-300 z-30",
-        "h-24 sm:h-32 rounded-b-[30px] sm:rounded-b-[40px]"
-      )}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 sm:gap-4 overflow-hidden flex-1">
+    <section className="relative flex h-full flex-col overflow-hidden border-none sm:border-solid border-l border-slate-100 bg-[#f8f9fb] text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+      <header className="z-30 shrink-0 border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="mx-auto flex w-full max-w-[700px] items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             {onBack && (
-              <button 
-                onClick={onBack} 
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition-all active:scale-95 lg:hidden"
+              <button
+                onClick={onBack}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition-all hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-900 lg:hidden"
+                title="Back"
               >
-                <ArrowLeft className="h-6 w-6" />
+                <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            <div 
-              className="flex items-center gap-3 sm:gap-4 cursor-pointer hover:opacity-90 transition-opacity min-w-0 group/header"
+
+            <button
+              type="button"
+              className="group/header flex min-w-0 items-center gap-2.5 text-left"
               onClick={() => {
                 if (chat.isGroup) {
                   onOpenGroupInfo?.(chat._id);
@@ -337,162 +391,181 @@ export const ChatWindow = ({
               }}
             >
               <div className="relative shrink-0">
-                <Avatar src={chatAvatar} name={chatTitle || "?"} className="h-10 w-10 sm:h-14 sm:w-14 border-2 border-white/50 rounded-[18px] sm:rounded-[22px]" />
-                {isOnline && <span className="absolute bottom-0 right-0 h-3 w-3 sm:h-4 sm:w-4 rounded-full border-2 border-white bg-emerald-400" />}
+                <Avatar
+                  src={chatAvatar}
+                  name={chatTitle || "?"}
+                  className="h-10 w-10 rounded-xl ring-1 ring-slate-200 shadow-sm dark:ring-slate-800"
+                />
+                {isOnline ? (
+                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 shadow-sm dark:border-slate-950" />
+                ) : null}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate text-lg sm:text-xl font-bold text-white tracking-tight leading-tight">{chatTitle}</h3>
-                  {chat.isGroup && (
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-white opacity-0 transition-opacity group-hover/header:opacity-100 sm:opacity-100">
-                      <MessageCircle className="h-3 w-3" />
-                    </div>
-                  )}
+                  <h3 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                    {chatTitle}
+                  </h3>
+                  {chat.isGroup ? (
+                    <span className="inline-flex items-center rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 opacity-0 transition-opacity group-hover/header:opacity-100 dark:bg-slate-900 dark:text-slate-300 sm:opacity-100">
+                      Group
+                    </span>
+                  ) : null}
                 </div>
-                <p className="text-[11px] sm:text-[13px] font-semibold text-white/80 line-clamp-1">
+                <p className="line-clamp-1 text-[12px] font-medium text-slate-500 dark:text-slate-400">
                   {typingLabel
                     ? typingLabel
                     : chat.isGroup
-                    ? (() => {
-                        const onlineParticipants = (chat.participants || [])
-                          .filter((p) => p._id !== currentUserId && onlineUserIds.includes(p._id));
-                        const totalOthers = (chat.participants || []).filter((p) => p._id !== currentUserId).length;
-                        if (onlineParticipants.length > 0) {
-                          const names = onlineParticipants.map((p) => p.name || p.username).join(", ");
-                          return `${names} online`;
-                        }
-                        return `${totalOthers} member${totalOthers !== 1 ? "s" : ""}`;
-                      })()
-                    : isOnline
-                    ? "Online"
-                    : "Offline"}
+                      ? (() => {
+                          const onlineParticipants = (chat.participants || []).filter(
+                            (p) => p._id !== currentUserId && onlineUserIds.includes(p._id)
+                          );
+                          const totalOthers = (chat.participants || []).filter((p) => p._id !== currentUserId).length;
+                          if (onlineParticipants.length > 0) {
+                            const names = onlineParticipants.map((p) => p.name || p.username).join(", ");
+                            return `${names} online`;
+                          }
+                          return `${totalOthers} member${totalOthers !== 1 ? "s" : ""}`;
+                        })()
+                      : isOnline
+                        ? "Online"
+                        : "Offline"}
                 </p>
               </div>
-            </div>
+            </button>
           </div>
-          
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
+
+          <div className="relative flex shrink-0 items-center gap-1.5">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowSearch(!showSearch)}
                 className={cn(
-                  "flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-white/20 text-white hover:bg-white/30 transition-colors",
-                  showSearch && "bg-white/40"
+                  "flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900",
+                  showSearch && "bg-slate-100 text-slate-900 dark:bg-slate-900"
                 )}
+                title="Search"
               >
-                <Search className="h-5 w-5 sm:h-6 sm:w-6" />
+                <Search className="h-5 w-5" />
               </button>
               {showSearch && (
-                <div className="absolute right-0 mt-3 w-64 xs:w-72 rounded-2xl bg-white p-3 shadow-2xl ring-1 ring-black/5 dark:bg-slate-800 z-[60]">
+                <div className="absolute right-0 mt-2 w-64 xs:w-72 rounded-2xl bg-white p-2.5 shadow-xl ring-1 ring-black/5 dark:bg-slate-900 z-[60]">
                   <input
                     ref={searchInputRef}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search messages..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                   />
-                  {searchQuery && (
-                    <p className="mt-1.5 text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                      {searchMatchCount} matches
-                    </p>
-                  )}
+                  {searchQuery ? (
+                    <p className="mt-1.5 text-[10px] font-semibold text-slate-400">{searchMatchCount} matches</p>
+                  ) : null}
                 </div>
               )}
             </div>
-            
-            <div className="relative">
-              <button 
-                onClick={() => setShowGroupMenu(!showGroupMenu)}
-                className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-white/20 text-white hover:bg-white/30 transition-colors"
-                title="Options"
-              >
-                <MoreVertical className="h-5 w-5 sm:h-6 sm:w-6" />
-              </button>
-              
-              <AnimatePresence>
-                {showGroupMenu && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-3 w-52 rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-black/5 dark:bg-slate-800 z-[60]"
-                  >
-                    <button 
-                      onClick={() => { setIsSelectionMode(!isSelectionMode); setShowGroupMenu(false); }}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700/50"
-                    >
-                      <Check className="h-4 w-4 text-blue-500" />
-                      Select Messages
-                    </button>
-                    {chat.isGroup && (
-                      <button 
-                        onClick={() => { onOpenGroupInfo?.(chat._id); setShowGroupMenu(false); }}
-                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700/50"
-                      >
-                        <MessageCircle className="h-4 w-4 text-emerald-500" />
-                        Group Info
-                      </button>
-                    )}
-                    {isSelectionMode && selectedMessages.size > 0 && (
-                      <button 
-                        onClick={() => {
-                          setConfirmDeleteOpen(true);
-                          setShowGroupMenu(false);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20 shadow-sm"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete ({selectedMessages.size})
-                      </button>
-                    )}
-                    <div className="my-1 h-px bg-slate-100 dark:bg-slate-700/50" />
-                    {chat.isGroup && (
-                      <button 
-                        onClick={() => { setConfirmLeaveOpen(true); setShowGroupMenu(false); }}
-                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20"
-                      >
-                        <X className="h-4 w-4" />
-                        Leave Group
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => { 
-                        setConfirmClearOpen(true);
-                        setShowGroupMenu(false); 
-                      }}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
-                    >
-                      <Trash2 className="h-4 w-4 text-amber-500" />
-                      Clear Chat
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            
-            {onClose && (
-              <button 
-                onClick={onClose} 
-                className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-white/20 text-white hover:bg-red-500 transition-colors"
+
+            <button
+              onClick={() => setShowGroupMenu((v) => !v)}
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900",
+                showGroupMenu && "bg-slate-100 text-slate-900 dark:bg-slate-900"
+              )}
+              title="Menu"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+
+            {onClose ? (
+              <button
+                onClick={onClose}
+                className="ml-1 flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20"
                 title="Close Chat"
               >
-                <X className="h-5 w-5 sm:h-6 sm:w-6" />
+                <X className="h-5 w-5" />
               </button>
-            )}
+            ) : null}
+
+            <AnimatePresence>
+              {showGroupMenu && (
+                <motion.div
+                  ref={groupMenuRef}
+                  initial={{ opacity: 0, scale: 0.98, y: 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 6 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-[calc(100%+8px)] w-60 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden z-[60] dark:bg-slate-900"
+                >
+                  <div className="p-1.5">
+                    <button
+                      onClick={() => {
+                        setIsSelectionMode(!isSelectionMode);
+                        setShowGroupMenu(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <CheckSquare className="h-4 w-4 text-blue-600" />
+                      {isSelectionMode ? "Cancel Selection" : "Select Messages"}
+                      {isSelectionMode && selectedMessages.size > 0 && ` (${selectedMessages.size})`}
+                    </button>
+                    {chat.isGroup ? (
+                      <button
+                        onClick={() => {
+                          onOpenGroupInfo?.(chat._id);
+                          setShowGroupMenu(false);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        <Users className="h-4 w-4 text-emerald-600" />
+                        Group Info
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => {
+                        setConfirmClearOpen(true);
+                        setShowGroupMenu(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <Trash2 className="h-4 w-4 text-amber-600" />
+                      Clear Chat History
+                    </button>
+                  </div>
+                  {chat.isGroup ? (
+                    <>
+                      <div className="mx-3 h-px bg-slate-100 dark:bg-slate-800" />
+                      <div className="p-1.5">
+                        <button
+                          onClick={() => {
+                            setConfirmLeaveOpen(true);
+                            setShowGroupMenu(false);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Leave Group
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
 
       <div 
         ref={scrollContainerRef} 
-        className="flex-1 overflow-y-auto px-4 py-6 sm:py-8 space-y-6 bg-slate-50/20 dark:bg-slate-900"
+        className="relative flex-1 overflow-y-auto px-4 py-6 sm:py-8 space-y-6"
+        style={getWallpaperStyle()}
       >
+        {currentWallpaper && currentWallpaper !== "none" && !currentWallpaper.startsWith("http") && (
+          <div className={wallpaperOverlayClass} />
+        )}
         {isLoading && messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
           </div>
         ) : (
-          <div className="mx-auto max-w-4xl space-y-6">
+          <div className="mx-auto max-w-[700px] space-y-6">
             {(() => {
               const groupedMessages: { message: Message; isGroupStart: boolean; isGroupEnd: boolean; groupedMedia?: Message[] }[] = [];
               let currentGroup: Message[] = [];
@@ -555,19 +628,17 @@ export const ChatWindow = ({
                 }
               }
               
-              return groupedMessages.map(({ message, isGroupStart, isGroupEnd, groupedMedia }, index) => {
+                return groupedMessages.map(({ message, isGroupStart, isGroupEnd, groupedMedia }, index) => {
                 const prev = index > 0 ? groupedMessages[index - 1].message : null;
                 const showDate = !prev || formatDateSeparator(message.createdAt) !== formatDateSeparator(prev.createdAt);
                 const isHighlighted = isMessageHighlighted(message);
                 return (
                   <div key={message._id}>
                     {showDate && (
-                      <div className="flex items-center gap-4 py-8">
-                        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                      <div className="flex items-center justify-center py-6">
+                        <span className="rounded-full bg-slate-100 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400 shadow-sm">
                           {formatDateSeparator(message.createdAt)}
                         </span>
-                        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
                       </div>
                     )}
                     <MessageBubble
@@ -585,6 +656,8 @@ export const ChatWindow = ({
                       onSelect={() => toggleMessageSelection(message._id)}
                       isSelectionMode={isSelectionMode}
                       groupedMedia={groupedMedia}
+                      isGroup={chat.isGroup}
+                      chatParticipants={chat.participants}
                     />
                   </div>
                 );
@@ -594,15 +667,15 @@ export const ChatWindow = ({
         )}
       </div>
 
-      <footer className="shrink-0 bg-transparent p-4 sm:p-6 pb-2 sm:pb-6 dark:bg-slate-900 z-30 mb-8 sm:mb-0">
-        <div className="mx-auto max-w-4xl relative">
+      <footer className="z-30 shrink-0 border-t border-slate-200/70 bg-[#f8f9fb]/80 p-4 pb-safe backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 sm:p-6">
+        <div className="relative mx-auto max-w-[700px]">
           <AnimatePresence>
             {replyTarget && (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="mb-3 flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-xs shadow-lg dark:bg-slate-800 ring-1 ring-black/5"
+                className="mb-3 flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-xs shadow-sm ring-1 ring-black/5 dark:bg-slate-900"
               >
                 <div className="truncate border-l-[3px] border-[#6d7af7] pl-3">
                   <p className="font-bold text-[#6d7af7] mb-0.5 uppercase tracking-wider text-[10px]">Replying to</p>
@@ -667,11 +740,11 @@ export const ChatWindow = ({
             </div>
           )}
 
-          <div className="relative flex items-end gap-2 sm:gap-3 bg-white dark:bg-slate-800 rounded-[28px] sm:rounded-[30px] p-2 pr-2 sm:pr-2.5 shadow-2xl shadow-blue-500/10 ring-1 ring-black/5">
+          <div className="relative flex items-end gap-2 sm:gap-3 rounded-[28px] bg-white p-2 pr-2 shadow-sm ring-1 ring-black/5 dark:bg-slate-900">
             {showEmojiPicker && (
               <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-2 z-50">
                 <EmojiPicker
-                  theme={Theme.DARK}
+                  theme={isDarkMode ? Theme.DARK : Theme.LIGHT}
                   onEmojiClick={(emojiData) => {
                     setDraft((prev) => prev + emojiData.emoji);
                     setShowEmojiPicker(false);
@@ -681,40 +754,47 @@ export const ChatWindow = ({
                 />
               </div>
             )}
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Collapsible Tool Menu for Mobile */}
+            <div className="flex items-center gap-1">
+              {/* Attach Menu */}
               <div className="relative group/tools">
                 <button 
-                  className="flex h-11 w-11 sm:hidden items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all active:scale-95"
-                  title="Tools"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-all active:scale-95"
+                  title="Attach"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
                 
-                {/* Desktop layout: horizontal list, Mobile layout: floating popup */}
                 <div className={cn(
-                  "flex items-center gap-1 sm:gap-2",
-                  "hidden sm:flex", // Desktop
-                  "absolute bottom-[130%] left-0 flex-col sm:flex-row bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-2xl ring-1 ring-black/5 opacity-0 group-hover/tools:opacity-100 pointer-events-none group-hover/tools:pointer-events-auto transition-all duration-200 translate-y-2 group-hover/tools:translate-y-0 sm:static sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0 sm:opacity-100 sm:pointer-events-auto sm:translate-y-0"
+                  "absolute bottom-full left-0 mb-2 flex-col gap-1 rounded-xl bg-white dark:bg-slate-800 p-1.5 shadow-xl ring-1 ring-black/5",
+                  "opacity-0 invisible group-hover/tools:opacity-100 group-hover/tools:visible transition-all duration-150",
+                  "flex"
                 )}>
-                  <button onClick={() => videoInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-400 hover:text-blue-500 transition-colors" title="Video"><Video className="h-5 w-5" /></button>
-                  <button onClick={() => imageInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-400 hover:text-blue-500 transition-colors" title="Image"><ImagePlus className="h-5 w-5" /></button>
-                  <button onClick={() => galleryInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-400 hover:text-blue-500 transition-colors" title="Gallery"><Images className="h-5 w-5" /></button>
-                  <button onClick={() => fileInputRef.current?.click()} className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-400 hover:text-blue-500 transition-colors" title="File"><Paperclip className="h-5 w-5" /></button>
+                  <button onClick={() => { videoInputRef.current?.click(); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700">
+                    <Video className="h-4 w-4" /> Video
+                  </button>
+                  <button onClick={() => { imageInputRef.current?.click(); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700">
+                    <ImagePlus className="h-4 w-4" /> Photo
+                  </button>
+                  <button onClick={() => { galleryInputRef.current?.click(); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700">
+                    <Images className="h-4 w-4" /> Gallery
+                  </button>
+                  <button onClick={() => { fileInputRef.current?.click(); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700">
+                    <Paperclip className="h-4 w-4" /> File
+                  </button>
                 </div>
               </div>
 
               <button 
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-2xl transition-all active:scale-95",
+                  "flex h-10 w-10 items-center justify-center rounded-xl transition-all active:scale-95",
                   showEmojiPicker 
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30" 
-                    : "bg-slate-50 text-slate-400 hover:bg-amber-50 hover:text-amber-500 dark:bg-slate-700/50"
+                    : "bg-slate-50 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:bg-slate-700/50"
                 )}
                 title="Emoji"
               >
-                <SmilePlus className="h-5.5 w-5.5" />
+                <SmilePlus className="h-5 w-5" />
               </button>
             </div>
 
@@ -742,8 +822,6 @@ export const ChatWindow = ({
                 <textarea
                   value={draft}
                   onChange={(e) => { setDraft(e.target.value); onTyping?.(); }}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitMessage(); } }}
                   placeholder="Type Your Message"
                   rows={1}
@@ -756,14 +834,15 @@ export const ChatWindow = ({
             <div className="p-0.5">
               {isRecording ? null : (
                 draft.trim() ? (
-                  <button
-                    onClick={submitMessage}
-                    disabled={!draft.trim() && !isSendingMedia}
-                    className={cn(
-                      "h-11 w-11 flex items-center justify-center rounded-full transition-all shadow-lg active:scale-90",
-                      "bg-[#6d7af7] text-white shadow-blue-500/30"
-                    )}
-                  >
+                    <button
+                      onClick={submitMessage}
+                      disabled={!draft.trim() && !isSendingMedia}
+                      className={cn(
+                        "h-11 w-11 flex items-center justify-center rounded-full transition-all shadow-lg active:scale-90",
+                        currentThemeClass,
+                        "text-white shadow-blue-500/30"
+                      )}
+                    >
                     <SendHorizonal className="h-5.5 w-5.5 transform rotate-[-45deg] translate-x-0.5" />
                   </button>
                 ) : (

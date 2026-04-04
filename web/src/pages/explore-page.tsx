@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ExplorePanel } from "@/components/explore-panel";
 import { Toast } from "@/components/toast";
+import { NavHeader } from "@/components/nav-header";
 import { useChatData } from "@/hooks/use-chat-data";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useSocialData } from "@/hooks/use-social-data";
@@ -37,7 +38,8 @@ export const ExplorePage = () => {
   });
 
   return (
-    <main className="h-dvh overflow-hidden">
+    <main className="flex h-dvh flex-col bg-[#0f172a]">
+      <NavHeader title="Explore" showNav />
       {chatError || socialError ? (
         <Toast
           message={chatError || socialError || ""}
@@ -48,7 +50,7 @@ export const ExplorePage = () => {
         />
       ) : null}
 
-      <div className="h-full w-full">
+      <div className="flex-1 overflow-hidden">
         <ExplorePanel
           variant="page"
           isOpen

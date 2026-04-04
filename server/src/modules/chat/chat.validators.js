@@ -64,9 +64,22 @@ const updateGroupProfileValidator = [
     .optional()
     .custom((value) => value === null || typeof value === "string")
     .withMessage("groupAvatar must be a string or null"),
+  body("wallpaper")
+    .optional()
+    .custom((value) => value === null || typeof value === "string")
+    .withMessage("wallpaper must be a string or null"),
+  body("theme")
+    .optional()
+    .isString()
+    .withMessage("theme must be a string"),
   body().custom((_, { req }) => {
-    if (req.body.groupName === undefined && req.body.groupAvatar === undefined) {
-      throw new Error("Provide groupName or groupAvatar");
+    if (
+      req.body.groupName === undefined &&
+      req.body.groupAvatar === undefined &&
+      req.body.wallpaper === undefined &&
+      req.body.theme === undefined
+    ) {
+      throw new Error("Provide groupName, groupAvatar, wallpaper, or theme");
     }
     return true;
   }),
