@@ -2,6 +2,8 @@ import { mobileConfig } from "@/lib/config";
 import {
   ChatParticipant,
   MobileChat,
+  MobileGroupInvite,
+  MobileGroupInvitePreview,
   MobileMessage,
   MobileProfile,
 } from "@/lib/types";
@@ -259,5 +261,147 @@ export const sendMobileMediaMessage = (
     method: "POST",
     token,
     body: JSON.stringify(input),
+  });
+
+export const createMobileGroupChat = (
+  token: string,
+  input: { groupName: string; participantIds: string[] }
+) =>
+  apiRequest<{ chat: MobileChat }>("/chats", {
+    method: "POST",
+    token,
+    body: JSON.stringify({
+      isGroup: true,
+      groupName: input.groupName,
+      participantIds: input.participantIds,
+    }),
+  });
+
+export const updateMobileGroupProfile = (
+  token: string,
+  chatId: string,
+  input: { groupName?: string; groupAvatar?: string | null }
+) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/group`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(input),
+  });
+
+export const addMobileGroupMembers = (
+  token: string,
+  chatId: string,
+  memberIds: string[]
+) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/members`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ memberIds }),
+  });
+
+export const removeMobileGroupMember = (
+  token: string,
+  chatId: string,
+  memberId: string
+) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/members/${memberId}`, {
+    method: "DELETE",
+    token,
+  });
+
+export const promoteMobileGroupAdmin = (
+  token: string,
+  chatId: string,
+  memberId: string
+) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/admins/${memberId}`, {
+    method: "POST",
+    token,
+  });
+
+export const demoteMobileGroupAdmin = (
+  token: string,
+  chatId: string,
+  memberId: string
+) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/admins/${memberId}`, {
+    method: "DELETE",
+    token,
+  });
+
+export const transferMobileGroupOwnership = (
+  token: string,
+  chatId: string,
+  nextOwnerId: string
+) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/owner`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ nextOwnerId }),
+  });
+
+export const leaveMobileGroup = (token: string, chatId: string) =>
+  apiRequest<{ chatId: string; deleted: boolean }>(`/chats/${chatId}/leave`, {
+    method: "POST",
+    token,
+  });
+
+export const createMobileGroupInviteLink = (
+  token: string,
+  chatId: string,
+  input?: { expiresInHours?: number; maxUses?: number }
+) =>
+  apiRequest<{ invite: MobileGroupInvite }>(`/chats/${chatId}/invite-link`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({
+      expiresInHours: input?.expiresInHours,
+      maxUses: input?.maxUses,
+    }),
+  });
+
+export const previewMobileGroupInviteLink = (token: string, inviteToken: string) =>
+  apiRequest<{ invite: MobileGroupInvitePreview }>(`/chats/invite/${encodeURIComponent(inviteToken)}`, {
+    method: "GET",
+    token,
+  });
+
+export const joinMobileGroupViaInvite = (token: string, inviteToken: string) =>
+  apiRequest<{ chat: MobileChat | null; joined: boolean }>(
+    `/chats/invite/${encodeURIComponent(inviteToken)}/join`,
+    {
+      method: "POST",
+      token,
+    }
+  );
+
+export const getMobileBlockedUsers = (token: string) =>
+  apiRequest<{ blockedUsers: ChatParticipant[] }>("/users/me/blocked", {
+    method: "GET",
+    token,
+  });
+
+export const getMobileProfileByUserId = (token: string, userId: string) =>
+  apiRequest<{ profile: MobileProfile }>(`/users/${userId}/profile`, {
+    method: "GET",
+    token,
+  });
+
+export const getMobileProfileByUsername = (token: string, username: string) =>
+  apiRequest<{ profile: MobileProfile }>(`/users/profile/${encodeURIComponent(username)}`, {
+    method: "GET",
+    token,
+  });
+
+export const searchMobileUsersByQuery = (token: string, query: string) =>
+  apiRequest<{ users: ChatParticipant[] }>(`/users/search?q=${encodeURIComponent(query)}`, {
+    method: "GET",
+    token,
+  });
+
+export const markMobileChatUnread = (token: string, chatId: string) =>
+  apiRequest<{ chat: MobileChat }>(`/chats/${chatId}/unread`, {
+    method: "PATCH",
+    token,
   });
 

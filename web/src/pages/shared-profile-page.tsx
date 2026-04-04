@@ -65,7 +65,7 @@ export const SharedProfilePage = () => {
 
   if (status === "loading" || isLoading) {
     return (
-      <main className="flex h-screen items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full items-center justify-center bg-white dark:bg-slate-950">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
           <p className="text-sm font-bold text-slate-400 uppercase tracking-widest leading-none">Loading Profile</p>
@@ -76,7 +76,7 @@ export const SharedProfilePage = () => {
 
   if (!session?.backendAccessToken) {
     return (
-      <main className="flex h-screen items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full items-center justify-center bg-white dark:bg-slate-950">
         <div className="flex max-w-sm flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <UserRound className="h-8 w-8 text-slate-400" />
@@ -97,7 +97,7 @@ export const SharedProfilePage = () => {
 
   if (error || !profile) {
     return (
-      <main className="flex h-screen items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full items-center justify-center bg-white dark:bg-slate-950">
         <div className="flex max-w-sm flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-900/30">
             <UserRound className="h-8 w-8 text-rose-500" />
@@ -119,7 +119,7 @@ export const SharedProfilePage = () => {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-white dark:bg-slate-950">
+    <main className="flex min-h-dvh w-full flex-col bg-white dark:bg-slate-950">
       <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

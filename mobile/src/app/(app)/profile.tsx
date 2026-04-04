@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import * as Updates from "expo-updates";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenShell } from "@/components/screen-shell";
@@ -58,6 +59,20 @@ export default function ProfileScreen() {
           />
           <Pressable style={styles.primaryButton} onPress={() => void saveProfile({ name, tagline, bio })}>
             <Text style={styles.primaryButtonText}>{isLoadingProfile ? "Saving..." : "Save profile"}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Settings</Text>
+          <Pressable style={styles.linkRow} onPress={() => router.push("/blocked-users" as any)}>
+            <View style={styles.linkIconContainer}>
+              <Ionicons name="shield-checkmark-outline" size={20} color="#155e75" />
+            </View>
+            <View style={styles.linkContent}>
+              <Text style={styles.linkTitle}>Blocked Users</Text>
+              <Text style={styles.linkSubtitle}>Manage blocked contacts</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
           </Pressable>
         </View>
 
@@ -141,6 +156,32 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "700",
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 8,
+  },
+  linkIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#e0f2fe",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkContent: {
+    flex: 1,
+  },
+  linkTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0f172a",
+  },
+  linkSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
   },
   signOutButton: {
     borderRadius: 999,

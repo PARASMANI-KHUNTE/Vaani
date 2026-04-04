@@ -27,5 +27,14 @@ export default function RootLayout() {
     currentUserId: session?.user?.userId,
   });
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="auth" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="index" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="new-chat" options={{ presentation: "modal" }} />
+      <Stack.Screen name="group-info" options={{ presentation: "modal" }} />
+      <Stack.Screen name="user-profile" options={{ presentation: "modal" }} />
+      <Stack.Screen name="blocked-users" options={{ presentation: "modal" }} />
+    </Stack>
+  );
 }

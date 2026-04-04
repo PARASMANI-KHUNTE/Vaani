@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +13,7 @@ import {
 import { ScreenShell } from "@/components/screen-shell";
 import { useMobileChats } from "@/hooks/use-mobile-chats";
 import { useSessionStore } from "@/store/session-store";
+import NewChatModal from "@/app/new-chat";
 
 const getPreview = (content?: string, type?: string) => {
   if (!type || type === "text") {
@@ -48,6 +50,7 @@ export default function ChatsScreen() {
   const { chats, isLoading, error, refresh } = useMobileChats({
     token: session?.accessToken,
   });
+  const [showNewChat, setShowNewChat] = useState(false);
 
   const subtitle = useMemo(() => {
     if (isLoading && chats.length === 0) {
@@ -58,11 +61,20 @@ export default function ChatsScreen() {
       return error;
     }
 
-    return "This is the first Android-facing shell wired to your existing chat API.";
+    return "Your conversations appear here.";
   }, [chats.length, error, isLoading]);
 
   return (
-    <ScreenShell eyebrow="Conversations" title="Chats" subtitle={subtitle}>
+    <ScreenShell
+      eyebrow="Conversations"
+      title="Chats"
+      subtitle={subtitle}
+      rightAction={
+        <Pressable style={styles.addButton} onPress={() => setShowNewChat(true)}>
+          <Ionicons name="add" size={24} color="#155e75" />
+        </Pressable>
+      }
+    >
       {isLoading && chats.length === 0 ? (
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#155e75" />
@@ -75,48 +87,75 @@ export default function ChatsScreen() {
           contentContainerStyle={chats.length === 0 ? styles.emptyContent : styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No chats loaded yet</Text>
+              <Text style={styles.emptyTitle}>No chats yet</Text>
               <Text style={styles.emptyBody}>
-                Once mobile auth is fully wired, your direct conversations from the web app will appear here automatically.
+                Start a new conversation by tapping the + button above.
               </Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <Pressable style={styles.chatCard} onPress={() => router.push(`/chat/${item._id}`)}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {(item.otherParticipant?.name || "?").charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.chatMeta}>
-                <View style={styles.chatHeader}>
-                  <Text style={styles.chatName} numberOfLines={1}>
-                    {item.otherParticipant?.name || "Unknown user"}
+          renderItem={({ item }) => {
+            const isGroup = item.isGroup;
+            const displayName = isGroup ? item.groupName || "Group" : item.otherParticipant?.name || "Unknown";
+            const avatarInitial = isGroup ? (item.groupName?.charAt(0) || "G") : (item.otherParticipant?.name?.charAt(0) || "?");
+            const avatarColor = isGroup ? "#0f172a" : "#cffafe";
+            const textColor = isGroup ? "#fff" : "#155e75";
+
+            return (
+              <Pressable
+                style={styles.chatCard}
+                onPress={() => router.push(`/chat/${item._id}`)}
+                onLongPress={() => {
+                  if (isGroup) {
+                    // @ts-expect-error - group-info is a modal route
+                    router.push("/group-info?chatId=" + item._id);
+                  }
+                }}
+              >
+                <View style={[styles.avatar, isGroup && styles.groupAvatar, { backgroundColor: avatarColor }]}>
+                  <Text style={[styles.avatarText, { color: textColor }]}>
+                    {avatarInitial.toUpperCase()}
                   </Text>
-                  <Text style={styles.chatTime}>
-                    {formatChatTime(item.lastMessage?.createdAt)}
-                  </Text>
+                  {isGroup && <View style={styles.groupBadge}><Ionicons name="people" size={12} color="#fff" /></View>}
                 </View>
-                <View style={styles.chatPreviewRow}>
-                  <Text style={styles.chatPreview} numberOfLines={2}>
-                    {getPreview(item.lastMessage?.content, item.lastMessage?.type)}
-                  </Text>
-                  {item.unreadCount > 0 ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
-                    </View>
-                  ) : null}
+                <View style={styles.chatMeta}>
+                  <View style={styles.chatHeader}>
+                    <Text style={styles.chatName} numberOfLines={1}>
+                      {displayName}
+                    </Text>
+                    <Text style={styles.chatTime}>
+                      {formatChatTime(item.lastMessage?.createdAt)}
+                    </Text>
+                  </View>
+                  <View style={styles.chatPreviewRow}>
+                    <Text style={styles.chatPreview} numberOfLines={2}>
+                      {getPreview(item.lastMessage?.content, item.lastMessage?.type)}
+                    </Text>
+                    {item.unreadCount > 0 ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-            </Pressable>
-          )}
+              </Pressable>
+            );
+          }}
         />
       )}
+      <NewChatModal visible={showNewChat} onClose={() => setShowNewChat(false)} />
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#e0f2fe",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   centerState: {
     flex: 1,
     alignItems: "center",
@@ -166,12 +205,28 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#cffafe",
+    position: "relative",
+  },
+  groupAvatar: {
+    backgroundColor: "#0f172a",
   },
   avatarText: {
     color: "#155e75",
     fontWeight: "800",
     fontSize: 20,
+  },
+  groupBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#155e75",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fffdf8",
   },
   chatMeta: {
     flex: 1,

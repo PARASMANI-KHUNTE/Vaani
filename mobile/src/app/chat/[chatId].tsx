@@ -243,13 +243,27 @@ export default function ChatDetailScreen() {
         </Pressable>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName} numberOfLines={1}>
-            {chat?.otherParticipant?.name || "Chat"}
+            {chat?.isGroup ? chat.groupName || "Group" : chat?.otherParticipant?.name || "Chat"}
           </Text>
           {isTyping ? (
             <Text style={styles.typingText}>typing...</Text>
+          ) : chat?.isGroup ? (
+            <Text style={styles.groupMembersText}>
+              {chat.participants?.length || 0} members
+            </Text>
           ) : null}
         </View>
-        <View style={styles.headerSpacer} />
+        {chat?.isGroup ? (
+          <Pressable 
+            style={styles.infoButton}
+            // @ts-expect-error - group-info is a modal route
+            onPress={() => router.push("/group-info?chatId=" + chatId)}
+          >
+            <Ionicons name="information-circle-outline" size={24} color="#0f172a" />
+          </Pressable>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <KeyboardAvoidingView
@@ -561,8 +575,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 2,
   },
+  groupMembersText: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: "500",
+    marginTop: 2,
+  },
   headerSpacer: {
     width: 36,
+  },
+  infoButton: {
+    padding: 4,
   },
   keyboardView: {
     flex: 1,

@@ -1,4 +1,4 @@
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, ReactNode } from "react";
 import { StatusBar, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -6,16 +6,22 @@ type ScreenShellProps = PropsWithChildren<{
   eyebrow?: string;
   title: string;
   subtitle?: string;
+  rightAction?: ReactNode;
 }>;
 
-export const ScreenShell = ({ eyebrow, title, subtitle, children }: ScreenShellProps) => {
+export const ScreenShell = ({ eyebrow, title, subtitle, rightAction, children }: ScreenShellProps) => {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#f7f2e8" />
       <View style={styles.container}>
         <View style={styles.header}>
-          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerText}>
+              {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+              <Text style={styles.title}>{title}</Text>
+            </View>
+            {rightAction ? <View style={styles.rightAction}>{rightAction}</View> : null}
+          </View>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
         <View style={styles.content}>{children}</View>
@@ -39,6 +45,17 @@ const styles = StyleSheet.create({
   header: {
     gap: 4,
     marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  headerText: {
+    flex: 1,
+  },
+  rightAction: {
+    marginLeft: 12,
   },
   eyebrow: {
     fontSize: 11,

@@ -26,10 +26,16 @@ export type ChatParticipant = {
 
 export type MobileChat = {
   _id: string;
+  isGroup: boolean;
+  groupName?: string | null;
+  groupAvatar?: string | null;
+  createdBy?: string | null;
+  adminIds?: string[];
   unreadCount: number;
   manuallyMarkedUnread?: boolean;
   createdAt: string;
   updatedAt?: string;
+  participants: ChatParticipant[];
   otherParticipant: ChatParticipant | null;
   lastMessage:
     | {
@@ -112,4 +118,21 @@ export type MobileNotificationItem = {
     username?: string;
     avatar?: string | null;
   };
+};
+
+export type MobileGroupInvite = {
+  token: string;
+  expiresAt: string;
+  maxUses: number;
+};
+
+export type MobileGroupInvitePreview = {
+  chatId: string;
+  groupName: string;
+  groupAvatar: string | null;
+  memberCount: number;
+  isAlreadyMember: boolean;
+  expiresAt: string;
+  maxUses: number;
+  useCount: number;
 };
