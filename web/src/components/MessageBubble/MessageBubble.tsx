@@ -686,13 +686,26 @@ export const MessageBubble = ({
           >
             <CornerUpLeft className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => setShowReactionPicker(!showReactionPicker)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black/5 hover:scale-110 transition-transform hover:text-[#fbbf24]"
-            title="React"
-          >
-            <SmilePlus className="h-4 w-4" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowReactionPicker(!showReactionPicker)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black/5 hover:scale-110 transition-transform hover:text-[#fbbf24]"
+              title="React"
+            >
+              <SmilePlus className="h-4 w-4" />
+            </button>
+            <AnimatePresence>
+              {showReactionPicker && (
+                <ReactionPicker
+                  onSelect={(emoji) => {
+                    handleReact(emoji);
+                    setShowReactionPicker(false);
+                  }}
+                  onClose={() => setShowReactionPicker(false)}
+                />
+              )}
+            </AnimatePresence>
+          </div>
           {isOwnMessage && (
             <div className="relative">
               <button

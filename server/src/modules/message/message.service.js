@@ -153,7 +153,9 @@ const createMessage = async ({ chatId, senderId, content, type = "text", replyTo
         "userStates.$[senderState].clearedAt": null,
         "userStates.$[senderState].manualUnread": false,
         "userStates.$[senderState].hidden": false,
-        "userStates.$[receiverState].clearedAt": null,
+        // Do NOT reset clearedAt for receivers — if they previously deleted
+        // the chat, old messages must stay permanently gone. Only this new
+        // message (which is after their clearedAt) will be visible to them.
         "userStates.$[receiverState].manualUnread": true,
         "userStates.$[receiverState].hidden": false,
       },

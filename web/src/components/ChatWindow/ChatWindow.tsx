@@ -59,6 +59,7 @@ type ChatWindowProps = {
   onBack?: () => void;
   onClose?: () => void;
   isOnline?: boolean;
+  onlineUserIds?: string[];
   typingLabel?: string | null;
   onOpenUserProfile?: (user: BackendUser) => void;
   mediaTransfer?: MediaTransferState;
@@ -99,6 +100,7 @@ export const ChatWindow = ({
   onBack,
   onClose,
   isOnline,
+  onlineUserIds = [],
   typingLabel,
   onOpenUserProfile,
   mediaTransfer,
@@ -129,6 +131,7 @@ export const ChatWindow = ({
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -155,6 +158,18 @@ export const ChatWindow = ({
       setLocalError(onError);
     }
   }, [onError]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showEmojiPicker]);
 
   const filteredMessages = messages;
 
@@ -335,7 +350,22 @@ export const ChatWindow = ({
                   )}
                 </div>
                 <p className="text-[11px] sm:text-[13px] font-semibold text-white/80 line-clamp-1">
-                  {typingLabel ? typingLabel : (isOnline ? "Online" : "Offline")}
+                  {typingLabel
+                    ? typingLabel
+                    : chat.isGroup
+                    ? (() => {
+                        const onlineParticipants = (chat.participants || [])
+                          .filter((p) => p._id !== currentUserId && onlineUserIds.includes(p._id));
+                        const totalOthers = (chat.participants || []).filter((p) => p._id !== currentUserId).length;
+                        if (onlineParticipants.length > 0) {
+                          const names = onlineParticipants.map((p) => p.name || p.username).join(", ");
+                          return `${names} online`;
+                        }
+                        return `${totalOthers} member${totalOthers !== 1 ? "s" : ""}`;
+                      })()
+                    : isOnline
+                    ? "Online"
+                    : "Offline"}
                 </p>
               </div>
             </div>
@@ -637,7 +667,20 @@ export const ChatWindow = ({
             </div>
           )}
 
-          <div className="flex items-end gap-2 sm:gap-3 bg-white dark:bg-slate-800 rounded-[28px] sm:rounded-[30px] p-2 pr-2 sm:pr-2.5 shadow-2xl shadow-blue-500/10 ring-1 ring-black/5">
+          <div className="relative flex items-end gap-2 sm:gap-3 bg-white dark:bg-slate-800 rounded-[28px] sm:rounded-[30px] p-2 pr-2 sm:pr-2.5 shadow-2xl shadow-blue-500/10 ring-1 ring-black/5">
+            {showEmojiPicker && (
+              <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-2 z-50">
+                <EmojiPicker
+                  theme={Theme.DARK}
+                  onEmojiClick={(emojiData) => {
+                    setDraft((prev) => prev + emojiData.emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  height={350}
+                  width={320}
+                />
+              </div>
+            )}
             <div className="flex items-center gap-1 sm:gap-2">
               {/* Collapsible Tool Menu for Mobile */}
               <div className="relative group/tools">

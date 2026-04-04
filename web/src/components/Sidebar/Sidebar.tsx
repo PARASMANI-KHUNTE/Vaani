@@ -156,24 +156,27 @@ export const Sidebar = ({
 
       {/* Active Users Carousel */}
       <div className="mt-2 flex gap-4 overflow-x-auto px-5 sm:px-6 py-4 no-scrollbar">
-        {chats.slice(0, 10).map((chat) => {
-          const user = chat.otherParticipant;
-          const isOnline = onlineUserIds.includes(user?._id || "");
-          return (
-            <div key={chat._id} className="flex flex-col items-center gap-2">
-              <div className="relative cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => handleChatClick(chat._id)}>
-                <Avatar 
-                  src={user?.avatar} 
-                  name={user?.name || "?"} 
-                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-[18px] sm:rounded-[22px] border-2 border-white shadow-md ring-1 ring-slate-100 dark:border-slate-800 dark:ring-slate-700" 
-                />
-                {isOnline && (
-                  <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm dark:border-slate-800" />
-                )}
+        {chats
+          .filter((chat) => !chat.isGroup && chat.otherParticipant)
+          .slice(0, 10)
+          .map((chat) => {
+            const user = chat.otherParticipant;
+            const isOnline = onlineUserIds.includes(user?._id || "");
+            return (
+              <div key={chat._id} className="flex flex-col items-center gap-2">
+                <div className="relative cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => handleChatClick(chat._id)}>
+                  <Avatar
+                    src={user?.avatar}
+                    name={user?.name || "?"}
+                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-[18px] sm:rounded-[22px] border-2 border-white shadow-md ring-1 ring-slate-100 dark:border-slate-800 dark:ring-slate-700"
+                  />
+                  {isOnline && (
+                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm dark:border-slate-800" />
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3">

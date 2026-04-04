@@ -118,8 +118,11 @@ const createOrGetDirectChat = async (currentUserId, participantId) => {
       .lean();
   } else {
     await ensureChatUserState(chat);
-    
-    // Unhide the chat if it was hidden
+
+    // Unhide the chat if it was hidden for this user.
+    // NOTE: Do NOT reset clearedAt — old messages must remain permanently
+    // deleted from this user's view. Only new messages (after clearedAt)
+    // will be visible when the conversation is re-opened.
     const normalizedUserId = normalizeId(currentUserId);
     await Chat.findOneAndUpdate(
       {
@@ -130,10 +133,16 @@ const createOrGetDirectChat = async (currentUserId, participantId) => {
       {
         $set: {
           "userStates.$.hidden": false,
-          "userStates.$.clearedAt": null,
         },
       }
     );
+
+    // Re-fetch with fresh userStates so formatChatForList doesn't use the
+    // stale in-memory object (which still has hidden: true / old clearedAt)
+    // and incorrectly return null.
+    chat = await Chat.findById(chat._id)
+      .populate("participants", "username name email avatar tagline bio lastSeen friends createdAt")
+      .lean();
   }
 
   return await formatChatForList(chat, currentUserId);
@@ -502,7 +511,8 @@ const createGroupSystemMessage = async ({
         "userStates.$[senderState].clearedAt": null,
         "userStates.$[senderState].manualUnread": false,
         "userStates.$[senderState].hidden": false,
-        "userStates.$[receiverState].clearedAt": null,
+        // Do NOT reset clearedAt for receivers — if they deleted the chat,
+        // old messages must remain gone; only this new message is visible.
         "userStates.$[receiverState].manualUnread": true,
         "userStates.$[receiverState].hidden": false,
       },

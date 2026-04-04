@@ -345,6 +345,7 @@ export const ChatShell = () => {
             onBack={selectedChatId ? () => selectChat(null) : undefined}
             onClose={selectedChatId ? () => selectChat(null) : undefined}
             isOnline={isActiveUserOnline}
+            onlineUserIds={onlineUserIds}
             typingLabel={activeTyping ? `${activeTyping.userName} is typing...` : null}
             onOpenUserProfile={(user) => navigate(`/profile/user/${user._id}`)}
             mediaTransfer={mediaTransfer}

@@ -93,7 +93,7 @@ export const MyProfilePage = () => {
 
   if (status === "loading" || isLoadingProfile) {
     return (
-      <main className="ambient-grid flex min-h-screen items-center justify-center p-6">
+      <main className="ambient-grid flex min-h-dvh items-center justify-center p-6">
         <div className="surface-panel rounded-[30px] px-8 py-10">Loading profile...</div>
       </main>
     );
@@ -101,7 +101,7 @@ export const MyProfilePage = () => {
 
   if (!token || !profile) {
     return (
-      <main className="ambient-grid flex min-h-screen items-center justify-center p-6">
+      <main className="ambient-grid flex min-h-dvh items-center justify-center p-6">
         <div className="surface-panel rounded-[30px] px-8 py-10 text-center">
           <h1 className="text-2xl font-semibold text-ink">Sign in to view your profile</h1>
           <Link to="/" className="mt-4 inline-flex rounded-full bg-lagoon/10 px-4 py-2 text-sm font-semibold text-lagoon">
@@ -113,7 +113,7 @@ export const MyProfilePage = () => {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-white dark:bg-slate-950">
+    <main className="flex min-h-dvh w-full flex-col bg-white dark:bg-slate-950">
       <header className="z-50 shrink-0 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
