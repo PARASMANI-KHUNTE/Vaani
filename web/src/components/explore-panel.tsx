@@ -118,14 +118,14 @@ export const ExplorePanel = ({
 
   const UserCard = ({ user }: { user: BackendUser }) => (
     <div
-      className="group relative rounded-2xl border border-slate-800/50 bg-slate-900/80 p-5 transition-all duration-300 hover:border-slate-700 hover:bg-slate-800/90 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20"
+      className="group relative cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:border-slate-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800"
       onClick={() => onOpenProfile(user)}
     >
       {/* Online Indicator */}
       {user.isOnline && (
         <div className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2 py-1">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          <span className="text-[10px] font-medium text-emerald-400">Online</span>
+          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Online</span>
         </div>
       )}
 
@@ -135,22 +135,22 @@ export const ExplorePanel = ({
           <Avatar
             src={user.avatar}
             name={user.name}
-            className="h-20 w-20 rounded-2xl ring-2 ring-slate-700/50 transition-all group-hover:ring-slate-600"
+            className="h-20 w-20 rounded-2xl ring-2 ring-slate-200 transition-all group-hover:ring-slate-300 dark:ring-slate-800 dark:group-hover:ring-slate-700"
             textClassName="text-2xl font-bold"
           />
         </div>
 
         {/* User Info */}
         <div className="mt-4 text-center">
-          <h3 className="text-base font-semibold text-white truncate max-w-full">{user.name}</h3>
-          <p className="text-sm text-slate-400">@{user.username}</p>
+          <h3 className="max-w-full truncate text-base font-semibold text-slate-900 dark:text-white">{user.name}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">@{user.username}</p>
           {user.tagline && (
-            <p className="mt-2 text-xs font-medium text-slate-500 uppercase tracking-wider">{user.tagline}</p>
+            <p className="mt-2 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">{user.tagline}</p>
           )}
         </div>
 
         {/* Friends Count */}
-        <div className="mt-3 flex items-center gap-1.5 text-slate-500">
+        <div className="mt-3 flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
           <Users className="h-3.5 w-3.5" />
           <span className="text-xs">{user.friendsCount || 0} friends</span>
         </div>
@@ -162,14 +162,14 @@ export const ExplorePanel = ({
           <>
             <button
               onClick={(e) => { e.stopPropagation(); onStartChat(user._id); }}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600/20 px-4 py-2.5 text-sm font-medium text-blue-400 transition-all hover:bg-blue-600/30 active:scale-95"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-blue-500 active:scale-95"
             >
               <MessageCircle className="h-4 w-4" />
               Message
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onUnfriend(user); }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/50 text-slate-400 transition-all hover:border-rose-500/50 hover:text-rose-400 hover:bg-rose-500/10"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-all hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50 dark:border-slate-700 dark:text-slate-400 dark:hover:border-rose-500/50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10"
               title="Unfriend"
             >
               <UserRoundMinus className="h-4 w-4" />
@@ -178,7 +178,7 @@ export const ExplorePanel = ({
         ) : user.requestSent ? (
           <button
             disabled
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-medium text-amber-400"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
           >
             <Loader2 className="h-4 w-4 animate-spin" />
             Request Sent
@@ -195,14 +195,14 @@ export const ExplorePanel = ({
           <>
             <button
               onClick={(e) => { e.stopPropagation(); onSendRequest(user); }}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-blue-500 active:scale-95"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-blue-500 active:scale-95"
             >
               <UserPlus2 className="h-4 w-4" />
               Add Friend
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onStartChat(user._id); }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/50 text-slate-400 transition-all hover:border-slate-600 hover:text-white hover:bg-slate-700/50"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200 dark:hover:bg-slate-800"
               title="Message"
             >
               <MessageCircle className="h-4 w-4" />
@@ -214,7 +214,7 @@ export const ExplorePanel = ({
       {/* More Options */}
       <button
         onClick={(e) => { e.stopPropagation(); setOpenMenuUserId(openMenuUserId === user._id ? null : user._id); }}
-        className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-800/80 text-slate-400 opacity-0 transition-all hover:bg-slate-700 hover:text-white group-hover:opacity-100"
+        className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 opacity-0 transition-all hover:bg-slate-200 hover:text-slate-700 group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
       >
         <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
           <circle cx="12" cy="5" r="2" />
@@ -226,18 +226,18 @@ export const ExplorePanel = ({
       {/* Dropdown Menu */}
       {openMenuUserId === user._id && (
         <div 
-          className="absolute left-4 top-14 z-50 w-48 rounded-xl border border-slate-700/50 bg-slate-900 p-1.5 shadow-xl shadow-black/20"
+          className="absolute left-4 top-14 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-800 dark:bg-slate-900"
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={(e) => { e.stopPropagation(); onOpenProfile(user); setOpenMenuUserId(null); }}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             View Profile
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onToggleBlock(user); setOpenMenuUserId(null); }}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-400 hover:bg-rose-500/10"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
           >
             <Ban className="h-4 w-4" />
             {user.hasBlocked ? "Unblock" : "Block"}
@@ -253,24 +253,24 @@ export const ExplorePanel = ({
       className={cn(
         "flex flex-col",
         variant === "overlay"
-          ? "absolute right-0 top-0 h-full w-full overflow-hidden border-l border-slate-800/50 bg-[var(--bg-page)] sm:max-w-md"
-          : "h-full w-full overflow-y-auto bg-[var(--bg-page)]"
+          ? "absolute right-0 top-0 h-full w-full overflow-hidden border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:max-w-md"
+          : "h-full w-full overflow-y-auto bg-white dark:bg-slate-950"
       )}
     >
       {/* Header */}
-      <div       className="sticky top-0 z-20 border-b border-slate-800/50 bg-[var(--bg-page)]/95 backdrop-blur-xl p-4 sm:p-6">
+      <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 sm:px-6">
         <div className={cn(
           "mb-5 transition-all duration-300",
-          variant === "page" ? "max-w-5xl mx-auto" : ""
+          variant === "page" ? "mx-auto max-w-5xl" : ""
         )}>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">Explore</h1>
-              <p className="mt-1 text-sm text-slate-400">Discover and connect with new people</p>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Explore</h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Discover and connect with new people</p>
             </div>
-            <div className="flex items-center gap-2 rounded-full bg-emerald-500/20 px-3 py-1.5">
-              <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="text-xs font-medium text-emerald-400">{onlineUsers.length} online</span>
+            <div className="flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 dark:bg-emerald-500/20">
+              <Wifi className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">{onlineUsers.length} online</span>
             </div>
           </div>
         </div>
@@ -278,15 +278,15 @@ export const ExplorePanel = ({
         {/* Search */}
         <div className={cn(
           "relative transition-all duration-300",
-          variant === "page" ? "max-w-5xl mx-auto" : ""
+          variant === "page" ? "mx-auto max-w-5xl" : ""
         )}>
           <div className={cn(
-            "relative flex items-center gap-3 rounded-2xl border border-slate-700/50 bg-slate-900/80 px-4 py-3 transition-all duration-300",
-            focusedSearch && "border-blue-500/50 bg-slate-900 shadow-lg shadow-blue-500/10"
+            "relative flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition-all duration-300 dark:border-slate-800 dark:bg-slate-900",
+            focusedSearch && "border-blue-500 bg-white shadow-lg dark:bg-slate-900"
           )}>
             <Search className={cn(
-              "h-5 w-5 text-slate-500 transition-colors",
-              focusedSearch && "text-blue-400"
+              "h-5 w-5 text-slate-400 transition-colors",
+              focusedSearch && "text-blue-500"
             )} />
             <input
               ref={searchRef}
@@ -296,12 +296,12 @@ export const ExplorePanel = ({
               onFocus={() => setFocusedSearch(true)}
               onBlur={() => setFocusedSearch(false)}
               placeholder="Search by name or username..."
-              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+              className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
             />
             {query && (
               <button
                 onClick={() => onQueryChange("")}
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-500 transition-colors hover:bg-slate-300 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
               >
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
@@ -314,7 +314,7 @@ export const ExplorePanel = ({
         {/* Filter Tabs */}
         <div className={cn(
           "mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide",
-          variant === "page" ? "max-w-5xl mx-auto" : ""
+          variant === "page" ? "mx-auto max-w-5xl" : ""
         )}>
           {filterTabs.map((tab) => (
             <button
@@ -324,14 +324,14 @@ export const ExplorePanel = ({
                 "flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all",
                 activeFilter === tab.id
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                  : "bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               )}
             >
               {tab.label}
               {tab.count !== undefined && tab.count > 0 && (
                 <span className={cn(
                   "rounded-full px-1.5 py-0.5 text-[10px]",
-                  activeFilter === tab.id ? "bg-white/20" : "bg-slate-700"
+                  activeFilter === tab.id ? "bg-white/20" : "bg-slate-200 dark:bg-slate-700"
                 )}>
                   {tab.count}
                 </span>
@@ -344,7 +344,7 @@ export const ExplorePanel = ({
       {/* Content */}
       <div className={cn(
         "flex-1 overflow-y-auto p-4 sm:p-6",
-        variant === "page" ? "max-w-5xl mx-auto w-full" : ""
+        variant === "page" ? "mx-auto w-full max-w-5xl" : ""
       )}>
         {/* Sections for "all" filter */}
         {activeFilter === "all" && !query && (
@@ -352,8 +352,8 @@ export const ExplorePanel = ({
             {/* Suggested Users */}
             {suggested.length > 0 && (
               <section className="mb-8">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
-                  <UserPlus2 className="h-5 w-5 text-blue-400" />
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  <UserPlus2 className="h-5 w-5 text-blue-500" />
                   Suggested for You
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -367,8 +367,8 @@ export const ExplorePanel = ({
             {/* Online Users */}
             {onlineUsers.length > 0 && (
               <section className="mb-8">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
-                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                   Online Now
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -382,7 +382,7 @@ export const ExplorePanel = ({
             {/* All Users */}
             {users.length > 0 && (
               <section>
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
                   <Users className="h-5 w-5 text-slate-400" />
                   All People
                 </h2>
@@ -399,9 +399,9 @@ export const ExplorePanel = ({
         {/* Filtered/ Search Results */}
         {(activeFilter !== "all" || query) && (
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-white">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
               {query ? `Search Results` : filterTabs.find(t => t.id === activeFilter)?.label}
-              <span className="ml-2 text-sm font-normal text-slate-400">({filteredUsers.length})</span>
+              <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">({filteredUsers.length})</span>
             </h2>
             {filteredUsers.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -410,10 +410,10 @@ export const ExplorePanel = ({
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700/50 bg-slate-900/50 py-16 text-center">
-                <Users className="mb-4 h-12 w-12 text-slate-600" />
-                <h3 className="text-lg font-semibold text-slate-300">No users found</h3>
-                <p className="mt-2 text-sm text-slate-500">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center dark:border-slate-800 dark:bg-slate-900">
+                <Users className="mb-4 h-12 w-12 text-slate-400 dark:text-slate-600" />
+                <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">No users found</h3>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-500">
                   {query ? "Try searching something else" : "Check back later for more suggestions"}
                 </p>
               </div>
@@ -425,12 +425,12 @@ export const ExplorePanel = ({
         {isLoading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="animate-pulse rounded-2xl border border-slate-800/50 bg-slate-900/80 p-5">
+              <div key={i} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-col items-center">
-                  <div className="h-20 w-20 rounded-2xl bg-slate-800" />
-                  <div className="mt-4 h-4 w-24 rounded bg-slate-800" />
-                  <div className="mt-2 h-3 w-16 rounded bg-slate-800" />
-                  <div className="mt-3 h-6 w-20 rounded-full bg-slate-800" />
+                  <div className="h-20 w-20 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                  <div className="mt-4 h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="mt-2 h-3 w-16 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="mt-3 h-6 w-20 rounded-full bg-slate-200 dark:bg-slate-800" />
                 </div>
               </div>
             ))}
@@ -440,11 +440,11 @@ export const ExplorePanel = ({
         {/* Empty State */}
         {!isLoading && users.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-800/50">
-              <Users className="h-10 w-10 text-slate-600" />
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900">
+              <Users className="h-10 w-10 text-slate-400 dark:text-slate-600" />
             </div>
-            <h3 className="text-xl font-semibold text-slate-300">No users found</h3>
-            <p className="mt-2 max-w-xs text-sm text-slate-500">
+            <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300">No users found</h3>
+            <p className="mt-2 max-w-xs text-sm text-slate-500 dark:text-slate-500">
               {query ? "Try searching something else" : "Be the first to join! More users will appear here."}
             </p>
           </div>
@@ -458,7 +458,7 @@ export const ExplorePanel = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[320] bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[320] bg-black/40 backdrop-blur-sm">
       {panelBody}
     </div>
   );

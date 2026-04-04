@@ -146,10 +146,12 @@ export const NotificationPanel = ({
         aria-expanded={isOpen}
         aria-haspopup="dialog"
       >
-        {unreadCount > 0 ? (
+        {!notificationToneEnabled ? (
+          <BellOff className={cn("h-4 w-4", unreadCount > 0 ? "text-slate-400" : "text-slate-400")} aria-hidden="true" />
+        ) : unreadCount > 0 ? (
           <Bell className="h-4 w-4" aria-hidden="true" />
         ) : (
-          <BellOff className="h-4 w-4" aria-hidden="true" />
+          <Bell className="h-4 w-4" aria-hidden="true" />
         )}
         {unreadCount > 0 && (
           <span

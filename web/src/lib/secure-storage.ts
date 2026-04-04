@@ -1,9 +1,59 @@
 const STORAGE_KEY = "linkup-web-session";
 const USE_SESSION_ONLY_KEY = "linkup-session-mode";
+const ENCRYPTION_KEY_NAME = "linkup-encryption-key";
+
+const generateEncryptionKey = (): string => {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+const getOrCreateEncryptionKey = (): string => {
+  const stored = sessionStorage.getItem(ENCRYPTION_KEY_NAME);
+  if (stored) return stored;
+
+  const newKey = generateEncryptionKey();
+  sessionStorage.setItem(ENCRYPTION_KEY_NAME, newKey);
+  return newKey;
+};
+
+const xorEncrypt = (data: string, key: string): string => {
+  const keyChars = key.split("");
+  const dataChars = data.split("");
+  const result: string[] = [];
+
+  for (let i = 0; i < dataChars.length; i++) {
+    const dataChar = dataChars[i].charCodeAt(0);
+    const keyChar = keyChars[i % keyChars.length].charCodeAt(0);
+    result.push(String.fromCharCode(dataChar ^ keyChar));
+  }
+
+  return btoa(result.join(""));
+};
+
+const xorDecrypt = (encrypted: string, key: string): string => {
+  try {
+    const decoded = atob(encrypted);
+    const keyChars = key.split("");
+    const result: string[] = [];
+
+    for (let i = 0; i < decoded.length; i++) {
+      const dataChar = decoded.charCodeAt(i);
+      const keyChar = keyChars[i % keyChars.length].charCodeAt(0);
+      result.push(String.fromCharCode(dataChar ^ keyChar));
+    }
+
+    return result.join("");
+  } catch {
+    return "";
+  }
+};
 
 const encode = (data: unknown): string => {
   try {
-    return btoa(encodeURIComponent(JSON.stringify(data)));
+    const json = JSON.stringify(data);
+    const key = getOrCreateEncryptionKey();
+    return xorEncrypt(json, key);
   } catch {
     return "";
   }
@@ -11,7 +61,10 @@ const encode = (data: unknown): string => {
 
 const decode = <T>(encoded: string): T | null => {
   try {
-    return JSON.parse(decodeURIComponent(atob(encoded))) as T;
+    const key = getOrCreateEncryptionKey();
+    const decrypted = xorDecrypt(encoded, key);
+    if (!decrypted) return null;
+    return JSON.parse(decrypted) as T;
   } catch {
     return null;
   }
@@ -64,4 +117,12 @@ export const secureStorage = {
   enableSessionMode: () => setSessionMode(true),
   disableSessionMode: () => setSessionMode(false),
   isSessionMode: getSessionMode,
+};
+
+export const clearAllSecureStorage = (): void => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(`${STORAGE_KEY}-session`);
+  sessionStorage.removeItem(ENCRYPTION_KEY_NAME);
 };

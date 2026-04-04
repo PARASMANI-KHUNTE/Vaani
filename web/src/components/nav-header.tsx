@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight, Compass, LogOut, Menu, MessageSquare, Settings, UserRound, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { NotificationPanel } from "@/components/notification-panel";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { acceptFriendRequest, rejectFriendRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -84,14 +85,14 @@ export const NavHeader = ({
   };
 
   return (
-    <header className="z-50 shrink-0 border-b border-[#374151]/60 bg-[#0f172a]/80 px-4 py-3 text-slate-100 backdrop-blur-xl">
+    <header className="z-50 shrink-0 border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
       <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4">
         {/* Left */}
         <div className="flex min-w-0 items-center gap-3">
           {showBackButton ? (
             <Link
               to={backTo || "/"}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-300 transition-all hover:bg-white/5 hover:text-white active:scale-95"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-all hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-900"
               aria-label="Back"
             >
               <svg
@@ -109,12 +110,12 @@ export const NavHeader = ({
             </Link>
           ) : null}
 
-          <Link to="/" className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-white/5" aria-label="Home">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#111827] ring-1 ring-white/10">
+          <Link to="/" className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-900" aria-label="Home">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
               <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold tracking-tight text-white">LinkUp</p>
+              <p className="truncate text-sm font-bold tracking-tight text-slate-900 dark:text-white">LinkUp</p>
               <p className="truncate text-[11px] font-medium text-slate-400">{title}</p>
             </div>
           </Link>
@@ -137,7 +138,9 @@ export const NavHeader = ({
                   onClick={t.onClick}
                   className={cn(
                     "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
-                    t.active ? "bg-[#111827] text-white ring-1 ring-white/10" : "text-[#9ca3af] hover:bg-white/5 hover:text-white"
+                    t.active 
+                      ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900" 
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -157,7 +160,7 @@ export const NavHeader = ({
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition-all hover:bg-white/5 hover:text-white active:scale-95 lg:hidden"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-all hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-900 lg:hidden"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
@@ -181,15 +184,17 @@ export const NavHeader = ({
             onNotificationToneChange={setNotificationToneEnabled}
           />
 
+          <ThemeToggle />
+
           <div className="relative" ref={userMenuRef}>
             <button
               type="button"
               onClick={() => setIsUserMenuOpen((v) => !v)}
-              className="flex h-9 items-center gap-2 rounded-xl px-2 py-1.5 text-slate-300 transition-all hover:bg-white/5 hover:text-white active:scale-[0.98]"
+              className="flex h-9 items-center gap-2 rounded-xl px-2 py-1.5 text-slate-600 transition-all hover:bg-slate-100 active:scale-[0.98] dark:text-slate-300 dark:hover:bg-slate-900"
               aria-label="User menu"
               aria-expanded={isUserMenuOpen}
             >
-              <div className="h-7 w-7 overflow-hidden rounded-xl bg-[#111827] ring-1 ring-white/10">
+              <div className="h-7 w-7 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
                 <Avatar
                   src={session?.backendUser?.avatar || null}
                   name={session?.backendUser?.name || "Me"}
@@ -197,25 +202,25 @@ export const NavHeader = ({
                   textClassName="text-xs font-bold"
                 />
               </div>
-              <span className="hidden md:inline text-sm font-semibold text-slate-100">
+              <span className="hidden md:inline text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {session?.backendUser?.name?.split(" ")[0]}
               </span>
             </button>
 
             {isUserMenuOpen ? (
-              <div className="absolute right-0 top-full z-[240] mt-2 w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-2xl ring-1 ring-black/30">
+              <div className="absolute right-0 top-full z-[240] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
                 <div className="px-3 py-2.5">
-                  <p className="truncate text-xs font-semibold text-slate-300">Signed in as</p>
-                  <p className="mt-0.5 truncate text-sm font-bold text-white">{session?.backendUser?.name}</p>
+                  <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">Signed in as</p>
+                  <p className="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-white">{session?.backendUser?.name}</p>
                 </div>
-                <div className="mx-3 h-px bg-white/10" />
+                <div className="mx-3 h-px bg-slate-200 dark:bg-slate-800" />
                 <button
                   type="button"
                   onClick={() => {
                     setIsUserMenuOpen(false);
                     handleLogout();
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-semibold text-rose-200 hover:bg-rose-500/10"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/10"
                 >
                   <LogOut className="h-4 w-4" />
                   Logout
@@ -234,7 +239,7 @@ export const NavHeader = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setIsMobileMenuOpen(false)}
             />
             <motion.div
@@ -242,14 +247,14 @@ export const NavHeader = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
               transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-              className="absolute left-1/2 top-6 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] shadow-2xl"
+              className="absolute left-1/2 top-6 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                <p className="text-sm font-bold text-white">Menu</p>
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Menu</p>
                 <button
                   type="button"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 hover:bg-white/5 hover:text-white active:scale-95"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-800"
                   aria-label="Close menu"
                 >
                   <X className="h-5 w-5" />
@@ -271,11 +276,11 @@ export const NavHeader = ({
                         setIsMobileMenuOpen(false);
                         item.onClick();
                       }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-100 hover:bg-white/5"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
                     >
-                      <Icon className="h-5 w-5 text-slate-300" />
+                      <Icon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                       {item.label}
-                      <ChevronRight className="ml-auto h-4 w-4 text-slate-500" />
+                      <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
                     </button>
                   );
                 })}
