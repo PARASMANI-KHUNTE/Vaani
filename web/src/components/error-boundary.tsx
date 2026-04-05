@@ -3,7 +3,6 @@
 import { Component, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { handleError } from "@/lib/error-handler";
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
