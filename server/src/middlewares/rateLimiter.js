@@ -12,7 +12,6 @@ const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: ipKeyGenerator,
-  trustProxy: 1,
 });
 
 const apiRateLimiter = rateLimit({
@@ -24,7 +23,6 @@ const apiRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: 1,
 });
 
 const groupMutationRateLimiter = rateLimit({
@@ -36,7 +34,6 @@ const groupMutationRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: 1,
 });
 
 const uploadRateLimiter = rateLimit({
@@ -52,7 +49,6 @@ const uploadRateLimiter = rateLimit({
     const userId = req.user?._id?.toString();
     return userId || ipKeyGenerator(req);
   },
-  trustProxy: 1,
 });
 
 const messageRateLimiter = rateLimit({
@@ -68,7 +64,6 @@ const messageRateLimiter = rateLimit({
     const userId = req.user?._id?.toString();
     return userId || ipKeyGenerator(req);
   },
-  trustProxy: 1,
 });
 
 module.exports = {

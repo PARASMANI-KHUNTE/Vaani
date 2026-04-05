@@ -24,7 +24,7 @@ const corsOptions = {
 
 const app = express();
 
-app.set("trust proxy", env.nodeEnv === "production");
+app.set("trust proxy", env.nodeEnv === "production" ? 1 : false);
 
 app.use(cors(corsOptions));
 app.use(helmet());
