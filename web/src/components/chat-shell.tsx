@@ -33,6 +33,7 @@ export const ChatShell = () => {
   const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
   const [notificationToneEnabled] = useLocalStorageBoolean("notificationToneEnabled", true);
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorageBoolean("sidebarCollapsed", false);
   const debouncedSearch = searchTerm.trim().toLowerCase();
 
   // Enable keyboard shortcuts
@@ -251,6 +252,9 @@ export const ChatShell = () => {
             if (isSelectionMode) setSelectedChatIds([]);
           }}
           onOpenNewChat={() => setIsNewChatModalOpen(true)}
+          isCollapsed={isSidebarCollapsed}
+          onCollapse={() => setIsSidebarCollapsed(true)}
+          onExpand={() => setIsSidebarCollapsed(false)}
         />
         <div className={cn("h-full min-w-0 flex-1", !selectedChatId ? "hidden sm:block" : "block")}>
           <ChatWindow
