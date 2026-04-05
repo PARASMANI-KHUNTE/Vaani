@@ -1,4 +1,6 @@
-const { ipKeyGenerator, rateLimit } = require("express-rate-limit");
+const { rateLimit } = require("express-rate-limit");
+
+const ipKeyGenerator = (req) => req.ip || req.socket.remoteAddress || "unknown";
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -9,7 +11,8 @@ const authRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ipKeyGenerator(req.ip || req.headers["x-forwarded-for"] || "unknown"),
+  keyGenerator: ipKeyGenerator,
+  trustProxy: 1,
 });
 
 const apiRateLimiter = rateLimit({
@@ -21,6 +24,7 @@ const apiRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: 1,
 });
 
 const groupMutationRateLimiter = rateLimit({
@@ -32,6 +36,7 @@ const groupMutationRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: 1,
 });
 
 const uploadRateLimiter = rateLimit({
@@ -45,8 +50,9 @@ const uploadRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     const userId = req.user?._id?.toString();
-    return userId || ipKeyGenerator(req.ip || req.headers["x-forwarded-for"] || "unknown");
+    return userId || ipKeyGenerator(req);
   },
+  trustProxy: 1,
 });
 
 const messageRateLimiter = rateLimit({
@@ -60,8 +66,9 @@ const messageRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     const userId = req.user?._id?.toString();
-    return userId || ipKeyGenerator(req.ip || req.headers["x-forwarded-for"] || "unknown");
+    return userId || ipKeyGenerator(req);
   },
+  trustProxy: 1,
 });
 
 module.exports = {
