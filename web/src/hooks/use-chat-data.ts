@@ -613,6 +613,14 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       setError(payload.message || "An error occurred. Please try again.");
     };
 
+    const handleConnect = () => {
+      const selectedChatId = storeRef.current?.selectedChatId;
+      if (selectedChatId) {
+        socket.emit(socketEvents.joinChat, { chatId: selectedChatId });
+      }
+    };
+
+    socket.on("connect", handleConnect);
     socket.on(socketEvents.presenceSync, handlePresenceSync);
     socket.on(socketEvents.userOnline, handleUserOnline);
     socket.on(socketEvents.userOffline, handleUserOffline);
@@ -634,6 +642,7 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     socket.on(socketEvents.socketError, handleSocketError);
 
     return () => {
+      socket.off("connect", handleConnect);
       socket.off(socketEvents.presenceSync, handlePresenceSync);
       socket.off(socketEvents.userOnline, handleUserOnline);
       socket.off(socketEvents.userOffline, handleUserOffline);

@@ -2,7 +2,15 @@ let ioInstance = null;
 const User = require("../user/user.model");
 const Chat = require("../chat/chat.model");
 const { sendExpoPushNotifications } = require("../../utils/pushNotifications");
-const { getChatSummariesForParticipants } = require("../chat/chat.service");
+
+let getChatSummariesForParticipants;
+
+const getChatService = () => {
+  if (!getChatSummariesForParticipants) {
+    ({ getChatSummariesForParticipants } = require("../chat/chat.service"));
+  }
+  return { getChatSummariesForParticipants };
+};
 
 const setSocketIO = (io) => {
   ioInstance = io;
@@ -56,7 +64,7 @@ const emitMessageCreated = async (message, chatId, currentUserId, currentUserNam
     chatParticipants = chat.participants.map((p) => p.toString());
   }
   
-  const summaries = await getChatSummariesForParticipants(chatIdStr, chatParticipants);
+  const summaries = await getChatService().getChatSummariesForParticipants(chatIdStr, chatParticipants);
   
   chatParticipants.forEach((participantId) => {
     const chatSummary = summaries[participantId];
@@ -143,7 +151,7 @@ const emitForwardedMessage = async (message, targetChatId, currentUserId) => {
   if (!targetChat) return;
   
   const participantIds = targetChat.participants.map((p) => p.toString());
-  const summaries = await getChatSummariesForParticipants(targetChatIdStr, participantIds);
+  const summaries = await getChatService().getChatSummariesForParticipants(targetChatIdStr, participantIds);
   
   participantIds.forEach((participantId) => {
     const chatSummary = summaries[participantId];

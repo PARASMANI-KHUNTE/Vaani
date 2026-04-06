@@ -1,4 +1,4 @@
-const { getRedisClient, isRedisConnected } = require("../config/redis.client");
+const { getRedisClient, isRedisConnected } = require("../../config/redis.client");
 
 const DEDUP_PREFIX = "msg_dedup:";
 const DEDUP_TTL_SECONDS = 300;

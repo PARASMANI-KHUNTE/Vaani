@@ -56,7 +56,10 @@ const env = {
   },
   redis: {
     url: process.env.REDIS_URL || "redis://localhost:6379",
+    upstashUrl: process.env.UPSTASH_REDIS_REST_URL || null,
+    upstashToken: process.env.UPSTASH_REDIS_REST_TOKEN || null,
     enabled: process.env.REDIS_ENABLED === "true",
+    cacheTtlSeconds: Number(process.env.REDIS_CACHE_TTL_SECONDS || 300),
   },
   retention: {
     messageDays: Number(process.env.MESSAGE_RETENTION_DAYS || 90),

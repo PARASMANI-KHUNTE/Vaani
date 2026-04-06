@@ -1,57 +1,101 @@
-const { createClient } = require("redis");
 const env = require("./env");
 
-let redisClient = null;
 let isConnected = false;
+let isUpstash = false;
 
-const getRedisClient = () => {
-  if (!env.redis.enabled) {
-    return null;
-  }
-
-  if (!redisClient) {
-    redisClient = createClient({ url: env.redis.url });
-
-    redisClient.on("error", (err) => {
-      console.error("Redis Client Error:", err);
-      isConnected = false;
-    });
-
-    redisClient.on("connect", () => {
-      console.log("Redis connected");
-      isConnected = true;
-    });
-
-    redisClient.on("disconnect", () => {
-      console.log("Redis disconnected");
-      isConnected = false;
-    });
-  }
-
-  return redisClient;
-};
+const isRedisEnabled = () => env.redis.enabled && env.redis.upstashUrl && env.redis.upstashToken;
 
 const connectRedis = async () => {
-  if (!env.redis.enabled) {
+  if (!isRedisEnabled()) {
     console.log("Redis disabled - using in-memory fallback");
     return;
   }
 
-  const client = getRedisClient();
-  if (client && !isConnected) {
-    await client.connect();
-  }
+  isUpstash = true;
+  isConnected = true;
+  console.log("Redis connected (Upstash)");
 };
 
 const disconnectRedis = async () => {
-  if (redisClient && isConnected) {
-    await redisClient.quit();
-    redisClient = null;
-    isConnected = false;
-  }
+  isConnected = false;
 };
 
 const isRedisConnected = () => isConnected;
+
+const getRedisClient = () => {
+  if (!isRedisEnabled()) {
+    return null;
+  }
+
+  return {
+    async get(key) {
+      try {
+        const response = await fetch(`${env.redis.upstashUrl}/get/${encodeURIComponent(key)}`, {
+          headers: { Authorization: `Bearer ${env.redis.upstashToken}` },
+        });
+        const data = await response.json();
+        return data.result || null;
+      } catch (error) {
+        console.error("Redis GET error:", error);
+        return null;
+      }
+    },
+
+    async set(key, value, options = {}) {
+      try {
+        const body = { key, value };
+        if (options.EX) body.ex = options.EX;
+        
+        const response = await fetch(`${env.redis.upstashUrl}/set`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.redis.upstashToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        return data.result;
+      } catch (error) {
+        console.error("Redis SET error:", error);
+        return null;
+      }
+    },
+
+    async setEx(key, seconds, value) {
+      return this.set(key, value, { EX: seconds });
+    },
+
+    async del(key) {
+      try {
+        const response = await fetch(`${env.redis.upstashUrl}/del/${encodeURIComponent(key)}`, {
+          headers: { Authorization: `Bearer ${env.redis.upstashToken}` },
+        });
+        const data = await response.json();
+        return data.result;
+      } catch (error) {
+        console.error("Redis DEL error:", error);
+        return 0;
+      }
+    },
+
+    duplicate() {
+      return getRedisClient();
+    },
+
+    async connect() {
+      return;
+    },
+
+    async quit() {
+      isConnected = false;
+    },
+
+    on() {
+      return this;
+    },
+  };
+};
 
 module.exports = {
   connectRedis,

@@ -13,6 +13,17 @@ import {
   Users,
   LogOut,
   MessageCircle,
+  ArrowLeft,
+  Search,
+  MoreHorizontal,
+  X,
+  CheckSquare,
+  Trash2,
+  RefreshCw,
+  AlertCircle,
+  ImagePlus,
+  Smile,
+  Mic,
 } from "lucide-react";
 import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
 import { ConfirmDialog } from "@/components/confirm-dialog";

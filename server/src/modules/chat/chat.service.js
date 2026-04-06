@@ -5,11 +5,20 @@ const GroupInvite = require("./groupInvite.model");
 const Message = require("../message/message.model");
 const User = require("../user/user.model");
 const ApiError = require("../../utils/apiError");
-const { assertUsersCanInteract, mapUserProfile } = require("../user/user.service");
 const { destroyMediaAssets } = require("../../utils/mediaUpload");
 const MAX_GROUP_MEMBERS = 50;
 const DEFAULT_INVITE_EXPIRY_HOURS = 24 * 7;
 const MAX_INVITE_EXPIRY_HOURS = 24 * 365 * 10;
+
+let assertUsersCanInteract;
+let mapUserProfile;
+
+const getUserService = () => {
+  if (!assertUsersCanInteract) {
+    ({ assertUsersCanInteract, mapUserProfile } = require("../user/user.service"));
+  }
+  return { assertUsersCanInteract, mapUserProfile };
+};
 
 const normalizeId = (value) => {
   if (!value) {
@@ -94,7 +103,7 @@ const createOrGetDirectChat = async (currentUserId, participantId) => {
   }
 
   await assertParticipantExists(participantId);
-  await assertUsersCanInteract({
+  await getUserService().assertUsersCanInteract({
     currentUserId,
     targetUserId: participantId,
   });
@@ -173,7 +182,7 @@ const createGroupChat = async ({ currentUserId, groupName, participantIds = [] }
   await Promise.all(
     participantsWithoutOwner.map(async (participantId) => {
       await assertParticipantExists(participantId);
-      await assertUsersCanInteract({
+      await getUserService().assertUsersCanInteract({
         currentUserId: normalizedCurrentUserId,
         targetUserId: participantId,
       });
@@ -236,7 +245,7 @@ const formatChatForList = async (chat, currentUserId) => {
       (participant) => normalizeId(participant._id || participant) !== normalizedCurrentUserId
     ) || null;
   const otherParticipant = !isGroup && otherParticipantRaw
-    ? mapUserProfile(otherParticipantRaw, normalizedCurrentUserId)
+    ? getUserService().mapUserProfile(otherParticipantRaw, normalizedCurrentUserId)
     : null;
 
   const lastMessage = await Message.findOne({
@@ -271,7 +280,7 @@ const formatChatForList = async (chat, currentUserId) => {
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
     participants: chat.participants.map((participant) =>
-      mapUserProfile(participant, normalizedCurrentUserId)
+      getUserService().mapUserProfile(participant, normalizedCurrentUserId)
     ),
     otherParticipant,
     lastMessage,
@@ -443,8 +452,8 @@ const getChatSummariesForParticipants = async (chatId, participantIds) => {
       adminIds: chat.isGroup ? (chat.admins || []).map((a) => normalizeId(a)).filter(Boolean) : [],
       createdAt: chat.createdAt,
       updatedAt: chat.updatedAt,
-      participants: chat.participants.map((p) => mapUserProfile(p, normalizedUserId)),
-      otherParticipant: otherParticipantRaw ? mapUserProfile(otherParticipantRaw, normalizedUserId) : null,
+      participants: chat.participants.map((p) => getUserService().mapUserProfile(p, normalizedUserId)),
+      otherParticipant: otherParticipantRaw ? getUserService().mapUserProfile(otherParticipantRaw, normalizedUserId) : null,
       lastMessage: lastMessage ? {
         _id: lastMessage._id,
         content: lastMessage.content,
@@ -807,7 +816,7 @@ const addGroupMembers = async ({ chatId, currentUserId, memberIds = [] }) => {
 
   await Promise.all(
     membersToAdd.map((memberId) =>
-      assertUsersCanInteract({
+      getUserService().assertUsersCanInteract({
         currentUserId,
         targetUserId: memberId,
       })

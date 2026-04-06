@@ -1,6 +1,6 @@
-const { rateLimit } = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
-const ipKeyGenerator = (req) => req.ip || req.socket.remoteAddress || "unknown";
+const requestIpKey = (req) => ipKeyGenerator(req.ip);
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -11,7 +11,7 @@ const authRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: ipKeyGenerator,
+  keyGenerator: (req) => requestIpKey(req),
 });
 
 const apiRateLimiter = rateLimit({
@@ -47,7 +47,7 @@ const uploadRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     const userId = req.user?._id?.toString();
-    return userId || ipKeyGenerator(req);
+    return userId || requestIpKey(req);
   },
 });
 
@@ -62,7 +62,7 @@ const messageRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     const userId = req.user?._id?.toString();
-    return userId || ipKeyGenerator(req);
+    return userId || requestIpKey(req);
   },
 });
 

@@ -25,7 +25,10 @@ export const useDebouncedValue = <T>(value: T, delay = 300): T => {
   return debouncedValue;
 };
 
-export const useDebouncedCallback = <T extends (...args: never[]) => unknown>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFunction = (...args: any[]) => any;
+
+export const useDebouncedCallback = <T extends AnyFunction = AnyFunction>(
   callback: T,
   delay = 300
 ): T => {
@@ -36,18 +39,15 @@ export const useDebouncedCallback = <T extends (...args: never[]) => unknown>(
     callbackRef.current = callback;
   }, [callback]);
 
-  const debouncedCallback = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (...args: any[]) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        callbackRef.current(...args);
-      }, delay);
-    },
-    [delay]
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const debouncedCallback = useCallback((...args: any[]) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      callbackRef.current(...args);
+    }, delay);
+  }, [delay]) as unknown as T;
 
-  return debouncedCallback as T;
+  return debouncedCallback;
 };
