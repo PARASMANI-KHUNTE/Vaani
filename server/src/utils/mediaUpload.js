@@ -64,7 +64,7 @@ const MEDIA_RULES = [
     resourceType: "video",
     mimeTypes: ["video/mp4", "video/webm", "video/quicktime", "video/ogg"],
     maxBytes: MAX_VIDEO_BYTES,
-    transformations: COMPRESSION.video,
+    transformations: null,
   },
   {
     messageType: "voice",
@@ -197,13 +197,10 @@ const buildCloudinaryUploadOptions = (rule, userId, originalName) => {
     baseOptions.crop = rule.transformations.crop;
   }
 
-  if (rule.transformations && rule.messageType === "video") {
-    baseOptions.quality = rule.transformations.quality;
-    baseOptions.fetch_format = rule.transformations.format;
-    if (rule.transformations.bitrate === "auto") {
-      baseOptions.video_bitrate = "auto";
-    }
-  }
+  // NOTE: Avoid passing video transformation options at upload-time.
+  // Cloudinary's upload API rejects some transformation-style params for videos,
+  // which can make images work while videos fail. Keep video uploads simple and
+  // let clients request derived formats via delivery URLs if needed.
 
   if (rule.messageType === "image" && rule.transformations) {
     baseOptions.eager = [
@@ -231,7 +228,9 @@ const uploadMessageMedia = async ({ file, userId }) => {
     }
 
     if (file.size > rule.maxBytes) {
-      throw new ApiError(413, "Uploaded file exceeds the allowed size for this media type");
+      const maxMb = Math.round(rule.maxBytes / 1024 / 1024);
+      const label = rule.messageType === "voice" ? "Audio" : rule.messageType.charAt(0).toUpperCase() + rule.messageType.slice(1);
+      throw new ApiError(413, `${label} exceeds the ${maxMb}MB limit`);
     }
 
     const cloudinary = configureCloudinary();

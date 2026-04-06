@@ -49,7 +49,7 @@ export const KeyboardShortcutsHint = () => {
       {/* Hint button in corner */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-40 flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 transition-all opacity-60 hover:opacity-100"
+        className="fixed bottom-4 right-4 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 transition-all opacity-60 hover:opacity-100"
         title="Keyboard shortcuts (?)"
       >
         ?

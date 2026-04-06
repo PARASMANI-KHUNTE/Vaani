@@ -293,10 +293,15 @@ const formatChatForList = async (chat, currentUserId) => {
 const listUserChats = async (currentUserId, options = {}) => {
   const { limit = 50, offset = 0 } = options;
   const normalizedUserId = normalizeId(currentUserId);
+  const userObjectId = mongoose.isValidObjectId(normalizedUserId) ? new mongoose.Types.ObjectId(normalizedUserId) : null;
+
+  if (!userObjectId) {
+    throw new ApiError(400, "Invalid user id");
+  }
 
   const pipeline = [
-    { $match: { participants: normalizedUserId } },
-    { $addFields: { userState: { $filter: { input: "$userStates", as: "s", cond: { $eq: ["$$s.userId", normalizedUserId] } } } } },
+    { $match: { participants: userObjectId } },
+    { $addFields: { userState: { $filter: { input: "$userStates", as: "s", cond: { $eq: ["$$s.userId", userObjectId] } } } } },
     { $match: { "userState.hidden": { $ne: true } } },
     { $sort: { updatedAt: -1, createdAt: -1 } },
     { $facet: {
@@ -318,7 +323,7 @@ const listUserChats = async (currentUserId, options = {}) => {
             from: "messages",
             let: { chatId: "$_id", userStateClearedAt: { $arrayElemAt: ["$userState.clearedAt", 0] } },
             pipeline: [
-              { $match: { $expr: { $eq: ["$chatId", "$$chatId"] }, deletedFor: { $ne: normalizedUserId }, ...(true ? {} : {}) } },
+              { $match: { $expr: { $eq: ["$chatId", "$$chatId"] }, deletedFor: { $ne: userObjectId }, ...(true ? {} : {}) } },
               { $match: { $expr: { $or: [{ $eq: ["$$userStateClearedAt", null] }, { $gt: ["$createdAt", "$$userStateClearedAt"] }] } } },
               { $sort: { createdAt: -1 } },
               { $limit: 1 },
@@ -336,8 +341,8 @@ const listUserChats = async (currentUserId, options = {}) => {
                 $match: {
                   $expr: { $eq: ["$chatId", "$$chatId"] },
                   deletedForEveryone: false,
-                  deletedFor: { $ne: normalizedUserId },
-                  senderId: { $ne: normalizedUserId },
+                  deletedFor: { $ne: userObjectId },
+                  senderId: { $ne: userObjectId },
                   status: { $in: ["sent", "delivered"] },
                   ...(true ? {} : {}),
                 },
@@ -359,7 +364,7 @@ const listUserChats = async (currentUserId, options = {}) => {
   const formattedChats = await Promise.all(
     chatDocs.map(async (chat) => {
       const otherParticipant = !chat.isGroup
-        ? chat.participants.find((p) => p._id.toString() !== normalizedUserId)
+        ? chat.participants.find((p) => normalizeId(p._id) !== normalizedUserId)
         : null;
 
       const lastMessage = chat.lastMessageArr[0] || null;
@@ -442,7 +447,7 @@ const getChatSummariesForParticipants = async (chatId, participantIds) => {
 
     const otherParticipantRaw =
       !chat.isGroup &&
-      chat.participants.find((p) => normalizeId(p._id) !== normalizedUserId);
+      chat.participants.find((p) => normalizeId(p._id || p) !== normalizedUserId);
 
     summaries[normalizedUserId] = {
       _id: chat._id,

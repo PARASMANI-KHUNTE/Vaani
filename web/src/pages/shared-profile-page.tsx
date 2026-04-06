@@ -5,6 +5,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { NavHeader } from "@/components/nav-header";
 import { getProfileByUserId, getProfileByUsername } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useChatData } from "@/hooks/use-chat-data";
 import { UserProfile } from "@/lib/types";
 
 export const SharedProfilePage = () => {
@@ -13,7 +14,13 @@ export const SharedProfilePage = () => {
   const { session, status } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStartingChat, setIsStartingChat] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { startChatWithUser } = useChatData({
+    token: session?.backendAccessToken,
+    currentUserId: session?.backendUser?._id,
+  });
 
   useEffect(() => {
     if (status === "loading") {
@@ -180,11 +187,23 @@ export const SharedProfilePage = () => {
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">Need to talk?</h4>
                   <p className="mt-1 text-xs text-slate-500">Start a conversation with {profile.name.split(' ')[0]} to collaborate in realtime.</p>
                   <button
-                    onClick={() => navigate("/explore")}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+                    onClick={async () => {
+                      if (!profile._id || isStartingChat) return;
+                      setIsStartingChat(true);
+                      try {
+                        await startChatWithUser(profile._id);
+                        navigate("/");
+                      } catch {
+                        setError("Failed to start chat. Please try again.");
+                      } finally {
+                        setIsStartingChat(false);
+                      }
+                    }}
+                    disabled={isStartingChat}
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900"
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Send Message
+                    {isStartingChat ? "Opening..." : "Send Message"}
                   </button>
                 </div>
               </div>

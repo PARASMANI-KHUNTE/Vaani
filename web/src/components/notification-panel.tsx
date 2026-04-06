@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Avatar } from "@/components/ui/avatar";
 import { useEffect, useRef, useState } from "react";
@@ -169,16 +169,22 @@ export const NotificationPanel = ({
       </button>
 
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -6, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -6, scale: 0.98 }}
-          transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-          className="absolute right-0 top-full z-[220] mt-2 flex w-[min(420px,calc(100vw-2rem))] max-h-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-2xl ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-950"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Notifications panel"
-        >
+        <>
+          <div 
+            className="fixed inset-0 z-[210] lg:hidden bg-black/5" 
+            onClick={onToggle}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+            className="absolute right-0 top-full z-[220] mt-2 flex w-[min(420px,calc(100vw-2rem))] max-h-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-2xl ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-950"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Notifications panel"
+          >
           <div className="shrink-0 border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -456,7 +462,8 @@ export const NotificationPanel = ({
               </div>
             )}
           </div>
-        </motion.div>
+          </motion.div>
+        </>
       )}
     </div>
   );

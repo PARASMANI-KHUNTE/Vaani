@@ -223,7 +223,7 @@ export const ChatShell = () => {
         onMarkRead={markNotificationRead} 
       />
 
-      <NavHeader title="Messages" showNav={!selectedChatId} />
+      <NavHeader title="Messages" showNav={true} />
 
       {isSelectionMode && selectedChatIds.length > 0 && (
         <div className="z-40 flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50/50 px-6 py-2 dark:border-blue-900/30 dark:bg-blue-950/20">
@@ -236,12 +236,12 @@ export const ChatShell = () => {
         </div>
       )}
 
-      <main className="flex min-h-0 flex-1 overflow-hidden pb-safe">
-        {/* Sidebar - always visible on mobile as collapsed, or full on desktop */}
+      <main className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Sidebar */}
         <div className={cn(
-          "h-full",
-          selectedChatId ? "flex sm:hidden" : "flex",
-          isSidebarCollapsed ? "w-12" : "w-full sm:w-auto"
+          "h-full shrink-0 border-r border-slate-200 dark:border-slate-800 transition-all duration-200",
+          selectedChatId ? "hidden md:flex" : "flex",
+          isSidebarCollapsed ? "w-16" : "w-full md:w-80 lg:w-96"
         )}>
           <Sidebar
             chats={filteredChats}
@@ -268,36 +268,47 @@ export const ChatShell = () => {
             onExpand={() => setIsSidebarCollapsed(false)}
           />
         </div>
-        <div className={cn("h-full min-w-0 flex-1", !selectedChatId ? "hidden sm:block" : "block")}>
-          <ChatWindow
-            chat={activeChat}
-            messages={messages}
-            currentUserId={session.backendUser?._id}
-            isLoading={isLoadingMessages}
-            onSendMessage={sendChatMessage}
-            onSendMedia={sendMediaMessage}
-            onTyping={notifyTyping}
-            onDeleteMessage={deleteChatMessage}
-            onReact={toggleReaction}
-            onBack={selectedChatId ? () => selectChat(null) : undefined}
-            onClose={selectedChatId ? () => selectChat(null) : undefined}
-            isOnline={isActiveUserOnline}
-            onlineUserIds={onlineUserIds}
-            typingLabel={typingLabel}
-            onOpenUserProfile={(user) => navigate(`/profile/user/${user._id}`)}
-            mediaTransfer={mediaTransfer}
-            onRetryMedia={retryLastMediaUpload}
-            onCancelMedia={cancelMediaUpload}
-            onDismissMedia={dismissMediaTransfer}
-            onLeaveGroup={async (chatId) => {
-              await leaveGroup(chatId);
-              selectChat(null);
-            }}
-            onOpenGroupInfo={(chatId) => navigate(`/group/${chatId}`)}
-            onClearChat={(chatId) => clearSelectedChatMessages(chatId)}
-            onOpenNewChat={() => setIsNewChatModalOpen(true)}
-            navigate={navigate}
-          />
+        
+        {/* Chat Area */}
+        <div className={cn("h-full min-w-0 flex-1", !selectedChatId ? "hidden md:block" : "block")}>
+          {selectedChatId && !activeChat && isLoadingChats ? (
+            <div className="flex h-full w-full items-center justify-center bg-[#f8f9fb] dark:bg-slate-950">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+                <p className="text-xs font-medium text-slate-500">Opening conversation...</p>
+              </div>
+            </div>
+          ) : (
+            <ChatWindow
+              chat={activeChat}
+              messages={messages}
+              currentUserId={session.backendUser?._id}
+              isLoading={isLoadingMessages}
+              onSendMessage={sendChatMessage}
+              onSendMedia={sendMediaMessage}
+              onTyping={notifyTyping}
+              onDeleteMessage={deleteChatMessage}
+              onReact={toggleReaction}
+              onBack={selectedChatId ? () => selectChat(null) : undefined}
+              onClose={selectedChatId ? () => selectChat(null) : undefined}
+              isOnline={isActiveUserOnline}
+              onlineUserIds={onlineUserIds}
+              typingLabel={typingLabel}
+              onOpenUserProfile={(user) => navigate(`/profile/user/${user._id}`)}
+              mediaTransfer={mediaTransfer}
+              onRetryMedia={retryLastMediaUpload}
+              onCancelMedia={cancelMediaUpload}
+              onDismissMedia={dismissMediaTransfer}
+              onLeaveGroup={async (chatId) => {
+                await leaveGroup(chatId);
+                selectChat(null);
+              }}
+              onOpenGroupInfo={(chatId) => navigate(`/group/${chatId}`)}
+              onClearChat={(chatId) => clearSelectedChatMessages(chatId)}
+              onOpenNewChat={() => setIsNewChatModalOpen(true)}
+              navigate={navigate}
+            />
+          )}
         </div>
       </main>
 

@@ -23,7 +23,12 @@ const disconnectDatabase = async () => {
 
 const isTransactionSupported = () => {
   const state = mongoose.connection.readyState;
-  return state === 1;
+  if (state !== 1) return false;
+
+  const topologyType = mongoose.connection.getClient()?.topology?.description?.type;
+  // Transactions are only allowed on Replica Sets or Sharded (mongos) clusters.
+  // A standalone instance will have the type 'Single'.
+  return topologyType && topologyType !== "Single" && topologyType !== "Unknown";
 };
 
 module.exports = {

@@ -63,22 +63,30 @@ export const useChatStore = create<ChatState>()(
       directoryUsers: {},
       setChats: (chats) => {
         const state = get();
+        
+        const existingChatIds = new Set(state.chats.map(c => c._id));
+        const freshChatIds = new Set(chats.map(c => c._id));
+        
+        const optimisticChats = state.chats.filter(c => 
+          existingChatIds.has(c._id) && !freshChatIds.has(c._id)
+        );
+        
+        const mergedChats = [...optimisticChats, ...chats];
+        
         const selectedChatStillExists = state.selectedChatId
-          ? chats.some((chat) => chat._id === state.selectedChatId)
+          ? mergedChats.some((chat) => chat._id === state.selectedChatId)
           : false;
-        const nextSelectedChatId = selectedChatStillExists
-          ? state.selectedChatId
-          : !state.hasExplicitlyClosedChat && chats.length > 0
-            ? chats[0]._id
-            : null;
+        
         const shouldAutoSelect =
           !state.selectedChatId &&
           !state.hasExplicitlyClosedChat &&
           !state.chats.length;
 
         set({
-          chats,
-          selectedChatId: shouldAutoSelect ? chats[0]?._id || null : nextSelectedChatId,
+          chats: mergedChats,
+          selectedChatId: shouldAutoSelect 
+            ? (mergedChats[0]?._id || null)
+            : (selectedChatStillExists ? state.selectedChatId : null),
           hasExplicitlyClosedChat: selectedChatStillExists ? false : state.hasExplicitlyClosedChat,
         });
       },
@@ -162,21 +170,34 @@ export const useChatStore = create<ChatState>()(
             ),
           },
         })),
-      upsertChat: (chat) =>
+      upsertChat: (incomingChat) =>
         set((state) => {
-          const chatWithDefaults = { ...chat, unreadCount: chat.unreadCount || 0 };
+          const existingChat = state.chats.find((c) => c._id === incomingChat._id);
+          const mergedChat = existingChat
+            ? {
+                ...existingChat,
+                ...incomingChat,
+                unreadCount: incomingChat.unreadCount ?? existingChat.unreadCount ?? 0,
+              }
+            : { ...incomingChat, unreadCount: incomingChat.unreadCount || 0 };
+
           const nextChats = [
-            chatWithDefaults,
-            ...state.chats.filter((entry) => entry._id !== chat._id),
+            mergedChat,
+            ...state.chats.filter((entry) => entry._id !== incomingChat._id),
           ];
           nextChats.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+          // Debug logging
+          if (process.env.NODE_ENV === 'development' && incomingChat.otherParticipant) {
+            console.debug('[upsertChat] otherParticipant:', incomingChat.otherParticipant?.name, 'for chat:', incomingChat._id);
+          }
 
           return {
             chats: nextChats,
             selectedChatId:
               state.selectedChatId || state.hasExplicitlyClosedChat
                 ? state.selectedChatId
-                : chat._id,
+                : incomingChat._id,
           };
         }),
       removeChat: (chatId) =>
@@ -324,6 +345,7 @@ export const useChatStore = create<ChatState>()(
       name: "canvas-chat-ui-state",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        chats: state.chats,
         selectedChatId: state.selectedChatId,
         hasExplicitlyClosedChat: state.hasExplicitlyClosedChat,
         directoryUsers: state.directoryUsers,

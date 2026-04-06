@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Compass, LogOut, Menu, MessageSquare, Settings, UserRound, X } from "lucide-react";
+import { ChevronRight, Compass, LogOut, Menu, MessageSquare, Settings, Sparkles, UserRound, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { NotificationPanel } from "@/components/notification-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -277,30 +277,36 @@ export const NavHeader = ({
             </button>
 
             {isUserMenuOpen ? (
-              <div className="absolute right-0 top-full z-[240] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-                <div className="px-3 py-2.5">
-                  <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">Signed in as</p>
-                  <p className="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-white">{session?.backendUser?.name}</p>
+              <>
+                <div 
+                  className="fixed inset-0 z-[230] lg:hidden bg-black/5" 
+                  onClick={() => setIsUserMenuOpen(false)} 
+                />
+                <div className="absolute right-0 top-full z-[240] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+                  <div className="px-3 py-2.5">
+                    <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">Signed in as</p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-white">{session?.backendUser?.name}</p>
+                  </div>
+                  <div className="mx-3 h-px bg-slate-200 dark:bg-slate-800" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/10"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
                 </div>
-                <div className="mx-3 h-px bg-slate-200 dark:bg-slate-800" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    handleLogout();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/10"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </button>
-              </div>
+              </>
             ) : null}
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Slide-in Drawer style */}
       <AnimatePresence>
         {isMobileMenuOpen ? (
           <div className="fixed inset-0 z-[9999] lg:hidden">
@@ -312,47 +318,89 @@ export const NavHeader = ({
               onClick={() => setIsMobileMenuOpen(false)}
             />
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-              className="absolute inset-x-4 top-4 mx-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:left-1/2 sm:top-6 sm:inset-x-auto sm:mx-0 sm:w-[min(520px,calc(100vw-2rem))] sm:-translate-x-1/2"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+              className="fixed bottom-0 right-0 top-0 flex w-[280px] max-w-full flex-col bg-white shadow-2xl dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800"
             >
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-                <p className="text-sm font-bold text-slate-900 dark:text-white">Menu</p>
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+                    <Sparkles className="h-4.5 w-4.5" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Navigation [v2]</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-800"
                   aria-label="Close menu"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="p-2">
-                {[
-                  { label: "Messages", icon: MessageSquare, onClick: () => navigate("/") },
-                  { label: "Explore", icon: Compass, onClick: () => navigate("/explore") },
-                  { label: "Profile", icon: UserRound, onClick: () => navigate("/me/profile") },
-                  { label: "Settings", icon: Settings, onClick: () => navigate("/settings") },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        item.onClick();
-                      }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
-                    >
-                      <Icon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                      {item.label}
-                      <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
-                    </button>
-                  );
-                })}
+              
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="mb-6 px-2 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+                      <Avatar
+                        src={session?.backendUser?.avatar || null}
+                        name={session?.backendUser?.name || "Me"}
+                        className="h-10 w-10"
+                        textClassName="text-sm font-bold"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{session?.backendUser?.name}</p>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">{session?.backendUser?.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  {[
+                    { label: "Messages", icon: MessageSquare, onClick: () => navigate("/") },
+                    { label: "Explore", icon: Compass, onClick: () => navigate("/explore") },
+                    { label: "Profile", icon: UserRound, onClick: () => navigate("/me/profile") },
+                    { label: "Settings", icon: Settings, onClick: () => navigate("/settings") },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          item.onClick();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-4 py-4 text-left text-[15px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800/70"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        {item.label}
+                        <ChevronRight className="ml-auto h-4 w-4 text-slate-300" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-auto border-t border-slate-200 p-6 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-4 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-100 active:scale-[0.98] dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/20"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+                <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">LinkUp v2.4.0</p>
               </div>
             </motion.div>
           </div>

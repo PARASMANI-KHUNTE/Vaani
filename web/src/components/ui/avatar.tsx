@@ -43,6 +43,11 @@ export const Avatar = ({
   const shouldAttemptImage = isUsableImageSrc(normalizedSrc);
   const [hasImageError, setHasImageError] = useState(false);
 
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('[Avatar]', { src: normalizedSrc, name, shouldAttemptImage, hasImageError });
+  }
+
   useEffect(() => {
     setHasImageError(false);
   }, [normalizedSrc]);

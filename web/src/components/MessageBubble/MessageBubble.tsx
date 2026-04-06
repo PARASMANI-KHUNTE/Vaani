@@ -7,15 +7,42 @@ import {
   Check,
   CheckCheck,
   CornerUpLeft,
+  Download,
   FileText,
-  Paperclip,
   Pause,
   Play,
   Smile,
   Trash2,
 } from "lucide-react";
 import { BackendUser, Message } from "@/lib/types";
+import type { PreviewItem } from "@/components/MediaPreview/MediaPreview";
 import { cn, formatMessageTime } from "@/lib/utils";
+
+const getDownloadName = (message: Message): string => {
+  const originalName = message.media?.originalName;
+  if (originalName) return originalName;
+
+  const format = message.media?.format || null;
+  const extFromMime =
+    (message.media?.mimeType || "")
+      .toLowerCase()
+      .split("/")
+      .pop()
+      ?.replace("x-", "") || "";
+
+  const ext =
+    format ||
+    extFromMime ||
+    (message.type === "image"
+      ? "jpg"
+      : message.type === "video"
+        ? "mp4"
+        : message.type === "voice"
+          ? "webm"
+          : "bin");
+
+  return `${message.type}-${message._id}.${ext}`;
+};
 
 type MessageBubbleProps = {
   message: Message;
@@ -25,6 +52,7 @@ type MessageBubbleProps = {
   onReply?: (message: Message) => void;
   onDelete?: (message: Message, scope: "me" | "everyone") => void;
   onReact?: (message: Message, emoji: string) => void;
+  onMediaPreview?: (items: PreviewItem[], startIndex: number) => void;
   isGroupStart?: boolean;
   isGroupEnd?: boolean;
   isHighlighted?: boolean;
@@ -284,6 +312,7 @@ const MessageBubbleBase = ({
   onReply,
   onDelete,
   onReact,
+  onMediaPreview,
   isGroupStart,
   isGroupEnd,
   isHighlighted,
@@ -409,26 +438,84 @@ const MessageBubbleBase = ({
               <>
                 {/* Image */}
                 {message.type === "image" && message.media?.url && (
-                  <div className="mb-2 overflow-hidden rounded-xl">
-                    <Image
-                      src={message.media.url}
-                      alt={message.content || "Photo"}
-                      width={message.media.width || 800}
-                      height={message.media.height || 600}
-                      className="max-h-[300px] w-full object-cover"
-                    />
+                  <div className="relative mb-2 overflow-hidden rounded-xl">
+                    <button
+                      type="button"
+                      className="block w-full cursor-pointer"
+                      onClick={() =>
+                        onMediaPreview?.(
+                          [{
+                            url: message.media!.url,
+                            type: "image",
+                            originalName: message.media!.originalName,
+                            width: message.media!.width,
+                            height: message.media!.height,
+                            messageId: message._id,
+                          }],
+                          0
+                        )
+                      }
+                    >
+                      <Image
+                        src={message.media.url}
+                        alt={message.content || "Photo"}
+                        width={message.media.width || 800}
+                        height={message.media.height || 600}
+                        className="max-h-[300px] w-full object-cover"
+                      />
+                    </button>
+                    <a
+                      href={message.media.url}
+                      download={getDownloadName(message)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Save"
+                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur hover:bg-black/70 active:scale-95"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
                   </div>
                 )}
 
                 {/* Video */}
                 {message.type === "video" && message.media?.url && (
-                  <div className="mb-2 overflow-hidden rounded-xl">
+                  <div className="relative mb-2 overflow-hidden rounded-xl">
                     <video
                       src={message.media.url}
                       controls
                       className="max-h-[300px] w-full rounded-xl bg-black/90"
                       preload="metadata"
                     />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onMediaPreview?.(
+                          [{
+                            url: message.media!.url,
+                            type: "video",
+                            originalName: message.media!.originalName,
+                            width: message.media!.width,
+                            height: message.media!.height,
+                            messageId: message._id,
+                          }],
+                          0
+                        )
+                      }
+                      title="Expand"
+                      className="absolute left-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur hover:bg-black/70 active:scale-95"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                    </button>
+                    <a
+                      href={message.media.url}
+                      download={getDownloadName(message)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Save"
+                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur hover:bg-black/70 active:scale-95"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
                   </div>
                 )}
 
@@ -438,41 +525,70 @@ const MessageBubbleBase = ({
                     "mb-2 grid gap-0.5 overflow-hidden rounded-xl",
                     groupedMedia.length === 2 ? "grid-cols-2" : "grid-cols-2 grid-rows-2"
                   )}>
-                    {groupedMedia.slice(0, 4).map((mediaMsg: Message, idx: number) => (
-                      <div
-                        key={mediaMsg._id}
-                        className={cn(
-                          "relative overflow-hidden bg-slate-100 dark:bg-slate-700",
-                          groupedMedia.length === 3 && idx === 0 ? "row-span-2" : ""
-                        )}
-                      >
-                        {mediaMsg.type === "image" && mediaMsg.media?.url && (
-                          <Image
-                            src={mediaMsg.media.url}
-                            alt="Photo"
-                            width={400}
-                            height={400}
-                            className="h-full w-full object-cover min-h-[100px]"
-                          />
-                        )}
-                        {mediaMsg.type === "video" && mediaMsg.media?.url && (
-                          <div className="relative flex h-full min-h-[100px] items-center justify-center bg-black/20">
-                            <Play className="h-8 w-8 text-white fill-current opacity-70" />
-                          </div>
-                        )}
-                        {idx === 3 && groupedMedia.length > 4 && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                            <span className="text-xl font-bold text-white">+{groupedMedia.length - 4}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {groupedMedia.slice(0, 4).map((mediaMsg: Message, idx: number) => {
+                      const groupPreviewItems: PreviewItem[] = groupedMedia
+                        .filter((m) => m.media?.url)
+                        .map((m) => ({
+                          url: m.media!.url,
+                          type: m.type as "image" | "video",
+                          originalName: m.media!.originalName,
+                          width: m.media!.width,
+                          height: m.media!.height,
+                          messageId: m._id,
+                        }));
+                      return (
+                        <button
+                          type="button"
+                          key={mediaMsg._id}
+                          onClick={() => onMediaPreview?.(groupPreviewItems, idx)}
+                          className={cn(
+                            "relative overflow-hidden bg-slate-100 dark:bg-slate-700 cursor-pointer",
+                            groupedMedia.length === 3 && idx === 0 ? "row-span-2" : ""
+                          )}
+                        >
+                          {mediaMsg.type === "image" && mediaMsg.media?.url && (
+                            <Image
+                              src={mediaMsg.media.url}
+                              alt="Photo"
+                              width={400}
+                              height={400}
+                              className="h-full w-full object-cover min-h-[100px]"
+                            />
+                          )}
+                          {mediaMsg.type === "video" && mediaMsg.media?.url && (
+                            <div className="relative flex h-full min-h-[100px] items-center justify-center bg-black/20">
+                              <Play className="h-8 w-8 text-white fill-current opacity-70" />
+                            </div>
+                          )}
+                          {idx === 3 && groupedMedia.length > 4 && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                              <span className="text-xl font-bold text-white">+{groupedMedia.length - 4}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Voice Note */}
                 {message.type === "voice" && message.media?.url && (
-                  <VoiceNotePlayer url={message.media.url} isOwnMessage={isOwnMessage} />
+                  <div className="mb-2 flex items-center gap-2">
+                    <VoiceNotePlayer url={message.media.url} isOwnMessage={isOwnMessage} />
+                    <a
+                      href={message.media.url}
+                      download={getDownloadName(message)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Save"
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95",
+                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#0084ff] text-white"
+                      )}
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                  </div>
                 )}
 
                 {/* File */}
@@ -494,14 +610,16 @@ const MessageBubbleBase = ({
                     </div>
                     <a
                       href={message.media.url}
+                      download={getDownloadName(message)}
                       target="_blank"
                       rel="noopener noreferrer"
+                      title="Save"
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95",
                         isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#0084ff] text-white"
                       )}
                     >
-                      <Paperclip className="h-4 w-4 rotate-45" />
+                      <Download className="h-4 w-4" />
                     </a>
                   </div>
                 )}
@@ -613,6 +731,7 @@ const arePropsEqual = (prev: MessageBubbleProps, next: MessageBubbleProps): bool
     prev.isSelected === next.isSelected &&
     prev.isSelectionMode === next.isSelectionMode &&
     prev.isGroup === next.isGroup &&
+    prev.onMediaPreview === next.onMediaPreview &&
     JSON.stringify(prev.message.reactions) === JSON.stringify(next.message.reactions) &&
     JSON.stringify(prev.message.media) === JSON.stringify(next.message.media) &&
     JSON.stringify(prev.message.replyTo) === JSON.stringify(next.message.replyTo)

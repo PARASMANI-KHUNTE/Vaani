@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar } from "@/components/ui/avatar";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -27,6 +27,7 @@ import {
   SendHorizontal,
 } from "lucide-react";
 import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
+import { MediaPreview, type PreviewItem } from "@/components/MediaPreview/MediaPreview";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BackendUser, Chat, Message } from "@/lib/types";
 import { cn, formatDateSeparator } from "@/lib/utils";
@@ -106,6 +107,14 @@ export const ChatWindow = ({
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<{
+    file: File;
+    url: string;
+    kind: "image" | "video" | "audio" | "file";
+  } | null>(null);
+  const [pendingBatch, setPendingBatch] = useState<
+    { file: File; url: string; kind: "image" | "video" | "audio" | "file" }[] | null
+  >(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -117,6 +126,9 @@ export const ChatWindow = ({
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const themeConfig: Record<string, string> = {
     default: "bg-[#6d7af7]",
@@ -134,6 +146,7 @@ export const ChatWindow = ({
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
   const headerMenuRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -170,7 +183,11 @@ export const ChatWindow = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (emojiButtonRef.current && emojiButtonRef.current.contains(target)) {
+        return;
+      }
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(target)) {
         setShowEmojiPicker(false);
       }
     };
@@ -282,7 +299,85 @@ export const ChatWindow = ({
     setIsSelectionMode(false);
   };
 
+  const formatBytes = (bytes: number) => {
+    if (!bytes || bytes <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, index);
+    return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+  };
+
+  const getMediaKind = (file: File): "image" | "video" | "audio" | "file" => {
+    const mime = (file.type || "").toLowerCase();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
+    if (mime.startsWith("video/") || ["mp4", "mov", "ogg"].includes(ext)) return "video";
+    if (mime.startsWith("audio/") || ["mp3", "wav", "m4a", "aac", "opus", "oga"].includes(ext)) return "audio";
+    return "file";
+  };
+
+  const clearPendingMedia = () => {
+    setPendingMedia((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
+  const clearPendingBatch = () => {
+    setPendingBatch((prev) => {
+      if (prev) {
+        prev.forEach((item) => URL.revokeObjectURL(item.url));
+      }
+      return null;
+    });
+  };
+
+  const sendPendingMedia = async () => {
+    if (!pendingMedia || !onSendMedia) return;
+    setIsSendingMedia(true);
+    setShowAttachMenu(false);
+    try {
+      await onSendMedia({
+        file: pendingMedia.file,
+        content: draft.trim() || undefined,
+        replyToId: replyTarget?._id || null,
+      });
+      setDraft("");
+      setReplyTarget(null);
+      setShowEmojiPicker(false);
+      clearPendingMedia();
+    } finally {
+      setIsSendingMedia(false);
+    }
+  };
+
+  const sendPendingBatch = async () => {
+    if (!pendingBatch || !onSendMedia) return;
+    const batchToSend = [...pendingBatch];
+    setIsSendingMedia(true);
+    setShowAttachMenu(false);
+    setPendingBatch(null);
+    try {
+      await Promise.all(batchToSend.map((item) => onSendMedia({ file: item.file })));
+      setDraft("");
+      setReplyTarget(null);
+      setShowEmojiPicker(false);
+    } catch {
+      // Error handled by onSendMedia
+    } finally {
+      setIsSendingMedia(false);
+    }
+  };
+
   const submitMessage = async () => {
+    if (pendingMedia) {
+      await sendPendingMedia();
+      return;
+    }
+    if (pendingBatch) {
+      await sendPendingBatch();
+      return;
+    }
     const trimmed = draft.trim();
     if (!trimmed) return;
     setDraft("");
@@ -292,31 +387,46 @@ export const ChatWindow = ({
 
   const handleSendFile = async (file: File | null) => {
     if (!file || !onSendMedia) return;
-    setIsSendingMedia(true);
     setShowAttachMenu(false);
-    try {
-      await onSendMedia({ file, content: draft.trim() || undefined, replyToId: replyTarget?._id || null });
-      setDraft("");
-      setReplyTarget(null);
-    } finally {
-      setIsSendingMedia(false);
-    }
+    clearPendingBatch();
+    setPendingMedia((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return {
+        file,
+        url: URL.createObjectURL(file),
+        kind: getMediaKind(file),
+      };
+    });
   };
 
   const handleSendMultipleFiles = async (files: FileList | null) => {
     if (!files || !onSendMedia) return;
-    setIsSendingMedia(true);
     setShowAttachMenu(false);
-    try {
-      for (const file of Array.from(files)) {
-        await onSendMedia({ file });
-      }
-      setDraft("");
-      setReplyTarget(null);
-    } finally {
-      setIsSendingMedia(false);
-    }
+    clearPendingMedia();
+    clearPendingBatch();
+    const nextBatch = Array.from(files).map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+      kind: getMediaKind(file),
+    }));
+    setPendingBatch(nextBatch);
   };
+
+  useEffect(() => {
+    return () => {
+      if (pendingMedia) {
+        URL.revokeObjectURL(pendingMedia.url);
+      }
+    };
+  }, [pendingMedia]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingBatch) {
+        pendingBatch.forEach((item) => URL.revokeObjectURL(item.url));
+      }
+    };
+  }, [pendingBatch]);
 
   const startRecording = async () => {
     try {
@@ -382,6 +492,12 @@ export const ChatWindow = ({
     };
   }, []);
 
+  const handleMediaPreview = useCallback((items: PreviewItem[], startIndex: number) => {
+    setPreviewItems(items);
+    setPreviewIndex(startIndex);
+    setIsPreviewOpen(true);
+  }, []);
+
   if (!chat) {
     return (
       <section className="flex h-full flex-col items-center justify-center bg-[#f8f9fb] p-6 text-center dark:bg-slate-950 sm:bg-transparent sm:dark:bg-transparent">
@@ -396,6 +512,19 @@ export const ChatWindow = ({
 
   const chatTitle = chat.isGroup ? chat.groupName : chat.otherParticipant?.name;
   const chatAvatar = chat.isGroup ? chat.groupAvatar : chat.otherParticipant?.avatar;
+
+  // Debug logging - log every render to track changes
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('[ChatWindow render]', {
+      chatId: chat._id,
+      isGroup: chat.isGroup,
+      chatTitle,
+      chatAvatar,
+      otherParticipantName: chat.otherParticipant?.name,
+      otherParticipantAvatar: chat.otherParticipant?.avatar,
+      currentUserId,
+    });
+  }
 
   return (
     <section className="relative flex h-full flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
@@ -521,11 +650,11 @@ export const ChatWindow = ({
               <div className="fixed inset-0 z-40" onClick={() => setShowHeaderMenu(false)} />
               <motion.div
                 ref={headerMenuRef}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute left-1/2 top-full z-50 w-[280px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800 ring-1 ring-black/5"
+                className="fixed left-1/2 top-[96px] z-50 w-[280px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800 ring-1 ring-black/5"
               >
                 <div className="p-1">
                   <button
@@ -615,6 +744,7 @@ export const ChatWindow = ({
                     onReact={(msg, emoji) => onReact?.(msg._id, emoji)}
                     onDelete={(msg, scope) => onDeleteMessage?.(msg._id, scope)}
                     onReply={() => setReplyTarget(message)}
+                    onMediaPreview={handleMediaPreview}
                     isGroupStart={isGroupStart}
                     isGroupEnd={isGroupEnd}
                     isHighlighted={isHighlighted}
@@ -633,7 +763,7 @@ export const ChatWindow = ({
       </div>
 
       {/* Input Bar - Sticky Bottom */}
-      <footer className="shrink-0 px-2 pb-safe pt-2 sm:px-4 sm:pb-4 bg-[#f0f2f5] dark:bg-[#1f232b]">
+      <footer className="shrink-0 px-2 pb-2 pt-2 sm:px-4 sm:pb-4 bg-[#f0f2f5] dark:bg-[#1f232b]">
         {/* Reply Preview */}
         <AnimatePresence>
           {replyTarget && (
@@ -688,6 +818,110 @@ export const ChatWindow = ({
           </div>
         )}
 
+        {/* Pending Media Preview */}
+        {pendingMedia && (
+          <div className="mb-2 flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
+            <div className="h-14 w-14 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+              {pendingMedia.kind === "image" ? (
+                <img src={pendingMedia.url} alt="Preview" className="h-full w-full object-cover" />
+              ) : pendingMedia.kind === "video" ? (
+                <video
+                  src={pendingMedia.url}
+                  className="h-full w-full object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+              ) : pendingMedia.kind === "audio" ? (
+                <Mic className="h-5 w-5 text-slate-500" />
+              ) : (
+                <Paperclip className="h-5 w-5 text-slate-500" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {pendingMedia.file.name}
+              </div>
+              {pendingMedia.kind === "audio" && (
+                <audio
+                  controls
+                  src={pendingMedia.url}
+                  preload="metadata"
+                  className="mt-2 h-8 w-full max-w-[260px]"
+                />
+              )}
+              <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                {pendingMedia.kind.toUpperCase()} • {formatBytes(pendingMedia.file.size)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={clearPendingMedia}
+              className="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+              disabled={isSendingMedia || mediaTransfer?.isUploading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={sendPendingMedia}
+              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
+              disabled={isSendingMedia || mediaTransfer?.isUploading}
+            >
+              Send
+            </button>
+          </div>
+        )}
+
+        {pendingBatch && pendingBatch.length > 0 && (
+          <div className="mb-2 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {pendingBatch.length} files selected
+                </div>
+                <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  Click send to upload and share
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={clearPendingBatch}
+                className="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                disabled={isSendingMedia || mediaTransfer?.isUploading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={sendPendingBatch}
+                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
+                disabled={isSendingMedia || mediaTransfer?.isUploading}
+              >
+                Send all
+              </button>
+            </div>
+
+            <div className="mt-2 grid grid-cols-6 gap-1">
+              {pendingBatch.slice(0, 6).map((item) => (
+                <div
+                  key={`${item.file.name}-${item.file.size}-${item.url}`}
+                  className="aspect-square overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center"
+                  title={item.file.name}
+                >
+                  {item.kind === "image" ? (
+                    <img src={item.url} alt="" className="h-full w-full object-cover" />
+                  ) : item.kind === "video" ? (
+                    <Video className="h-5 w-5 text-slate-500" />
+                  ) : (
+                    <Paperclip className="h-5 w-5 text-slate-500" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Input Row */}
         <div className="flex items-end gap-2">
           {/* Attach Button */}
@@ -707,7 +941,7 @@ export const ChatWindow = ({
                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                  className="absolute bottom-full left-0 mb-2 overflow-hidden rounded-2xl bg-white p-2 shadow-xl dark:bg-slate-800 ring-1 ring-black/5"
+                  className="fixed left-4 bottom-20 z-50 w-[200px] overflow-hidden rounded-2xl bg-white p-2 shadow-xl dark:bg-slate-800 ring-1 ring-black/5"
                 >
                   <button
                     onClick={() => { setShowAttachMenu(false); videoInputRef.current?.click(); }}
@@ -743,14 +977,31 @@ export const ChatWindow = ({
           </div>
 
           {/* Text Input / Recording */}
-          <div className="flex flex-1 items-end gap-2 rounded-full bg-white px-4 py-2.5 shadow-sm dark:bg-slate-800">
+          <div className="flex flex-1 items-end gap-2 rounded-2xl sm:rounded-full bg-white px-2 py-2 sm:px-4 sm:py-2.5 shadow-sm dark:bg-slate-800">
             {/* Emoji Button */}
-            <button
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 active:scale-95"
-            >
-              <Smile className="h-5 w-5" />
-            </button>
+            <div className="relative shrink-0">
+              <button
+                ref={emojiButtonRef}
+                type="button"
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 active:scale-95"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+
+              {showEmojiPicker && (
+                <div ref={emojiPickerRef} className="absolute bottom-full left-0 mb-2 z-50">
+                  <EmojiPicker
+                    theme={isDarkMode ? Theme.DARK : Theme.LIGHT}
+                    onEmojiClick={(emojiData) => {
+                      setDraft((prev) => prev + emojiData.emoji);
+                    }}
+                    height={350}
+                    width={320}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Textarea */}
             {isRecording ? (
@@ -774,19 +1025,6 @@ export const ChatWindow = ({
               />
             )}
 
-            {/* Emoji Picker */}
-            {showEmojiPicker && (
-              <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-2 z-50">
-                <EmojiPicker
-                  theme={isDarkMode ? Theme.DARK : Theme.LIGHT}
-                  onEmojiClick={(emojiData) => {
-                    setDraft((prev) => prev + emojiData.emoji);
-                  }}
-                  height={350}
-                  width={320}
-                />
-              </div>
-            )}
           </div>
 
           {/* Send / Mic Button */}
@@ -797,10 +1035,14 @@ export const ChatWindow = ({
             >
               <Square className="h-4 w-4 fill-current" />
             </button>
-          ) : draft.trim() ? (
+          ) : draft.trim() || pendingMedia || pendingBatch ? (
             <button
               onClick={submitMessage}
-              disabled={!draft.trim() && !isSendingMedia}
+              disabled={
+                (!draft.trim() && !pendingMedia && !pendingBatch) ||
+                isSendingMedia ||
+                Boolean(mediaTransfer?.isUploading)
+              }
               className={cn(
                 "flex h-11 w-11 items-center justify-center rounded-full active:scale-95",
                 currentThemeClass,
@@ -866,6 +1108,14 @@ export const ChatWindow = ({
           setConfirmClearOpen(false);
         }}
         onCancel={() => setConfirmClearOpen(false)}
+      />
+
+      {/* Media Preview Lightbox */}
+      <MediaPreview
+        items={previewItems}
+        initialIndex={previewIndex}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
       />
     </section>
   );

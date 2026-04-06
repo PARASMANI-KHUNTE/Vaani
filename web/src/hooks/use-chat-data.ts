@@ -75,6 +75,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [userResults, setUserResults] = useState<BackendUser[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const mediaIdCounterRef = useRef(0);
   const [mediaTransfer, setMediaTransfer] = useState<MediaTransferState>({
     isUploading: false,
     progress: 0,
@@ -132,14 +133,18 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
             if (!store) return;
 
             const currentSelectedId = store.selectedChatId;
-            const selectedChat = currentSelectedId ? store.chats.find(c => c._id === currentSelectedId) : null;
+            const currentChats = store.chats;
+            const selectedChat = currentSelectedId ? currentChats.find(c => c._id === currentSelectedId) : null;
             
-            let finalChats = response.chats;
+            let finalChats = response.chats || [];
+            
             if (selectedChat && !finalChats.find(c => c._id === selectedChat._id)) {
               finalChats = [selectedChat, ...finalChats];
             }
             
-            store.setChats(finalChats);
+            if (finalChats.length > 0 || currentChats.length === 0) {
+              store.setChats(finalChats);
+            }
           });
         }
       } catch (loadError) {
@@ -161,7 +166,9 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
   }, [setChats, startTransition, token]);
 
   useEffect(() => {
-    if (!token || !selectedChatId || messagesByChat[selectedChatId]) {
+    const chatIdToLoad = selectedChatId;
+    
+    if (!token || !chatIdToLoad || messagesByChat[chatIdToLoad]) {
       return;
     }
 
@@ -177,14 +184,14 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         setIsLoadingMessages(true);
         const response = await getMessages(
           token,
-          selectedChatId,
+          chatIdToLoad,
           1,
           20,
           abortControllerRef.current?.signal
         );
 
         if (active && !abortControllerRef.current?.signal.aborted) {
-          storeRef.current?.setMessages(selectedChatId, response.messages);
+          storeRef.current?.setMessages(chatIdToLoad, response.messages);
         }
       } catch (loadError) {
         if (active && !(loadError instanceof Error && loadError.name === "AbortError")) {
@@ -203,7 +210,8 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       active = false;
       abortControllerRef.current?.abort();
     };
-  }, [selectedChatId, token, messagesByChat]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChatId, token]);
 
   useEffect(() => {
     if (!token || !selectedChatId) {
@@ -902,9 +910,10 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       return;
     }
 
+    let detectedFileType: "image" | "video" | "voice" | "file" = "file";
+
     try {
       failedMediaRef.current = null;
-      let fileType: string;
       const mimeType = file.type.toLowerCase();
       const extension = file.name.split(".").pop()?.toLowerCase() || "";
       const isImage = mimeType.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(extension);
@@ -912,19 +921,33 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       const isAudio = mimeType.startsWith("audio/") || ["webm", "ogg", "mp3", "wav", "m4a"].includes(extension);
       
       if (isImage) {
-        fileType = "image";
+        detectedFileType = "image";
       } else if (isVideo) {
-        fileType = "video";
+        detectedFileType = "video";
       } else if (isAudio) {
-        fileType = "voice";
+        detectedFileType = "voice";
       } else {
-        fileType = "file";
+        detectedFileType = "file";
       }
+
+      const LIMITS_BYTES = {
+        image: 12 * 1024 * 1024,
+        video: 50 * 1024 * 1024,
+        voice: 20 * 1024 * 1024,
+        file: 25 * 1024 * 1024,
+      } as const;
+
+      const maxBytes = LIMITS_BYTES[detectedFileType];
+      if (file.size > maxBytes) {
+        const maxMb = Math.round(maxBytes / 1024 / 1024);
+        throw new Error(`${detectedFileType} exceeds the ${maxMb}MB limit`);
+      }
+
       setMediaTransfer({
         isUploading: true,
         progress: 0,
         fileName: file.name,
-        fileType,
+        fileType: detectedFileType,
         error: null,
         canRetry: false,
         canCancel: true,
@@ -938,7 +961,7 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
             isUploading: true,
             progress,
             fileName: file.name,
-            fileType,
+            fileType: detectedFileType,
             error: null,
             canRetry: false,
             canCancel: true,
@@ -950,7 +973,8 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       );
       const media = uploadResponse.media;
       const type = media.messageType as Exclude<MessageType, "text">;
-      const optimisticId = `temp-media-${Date.now()}`;
+      const mediaId = ++mediaIdCounterRef.current;
+      const optimisticId = `temp-media-${Date.now()}-${mediaId}`;
       const replyToMessage = replyToId
         ? (messagesByChat[selectedChatId] || []).find((message) => message._id === replyToId)
         : null;
@@ -1029,12 +1053,11 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
         replyToId,
       };
       setError(message);
-      const errorFileType = file.type.startsWith('image/') ? 'image' : 'file';
       setMediaTransfer({
         isUploading: false,
         progress: 0,
         fileName: file.name,
-        fileType: errorFileType,
+        fileType: detectedFileType,
         error: message,
         canRetry: true,
         canCancel: false,

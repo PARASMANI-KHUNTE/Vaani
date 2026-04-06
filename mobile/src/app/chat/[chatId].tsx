@@ -420,8 +420,8 @@ export default function ChatDetailScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        behavior="padding"
+        keyboardVerticalOffset={0}
       >
         {isLoading && messages.length === 0 ? (
           <View style={styles.centerState}>

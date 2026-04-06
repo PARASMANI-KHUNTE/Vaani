@@ -3,7 +3,6 @@
 import { Component, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { handleError } from "@/lib/error-handler";
-import { useNavigate } from "react-router-dom";
 
 interface Props {
   children: ReactNode;
@@ -93,10 +92,9 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 const HomeButton = () => {
-  const navigate = useNavigate();
   return (
     <button
-      onClick={() => navigate("/")}
+      onClick={() => (window.location.href = "/")}
       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
     >
       <Home className="h-4 w-4" />
