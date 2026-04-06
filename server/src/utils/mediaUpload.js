@@ -123,17 +123,32 @@ const getMediaRuleByMime = (mimeType) => {
 const assertTrustedCloudinaryUrl = (value) => {
   try {
     const parsedUrl = new URL(value);
-    if (parsedUrl.protocol !== "https:" || !parsedUrl.hostname.includes("cloudinary.com")) {
-      logger.warn("Potentially untrusted media URL in assertTrustedCloudinaryUrl", { url: value, hostname: parsedUrl.hostname });
+    const expectedHostname = env.cloudinary.cloudName + ".cloudinary.com";
+    if (parsedUrl.protocol !== "https:") {
+      throw new ApiError(400, "Media URL must use HTTPS");
     }
-  } catch (err) {
-    logger.warn("Invalid media URL in assertTrustedCloudinaryUrl", { url: value, error: err.message });
+    if (!parsedUrl.hostname.includes("cloudinary.com")) {
+      throw new ApiError(400, "Only Cloudinary URLs are allowed for media uploads");
+    }
+    if (!parsedUrl.hostname.endsWith(".cloudinary.com") && parsedUrl.hostname !== "cloudinary.com") {
+      if (!parsedUrl.hostname.includes(env.cloudinary.cloudName)) {
+        throw new ApiError(400, "Media URL must be from the configured Cloudinary account");
+      }
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    logger.warn("Invalid media URL in assertTrustedCloudinaryUrl", { url: value, error: error.message });
+    throw new ApiError(400, "Invalid media URL format");
   }
 };
 
 const normalizeMessageMedia = (media, expectedType) => {
   if (!media || typeof media !== "object") {
     throw new ApiError(400, "Media metadata is required for this message type");
+  }
+
+  if (!media.url || typeof media.url !== "string") {
+    throw new ApiError(400, "Media URL is required");
   }
 
   assertTrustedCloudinaryUrl(media.url);
@@ -337,8 +352,29 @@ const createSignedUploadParams = ({ mimeType, userId, originalName = "upload" })
   return buildSignedUploadOptions(rule, userId, originalName);
 };
 
-const destroyMediaAsset = async (media) => {
+const destroyMediaAsset = async (media, currentChatId = null) => {
   if (!media?.publicId) {
+    return false;
+  }
+
+  const Message = require("../modules/message/message.model");
+  
+  const query = {
+    "media.publicId": media.publicId,
+    _id: { $ne: media._id || null },
+  };
+  
+  if (currentChatId) {
+    query.chatId = currentChatId;
+  }
+  
+  const otherMessagesWithMedia = await Message.countDocuments(query);
+  
+  if (otherMessagesWithMedia > 0) {
+    logger.info("Skipping media deletion - still referenced by other messages", { 
+      publicId: media.publicId,
+      chatId: currentChatId 
+    });
     return false;
   }
 

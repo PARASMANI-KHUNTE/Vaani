@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { getMobileSocket } from "@/lib/socket/client";
+import { useEffect, useRef } from "react";
+import { disconnectMobileSocket, getMobileSocket } from "@/lib/socket/client";
 import { mobileSocketEvents } from "@/lib/socket/events";
 import { MobileChat, MobileMessage, MobileNotificationItem } from "@/lib/types";
 import { useChatStore } from "@/store/chat-store";
@@ -23,11 +23,19 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
   const addNotification = useNotificationStore((state) => state.addNotification);
   const setOnlineUsers = useNotificationStore((state) => state.setOnlineUsers);
   const setUserOnlineState = useNotificationStore((state) => state.setUserOnlineState);
+  const updateFriendStatus = useNotificationStore((state) => state.updateFriendStatus);
+  const tokenRef = useRef(token);
 
   useEffect(() => {
     if (!token) {
+      disconnectMobileSocket();
       return;
     }
+
+    if (tokenRef.current && tokenRef.current !== token) {
+      disconnectMobileSocket();
+    }
+    tokenRef.current = token;
 
     const socket = getMobileSocket(token);
 
@@ -72,8 +80,32 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
       upsertChat(chat);
     };
 
-    const handleFriendNotification = (notification: MobileNotificationItem) => {
+    const handleFriendRequestReceived = (notification: MobileNotificationItem) => {
       addNotification(notification);
+    };
+
+    const handleFriendRequestAccepted = (notification: MobileNotificationItem) => {
+      addNotification(notification);
+      if (notification.fromUser?._id) {
+        updateFriendStatus({
+          userId: notification.fromUser._id,
+          isFriend: true,
+          requestSent: false,
+          requestReceived: false,
+        });
+      }
+    };
+
+    const handleFriendRequestRejected = (notification: MobileNotificationItem) => {
+      addNotification(notification);
+      if (notification.fromUser?._id) {
+        updateFriendStatus({
+          userId: notification.fromUser._id,
+          isFriend: false,
+          requestSent: false,
+          requestReceived: false,
+        });
+      }
     };
 
     const handleReactionAdded = ({
@@ -125,9 +157,9 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
     socket.on(mobileSocketEvents.userOffline, handleUserOffline);
     socket.on(mobileSocketEvents.newMessage, handleNewMessage);
     socket.on(mobileSocketEvents.chatUpdated, handleChatUpdated);
-    socket.on(mobileSocketEvents.friendRequestReceived, handleFriendNotification);
-    socket.on(mobileSocketEvents.friendRequestAccepted, handleFriendNotification);
-    socket.on(mobileSocketEvents.friendRequestRejected, handleFriendNotification);
+    socket.on(mobileSocketEvents.friendRequestReceived, handleFriendRequestReceived);
+    socket.on(mobileSocketEvents.friendRequestAccepted, handleFriendRequestAccepted);
+    socket.on(mobileSocketEvents.friendRequestRejected, handleFriendRequestRejected);
     socket.on(mobileSocketEvents.reactionAdded, handleReactionAdded);
     socket.on(mobileSocketEvents.reactionRemoved, handleReactionRemoved);
     socket.on(mobileSocketEvents.messageDeleted, handleMessageDeleted);
@@ -138,12 +170,12 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
       socket.off(mobileSocketEvents.userOffline, handleUserOffline);
       socket.off(mobileSocketEvents.newMessage, handleNewMessage);
       socket.off(mobileSocketEvents.chatUpdated, handleChatUpdated);
-      socket.off(mobileSocketEvents.friendRequestReceived, handleFriendNotification);
-      socket.off(mobileSocketEvents.friendRequestAccepted, handleFriendNotification);
-      socket.off(mobileSocketEvents.friendRequestRejected, handleFriendNotification);
+      socket.off(mobileSocketEvents.friendRequestReceived, handleFriendRequestReceived);
+      socket.off(mobileSocketEvents.friendRequestAccepted, handleFriendRequestAccepted);
+      socket.off(mobileSocketEvents.friendRequestRejected, handleFriendRequestRejected);
       socket.off(mobileSocketEvents.reactionAdded, handleReactionAdded);
       socket.off(mobileSocketEvents.reactionRemoved, handleReactionRemoved);
       socket.off(mobileSocketEvents.messageDeleted, handleMessageDeleted);
     };
-  }, [addNotification, currentUserId, setOnlineUsers, setUserOnlineState, token, upsertChat]);
+  }, [addNotification, currentUserId, setOnlineUsers, setUserOnlineState, token, upsertChat, updateFriendStatus]);
 };

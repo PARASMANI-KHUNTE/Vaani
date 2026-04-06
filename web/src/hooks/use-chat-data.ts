@@ -50,23 +50,25 @@ type MediaMessageInput = {
 };
 
 export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataParams) => {
+  const storeRef = useRef<ReturnType<typeof useChatStore.getState> | null>(null);
+  
+  const store = useChatStore();
+  storeRef.current = store;
+
+  const currentUserIdRef = useRef<string | undefined>(currentUserId);
+  currentUserIdRef.current = currentUserId;
   const {
-    chats,
-    messagesByChat,
-    selectedChatId,
     setChats,
     setMessages,
+    upsertChat,
     upsertMessage,
+    replaceOptimisticMessage,
+    markMessageFailed,
     updateMessage,
     removeMessage,
-    replaceOptimisticMessage,
-    upsertChat,
     removeChat,
-    setTypingState,
-    setOnlineUsers,
-    setUserOnlineState,
-    addNotification,
-  } = useChatStore();
+  } = store;
+  
   const selectChat = useChatStore((state) => state.selectChat);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -88,6 +90,10 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const searchAbortControllerRef = useRef<AbortController | null>(null);
   const failedMediaRef = useRef<MediaMessageInput | null>(null);
+
+  const selectedChatId = store.selectedChatId;
+  const chats = store.chats;
+  const messagesByChat = store.messagesByChat;
 
   const getNotificationPreview = (message: Message) => {
     if (message.type === "image") {
@@ -120,18 +126,18 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
         if (active) {
           startTransition(() => {
-            // Merge logic: If we have a selectedChatId, make sure that specific chat 
-            // stays in the list even if the server response is slightly stale.
-            const currentSelectedId = useChatStore.getState().selectedChatId;
-            const currentChats = useChatStore.getState().chats;
-            const selectedChat = currentSelectedId ? currentChats.find(c => c._id === currentSelectedId) : null;
+            const store = storeRef.current;
+            if (!store) return;
+
+            const currentSelectedId = store.selectedChatId;
+            const selectedChat = currentSelectedId ? store.chats.find(c => c._id === currentSelectedId) : null;
             
             let finalChats = response.chats;
             if (selectedChat && !finalChats.find(c => c._id === selectedChat._id)) {
               finalChats = [selectedChat, ...finalChats];
             }
             
-            setChats(finalChats);
+            store.setChats(finalChats);
           });
         }
       } catch (loadError) {
@@ -176,7 +182,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         );
 
         if (active && !abortControllerRef.current?.signal.aborted) {
-          setMessages(selectedChatId, response.messages);
+          storeRef.current?.setMessages(selectedChatId, response.messages);
         }
       } catch (loadError) {
         if (active && !(loadError instanceof Error && loadError.name === "AbortError")) {
@@ -195,14 +201,17 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       active = false;
       abortControllerRef.current?.abort();
     };
-  }, [selectedChatId, token, messagesByChat, setMessages]);
+  }, [selectedChatId, token, messagesByChat]);
 
   useEffect(() => {
     if (!token || !selectedChatId) {
       return;
     }
 
-    const selectedChat = chats.find((chat) => chat._id === selectedChatId);
+    const storeState = storeRef.current;
+    if (!storeState) return;
+
+    const selectedChat = storeState.chats.find((chat) => chat._id === selectedChatId);
 
     if (!selectedChat || selectedChat.unreadCount === 0) {
       return;
@@ -210,12 +219,12 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
     void markChatRead(token, selectedChatId)
       .then((response) => {
-        upsertChat(response.chat);
+        storeState.upsertChat(response.chat);
       })
       .catch((markError) => {
         setError(markError instanceof Error ? markError.message : "Failed to mark chat as read");
       });
-  }, [chats, selectedChatId, token, upsertChat]);
+  }, [selectedChatId, token]);
 
   useEffect(() => {
     if (!token || !searchQuery?.trim()) {
@@ -268,40 +277,43 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
 
     const socket = getSocketClient(token);
-
-    const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
-      setOnlineUsers(payload.onlineUserIds);
+const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
+      storeRef.current?.setOnlineUsers(payload.onlineUserIds);
     };
 
     const handleUserOnline = ({ userId }: { userId: string }) => {
-      setUserOnlineState(userId, true);
+      storeRef.current?.setUserOnlineState(userId, true);
     };
 
     const handleUserOffline = ({ userId }: { userId: string }) => {
-      setUserOnlineState(userId, false);
+      storeRef.current?.setUserOnlineState(userId, false);
     };
 
     const handleNewMessage = ({ message, chat, clientTempId }: SocketNewMessagePayload) => {
-      upsertChat(chat);
+      const store = storeRef.current;
+      if (!store) return;
+
+      store.upsertChat(chat);
 
       if (clientTempId) {
-        replaceOptimisticMessage(chat._id, clientTempId, message);
+        store.replaceOptimisticMessage(chat._id, clientTempId, message);
       } else {
-        upsertMessage(chat._id, message);
+        store.upsertMessage(chat._id, message);
       }
 
       const senderId = typeof message.senderId === "string" ? message.senderId : message.senderId._id;
+      const currentSelectedChatId = store.selectedChatId;
 
-      if (senderId !== currentUserId && selectedChatId === chat._id) {
+      if (senderId !== currentUserIdRef.current && currentSelectedChatId === chat._id) {
         socket.emit(socketEvents.joinChat, { chatId: chat._id });
       }
 
-      if (senderId !== currentUserId && selectedChatId !== chat._id) {
+      if (senderId !== currentUserIdRef.current && currentSelectedChatId !== chat._id) {
         const senderName = typeof message.senderId === "string" 
           ? "Someone" 
           : message.senderId.name || "Someone";
         
-        addNotification({
+        store.addNotification({
           id: `msg-${message._id}`,
           title: senderName,
           body: getNotificationPreview(message),
@@ -320,14 +332,30 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       messageId?: string;
       message?: Message;
     }) => {
+      const store = storeRef.current;
+      if (!store) return;
+
       if (payload.scope === "everyone" && payload.message) {
-        updateMessage(payload.chatId, payload.message._id, () => payload.message as Message);
+        store.updateMessage(payload.chatId, payload.message._id, () => payload.message as Message);
         return;
       }
 
       if (payload.scope === "me" && payload.messageId) {
-        removeMessage(payload.chatId, payload.messageId);
+        store.removeMessage(payload.chatId, payload.messageId);
       }
+    };
+    const handleMessageEdited = ({
+      message,
+      chatId,
+    }: {
+      message: Message;
+      chatId: string;
+    }) => {
+      const store = storeRef.current;
+      if (!store) return;
+      if (!chatId || !message?._id) return;
+
+      store.updateMessage(chatId, message._id, () => message);
     };
 
     const handleReactionAdded = (payload: {
@@ -336,12 +364,15 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       userName: string;
       emoji: string;
     }) => {
+      const store = storeRef.current;
+      if (!store) return;
+
       const { message, userId, userName, emoji } = payload;
       const chatId = message.chatId;
       if (chatId && typeof chatId === "string") {
-        updateMessage(chatId, message._id, () => message);
-        if (userId !== currentUserId) {
-          addNotification({
+        store.updateMessage(chatId, message._id, () => message);
+        if (userId !== currentUserIdRef.current) {
+          store.addNotification({
             id: `reaction-${message._id}-${Date.now()}`,
             title: userName,
             body: `${emoji} reacted to your message`,
@@ -359,10 +390,13 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       userId: string;
       emoji: string;
     }) => {
+      const store = storeRef.current;
+      if (!store) return;
+
       const { message } = payload;
       const chatId = message.chatId;
       if (chatId && typeof chatId === "string") {
-        updateMessage(chatId, message._id, () => message);
+        store.updateMessage(chatId, message._id, () => message);
       }
     };
 
@@ -373,19 +407,22 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       chatId: string;
       messageId: string;
     }) => {
-      updateMessage(chatId, messageId, (message) => ({
+      storeRef.current?.updateMessage(chatId, messageId, (message) => ({
         ...message,
         status: "delivered",
       }));
     };
 
     const handleMessageSeen = ({ chatId }: { chatId: string }) => {
-      const existingMessages = useChatStore.getState().messagesByChat[chatId] || [];
+      const store = storeRef.current;
+      if (!store) return;
+
+      const existingMessages = store.messagesByChat[chatId] || [];
 
       existingMessages.forEach((message) => {
         const senderId = typeof message.senderId === "string" ? message.senderId : message.senderId._id;
-        if (senderId === currentUserId) {
-          updateMessage(chatId, message._id, (entry) => ({
+        if (senderId === currentUserIdRef.current) {
+          store.updateMessage(chatId, message._id, (entry) => ({
             ...entry,
             status: "seen",
           }));
@@ -394,16 +431,17 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     };
 
     const handleChatUpdated = ({ chat }: { chat: Chat }) => {
-      upsertChat(chat);
+      storeRef.current?.upsertChat(chat);
     };
 
     const handleChatRemoved = ({ chatId }: { chatId: string }) => {
-      if (!chatId) {
+      const store = storeRef.current;
+      if (!store || !chatId) {
         return;
       }
-      removeChat(chatId);
-      if (selectedChatId === chatId) {
-        selectChat(null);
+      store.removeChat(chatId);
+      if (store.selectedChatId === chatId) {
+        store.selectChat(null);
       }
     };
 
@@ -418,10 +456,10 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       userName: string;
       isTyping: boolean;
     }) => {
-      if (userId === currentUserId) {
+      if (userId === currentUserIdRef.current) {
         return;
       }
-      setTypingState(chatId, isTyping ? { userId, userName } : null);
+      storeRef.current?.setTypingState(chatId, userId, userName, isTyping);
     };
 
     const handleFriendRequestReceived = (notification: {
@@ -440,7 +478,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         avatar?: string | null;
       };
     }) => {
-      addNotification({
+      storeRef.current?.addNotification({
         id: notification.id,
         title: notification.title,
         body: notification.body,
@@ -469,7 +507,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         avatar?: string | null;
       };
     }) => {
-      addNotification({
+      storeRef.current?.addNotification({
         id: notification.id,
         title: notification.title,
         body: notification.body,
@@ -480,6 +518,15 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         action: notification.action,
         fromUser: notification.fromUser,
       });
+
+      if (notification.fromUser?._id) {
+        storeRef.current?.updateFriendStatus({
+          userId: notification.fromUser._id,
+          isFriend: true,
+          requestSent: false,
+          requestReceived: false,
+        });
+      }
     };
 
     const handleFriendRequestRejected = (notification: {
@@ -498,7 +545,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         avatar?: string | null;
       };
     }) => {
-      addNotification({
+      storeRef.current?.addNotification({
         id: notification.id,
         title: notification.title,
         body: notification.body,
@@ -509,12 +556,24 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         action: notification.action,
         fromUser: notification.fromUser,
       });
+
+      if (notification.fromUser?._id) {
+        storeRef.current?.updateFriendStatus({
+          userId: notification.fromUser._id,
+          isFriend: false,
+          requestSent: false,
+          requestReceived: false,
+        });
+      }
     };
 
     const handleChatCreated = ({ chat }: { chat: Chat }) => {
-      upsertChat(chat);
+      const store = storeRef.current;
+      if (!store) return;
+
+      store.upsertChat(chat);
       if (chat.groupName) {
-        addNotification({
+        store.addNotification({
           id: `chat-created-${chat._id}`,
           title: "New Group",
           body: `You were added to "${chat.groupName}"`,
@@ -533,9 +592,12 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       addedUserId: string;
       chatId: string;
     }) => {
-      upsertChat(payload.chat);
-      if (payload.addedUserId === currentUserId) {
-        addNotification({
+      const store = storeRef.current;
+      if (!store) return;
+
+      store.upsertChat(payload.chat);
+      if (payload.addedUserId === currentUserIdRef.current) {
+        store.addNotification({
           id: `member-added-${payload.chatId}-${Date.now()}`,
           title: "Added to Group",
           body: `${payload.addedByUserName} added you to "${payload.chat.groupName || "a group"}"`,
@@ -558,6 +620,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     socket.on(socketEvents.messageDelivered, handleMessageDelivered);
     socket.on(socketEvents.messageSeen, handleMessageSeen);
     socket.on(socketEvents.messageDeleted, handleMessageDeleted);
+    socket.on(socketEvents.messageEdited, handleMessageEdited);
     socket.on(socketEvents.chatUpdated, handleChatUpdated);
     socket.on(socketEvents.chatRemoved, handleChatRemoved);
     socket.on(socketEvents.typing, handleTyping);
@@ -578,6 +641,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       socket.off(socketEvents.messageDelivered, handleMessageDelivered);
       socket.off(socketEvents.messageSeen, handleMessageSeen);
       socket.off(socketEvents.messageDeleted, handleMessageDeleted);
+      socket.off(socketEvents.messageEdited, handleMessageEdited);
       socket.off(socketEvents.chatUpdated, handleChatUpdated);
       socket.off(socketEvents.chatRemoved, handleChatRemoved);
       socket.off(socketEvents.typing, handleTyping);
@@ -590,22 +654,8 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
       socket.off(socketEvents.memberAddedToGroup, handleMemberAddedToGroup);
       socket.off(socketEvents.socketError, handleSocketError);
     };
-  }, [
-    addNotification,
-    currentUserId,
-    replaceOptimisticMessage,
-    selectedChatId,
-    setOnlineUsers,
-    setTypingState,
-    setUserOnlineState,
-    token,
-    upsertChat,
-    upsertMessage,
-    updateMessage,
-    removeMessage,
-    removeChat,
-    selectChat,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!token || !selectedChatId) {
@@ -623,9 +673,8 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
     try {
       const response = await createChat(token, participantId);
-      // Wait for store to update
-      useChatStore.getState().upsertChat(response.chat);
-      useChatStore.getState().selectChat(response.chat._id);
+      storeRef.current?.upsertChat(response.chat);
+      storeRef.current?.selectChat(response.chat._id);
       setUserResults([]);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to start chat");
@@ -642,8 +691,8 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         groupName,
         participantIds,
       });
-      upsertChat(response.chat);
-      useChatStore.getState().selectChat(response.chat._id);
+      storeRef.current?.upsertChat(response.chat);
+      storeRef.current?.selectChat(response.chat._id);
       setUserResults([]);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to create group chat");
@@ -657,7 +706,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
     try {
       const response = await updateGroupProfile(token, chatId, { groupName });
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Failed to rename group");
     }
@@ -670,7 +719,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
     try {
       const response = await updateGroupProfile(token, chatId, { groupAvatar });
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Failed to update group avatar");
     }
@@ -682,7 +731,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
     try {
       const response = await addGroupMembers(token, chatId, memberIds);
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (groupError) {
       setError(groupError instanceof Error ? groupError.message : "Failed to add members");
     }
@@ -694,7 +743,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
     try {
       const response = await removeGroupMember(token, chatId, memberId);
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (groupError) {
       setError(groupError instanceof Error ? groupError.message : "Failed to remove member");
     }
@@ -706,7 +755,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
     try {
       const response = await promoteGroupAdmin(token, chatId, memberId);
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (groupError) {
       setError(groupError instanceof Error ? groupError.message : "Failed to promote admin");
     }
@@ -718,7 +767,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
     try {
       const response = await demoteGroupAdmin(token, chatId, memberId);
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (groupError) {
       setError(groupError instanceof Error ? groupError.message : "Failed to demote admin");
     }
@@ -730,7 +779,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     }
     try {
       const response = await transferGroupOwnership(token, chatId, nextOwnerId);
-      upsertChat(response.chat);
+      store.upsertChat(response.chat);
     } catch (groupError) {
       setError(groupError instanceof Error ? groupError.message : "Failed to transfer ownership");
     }
@@ -812,6 +861,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         },
         (acknowledgement: { ok: boolean; error?: string }) => {
           if (!acknowledgement?.ok) {
+            markMessageFailed(selectedChatId, optimisticId);
             setError(acknowledgement.error || "Failed to send message");
           }
         }
@@ -826,6 +876,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
         replaceOptimisticMessage(selectedChatId, optimisticId, response.message);
       } catch (fallbackError) {
+        markMessageFailed(selectedChatId, optimisticId);
         setError(fallbackError instanceof Error ? fallbackError.message : "Failed to send message");
       }
     }
@@ -927,20 +978,26 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
           },
           (acknowledgement: { ok: boolean; error?: string }) => {
             if (!acknowledgement?.ok) {
+              markMessageFailed(selectedChatId, optimisticId);
               setError(acknowledgement.error || "Failed to send media message");
             }
           }
         );
       } catch {
         // Socket failed, fallback to HTTP API
-        const response = await sendMessage(token, {
-          chatId: selectedChatId,
-          content: content || "",
-          type,
-          media,
-          replyToId: replyToId || null,
-        });
-        replaceOptimisticMessage(selectedChatId, optimisticId, response.message);
+        try {
+          const response = await sendMessage(token, {
+            chatId: selectedChatId,
+            content: content || "",
+            type,
+            media,
+            replyToId: replyToId || null,
+          });
+          replaceOptimisticMessage(selectedChatId, optimisticId, response.message);
+        } catch (fallbackError) {
+          markMessageFailed(selectedChatId, optimisticId);
+          setError(fallbackError instanceof Error ? fallbackError.message : "Failed to send media message");
+        }
       }
       setMediaTransfer({
         isUploading: false,
@@ -1037,13 +1094,21 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
   };
 
   useEffect(() => {
-    return () => {
+    const sendTypingOnCleanup = () => {
       if (typingTimeoutRef.current) {
         window.clearTimeout(typingTimeoutRef.current);
-        sendTypingState(false);
+        typingTimeoutRef.current = null;
+      }
+      if (token && selectedChatId) {
+        const socket = getSocketClient(token);
+        socket.emit(socketEvents.stopTyping, { chatId: selectedChatId });
       }
     };
-  }, [sendTypingState]);
+
+    return () => {
+      sendTypingOnCleanup();
+    };
+  }, [token, selectedChatId]);
 
   const deleteChatMessage = async (messageId: string, scope: "me" | "everyone") => {
     if (!token || !selectedChatId) {

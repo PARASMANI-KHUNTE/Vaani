@@ -95,6 +95,8 @@ export const usePushNotifications = () => {
           Platform.OS === "ios" ? "ios" : "android"
         );
 
+        await useNotificationStore.getState().setPushToken(token);
+
         const Notifications = await loadNotificationsModule();
 
         responseSubscription =

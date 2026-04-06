@@ -241,6 +241,7 @@ const formatChatForList = async (chat, currentUserId) => {
 
   const lastMessage = await Message.findOne({
     chatId: chat._id,
+    deletedFor: { $ne: currentUserId },
     ...getVisibleMessageFilter(currentUserState),
   })
     .sort({ createdAt: -1 })
@@ -253,6 +254,8 @@ const formatChatForList = async (chat, currentUserId) => {
 
   const unreadCount = await Message.countDocuments({
     chatId: chat._id,
+    deletedForEveryone: false,
+    deletedFor: { $ne: currentUserId },
     senderId: { $ne: currentUserId },
     status: { $in: ["sent", "delivered"] },
     ...getVisibleMessageFilter(currentUserState),
@@ -277,26 +280,111 @@ const formatChatForList = async (chat, currentUserId) => {
   };
 };
 
-const listUserChats = async (currentUserId) => {
+const listUserChats = async (currentUserId, options = {}) => {
+  const { limit = 50, offset = 0 } = options;
   const normalizedUserId = normalizeId(currentUserId);
-  const chats = await Chat.find({
-    participants: currentUserId,
-    "userStates.userId": normalizedUserId,
-    "userStates.hidden": { $ne: true },
-  })
-    .sort({ updatedAt: -1, createdAt: -1 })
-    .populate("participants", "username name email avatar tagline bio lastSeen friends createdAt")
-    .lean();
 
-  for (const chat of chats) {
-    await ensureChatUserState(chat);
-  }
+  const pipeline = [
+    { $match: { participants: normalizedUserId } },
+    { $addFields: { userState: { $filter: { input: "$userStates", as: "s", cond: { $eq: ["$$s.userId", normalizedUserId] } } } } },
+    { $match: { "userState.hidden": { $ne: true } } },
+    { $sort: { updatedAt: -1, createdAt: -1 } },
+    { $facet: {
+      metadata: [{ $count: "total" }],
+      data: [
+        { $skip: offset },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "users",
+            localField: "participants",
+            foreignField: "_id",
+            as: "participants",
+            pipeline: [{ $project: { username: 1, name: 1, email: 1, avatar: 1, tagline: 1, bio: 1, lastSeen: 1, friends: 1, createdAt: 1 } }],
+          },
+        },
+        {
+          $lookup: {
+            from: "messages",
+            let: { chatId: "$_id", userStateClearedAt: { $arrayElemAt: ["$userState.clearedAt", 0] } },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$chatId", "$$chatId"] }, deletedFor: { $ne: normalizedUserId }, ...(true ? {} : {}) } },
+              { $match: { $expr: { $or: [{ $eq: ["$$userStateClearedAt", null] }, { $gt: ["$createdAt", "$$userStateClearedAt"] }] } } },
+              { $sort: { createdAt: -1 } },
+              { $limit: 1 },
+              { $project: { content: 1, type: 1, status: 1, senderId: 1, createdAt: 1, deliveredAt: 1, seenAt: 1 } },
+            ],
+            as: "lastMessageArr",
+          },
+        },
+        {
+          $lookup: {
+            from: "messages",
+            let: { chatId: "$_id", userStateClearedAt: { $arrayElemAt: ["$userState.clearedAt", 0] } },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$chatId", "$$chatId"] },
+                  deletedForEveryone: false,
+                  deletedFor: { $ne: normalizedUserId },
+                  senderId: { $ne: normalizedUserId },
+                  status: { $in: ["sent", "delivered"] },
+                  ...(true ? {} : {}),
+                },
+              },
+              { $match: { $expr: { $or: [{ $eq: ["$$userStateClearedAt", null] }, { $gt: ["$createdAt", "$$userStateClearedAt"] }] } } },
+              { $count: "unreadCount" },
+            ],
+            as: "unreadArr",
+          },
+        },
+      ],
+    }},
+  ];
 
-  const chatItems = await Promise.all(
-    chats.map((chat) => formatChatForList(chat, currentUserId))
+  const [result] = await Chat.aggregate(pipeline).allowDiskUse(true);
+  const total = result.metadata[0]?.total || 0;
+  const chatDocs = result.data;
+
+  const formattedChats = await Promise.all(
+    chatDocs.map(async (chat) => {
+      const otherParticipant = !chat.isGroup
+        ? chat.participants.find((p) => p._id.toString() !== normalizedUserId)
+        : null;
+
+      const lastMessage = chat.lastMessageArr[0] || null;
+      const unreadCount = (chat.unreadArr[0]?.unreadCount || 0);
+      const currentUserState = chat.userState[0] || {};
+
+      return {
+        _id: chat._id,
+        isGroup: chat.isGroup,
+        groupName: chat.isGroup ? chat.groupName || "Untitled Group" : null,
+        groupAvatar: chat.isGroup ? chat.groupAvatar || null : null,
+        createdBy: chat.createdBy ? normalizeId(chat.createdBy) : null,
+        adminIds: chat.isGroup ? (chat.admins || []).map((adminId) => normalizeId(adminId)).filter(Boolean) : [],
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
+        participants: chat.participants.map((p) => ({
+          ...p,
+          _id: p._id.toString(),
+          isFriend: normalizedUserId !== p._id.toString() ? false : undefined,
+          requestSent: false,
+          requestReceived: false,
+          friendsCount: 0,
+        })),
+        otherParticipant,
+        lastMessage,
+        unreadCount: Math.max(unreadCount, currentUserState.manualUnread ? 1 : 0),
+        manuallyMarkedUnread: Boolean(currentUserState.manualUnread),
+      };
+    })
   );
 
-  return chatItems.filter(Boolean);
+  return {
+    chats: formattedChats,
+    pagination: { total, limit, offset, hasMore: offset + chatDocs.length < total },
+  };
 };
 
 const getChatSummary = async (chatId, currentUserId) => {
@@ -314,6 +402,65 @@ const getChatSummary = async (chatId, currentUserId) => {
   await ensureChatUserState(chat);
 
   return formatChatForList(chat, currentUserId);
+};
+
+const getChatSummariesForParticipants = async (chatId, participantIds) => {
+  const normalizedChatId = normalizeId(chatId);
+  const normalizedParticipantIds = participantIds.map((id) => normalizeId(id));
+
+  const [chat, lastMessages] = await Promise.all([
+    Chat.findById(normalizedChatId)
+      .populate("participants", "username name email avatar tagline bio lastSeen friends createdAt")
+      .lean(),
+    Message.aggregate([
+      { $match: { chatId: new mongoose.Types.ObjectId(normalizedChatId), deletedFor: { $nin: normalizedParticipantIds } } },
+      { $sort: { createdAt: -1 } },
+      { $limit: 1 },
+    ]),
+  ]);
+
+  if (!chat) {
+    return {};
+  }
+
+  const lastMessage = lastMessages[0] || null;
+
+  const summaries = {};
+  for (const userId of normalizedParticipantIds) {
+    const normalizedUserId = normalizeId(userId);
+    const userState = getUserState(chat, normalizedUserId);
+
+    const otherParticipantRaw =
+      !chat.isGroup &&
+      chat.participants.find((p) => normalizeId(p._id) !== normalizedUserId);
+
+    summaries[normalizedUserId] = {
+      _id: chat._id,
+      isGroup: Boolean(chat.isGroup),
+      groupName: chat.isGroup ? chat.groupName || "Untitled Group" : null,
+      groupAvatar: chat.isGroup ? chat.groupAvatar || null : null,
+      createdBy: chat.createdBy ? normalizeId(chat.createdBy) : null,
+      adminIds: chat.isGroup ? (chat.admins || []).map((a) => normalizeId(a)).filter(Boolean) : [],
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      participants: chat.participants.map((p) => mapUserProfile(p, normalizedUserId)),
+      otherParticipant: otherParticipantRaw ? mapUserProfile(otherParticipantRaw, normalizedUserId) : null,
+      lastMessage: lastMessage ? {
+        _id: lastMessage._id,
+        content: lastMessage.content,
+        type: lastMessage.type,
+        status: lastMessage.status,
+        senderId: lastMessage.senderId,
+        createdAt: lastMessage.createdAt,
+        deliveredAt: lastMessage.deliveredAt,
+        seenAt: lastMessage.seenAt,
+      } : null,
+      unreadCount: userState?.manualUnread ? 1 : 0,
+      manuallyMarkedUnread: Boolean(userState?.manualUnread),
+    };
+  }
+
+  return summaries;
 };
 
 const markChatRead = async ({ chatId, currentUserId }) => {
@@ -1173,6 +1320,7 @@ module.exports = {
   ensureChatMember,
   ensureGroupChatMember,
   getChatSummary,
+  getChatSummariesForParticipants,
   isGroupAdmin,
   leaveGroup,
   getGroupInvitePreview,

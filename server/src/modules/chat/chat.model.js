@@ -81,5 +81,8 @@ const chatSchema = new mongoose.Schema(
 
 chatSchema.index({ participants: 1 });
 chatSchema.index({ isGroup: 1, createdAt: -1 });
+chatSchema.index({ "userStates.userId": 1 });
+chatSchema.index({ "userStates.userId": 1, "userStates.hidden": 1 });
+chatSchema.index({ updatedAt: -1 });
 
 module.exports = mongoose.model("Chat", chatSchema);

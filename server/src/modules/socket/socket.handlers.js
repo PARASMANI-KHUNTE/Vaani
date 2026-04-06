@@ -9,6 +9,8 @@ const {
   markMessagesAsSeen,
   addReaction,
   removeReaction,
+  editMessage: editMessageService,
+  forwardMessage: forwardMessageService,
 } = require("../message/message.service");
 const { SOCKET_EVENTS } = require("./socket.constants");
 const {
@@ -19,7 +21,21 @@ const {
   isUserOnline,
   removeOnlineUser,
 } = require("./socket.service");
-const { sendUserPushNotification } = require("./socket.notifications");
+const {
+  sendUserPushNotification,
+  emitMessageCreated,
+  emitMessageDeleted,
+  emitReactionAdded,
+  emitReactionRemoved,
+  emitMessageEdited,
+  emitForwardedMessage,
+} = require("./socket.notifications");
+const { checkAndSetDedup, storeDedup } = require("./socket.dedup");
+
+const RATE_LIMIT_WINDOW_MS = 1000;
+const RATE_LIMIT_MAX_MESSAGES = 10;
+const RATE_LIMIT_MAX_TYPING = 30;
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60000;
 
 const emitToUser = (io, userId, event, data) => {
   io.to(getUserRoom(userId)).emit(event, data);
@@ -36,6 +52,49 @@ const emitSocketError = (socket, message, code = "UNKNOWN_ERROR") => {
     timestamp: new Date().toISOString(),
   });
 };
+
+const createRateLimiter = (maxEvents, windowMs) => {
+  const userEvents = new Map();
+
+  return {
+    check: (userId) => {
+      const now = Date.now();
+      const key = userId;
+      const userData = userEvents.get(key) || { count: 0, windowStart: now };
+
+      if (now - userData.windowStart > windowMs) {
+        userData.count = 1;
+        userData.windowStart = now;
+      } else {
+        userData.count++;
+      }
+
+      userEvents.set(key, userData);
+
+      if (userData.count > maxEvents) {
+        return false;
+      }
+      return true;
+    },
+    cleanup: () => {
+      const now = Date.now();
+      for (const [key, data] of userEvents.entries()) {
+        if (now - data.windowStart > windowMs * 2) {
+          userEvents.delete(key);
+        }
+      }
+    },
+    getSize: () => userEvents.size,
+  };
+};
+
+const messageRateLimiter = createRateLimiter(RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_MS);
+const typingRateLimiter = createRateLimiter(RATE_LIMIT_MAX_TYPING, RATE_LIMIT_WINDOW_MS);
+
+setInterval(() => {
+  messageRateLimiter.cleanup();
+  typingRateLimiter.cleanup();
+}, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 
 const handleSocketError = (socket, error, context = "operation") => {
   logger.error(`Socket error in ${context}`, {
@@ -70,9 +129,18 @@ const registerSocketHandlers = (io, socket) => {
   addOnlineUser(currentUserId, socket.id);
   socket.join(getUserRoom(currentUserId));
 
-  socket.emit(SOCKET_EVENTS.PRESENCE_SYNC, {
-    onlineUserIds: getOnlineUserIds(),
-  });
+  void getOnlineUserIds()
+    .then((onlineUserIds) => {
+      socket.emit(SOCKET_EVENTS.PRESENCE_SYNC, {
+        onlineUserIds,
+      });
+    })
+    .catch((error) => {
+      logger.error("PRESENCE_SYNC failed", { userId: currentUserId, error: error.message });
+      socket.emit(SOCKET_EVENTS.PRESENCE_SYNC, {
+        onlineUserIds: Array.from(new Set([currentUserId])),
+      });
+    });
   emitPresence(io, SOCKET_EVENTS.USER_ONLINE, currentUserId);
 
   socket.on(SOCKET_EVENTS.JOIN_CHAT, async ({ chatId }) => {
@@ -128,6 +196,13 @@ const registerSocketHandlers = (io, socket) => {
 
   socket.on(SOCKET_EVENTS.SEND_MESSAGE, async (payload, acknowledgement) => {
     try {
+      if (!messageRateLimiter.check(currentUserId)) {
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "Too many messages. Please slow down." });
+        }
+        return;
+      }
+
       const { chatId, content = "", type = "text", media = null, clientTempId, replyToId = null } = payload || {};
 
       if (!chatId) {
@@ -135,6 +210,16 @@ const registerSocketHandlers = (io, socket) => {
           acknowledgement({ ok: false, error: "chatId is required" });
         }
         return;
+      }
+
+      if (clientTempId) {
+        const existingMessageId = await checkAndSetDedup(currentUserId, clientTempId);
+        if (existingMessageId) {
+          if (typeof acknowledgement === "function") {
+            acknowledgement({ ok: true, messageId: existingMessageId, deduplicated: true });
+          }
+          return;
+        }
       }
 
       const trimmedContent = (content || "").trim();
@@ -149,7 +234,7 @@ const registerSocketHandlers = (io, socket) => {
         assertSafeMessageContent(trimmedContent);
       }
 
-      let message = await createMessage({
+      const { message, participantIds } = await createMessage({
         chatId,
         senderId: currentUserId,
         content: trimmedContent,
@@ -158,56 +243,50 @@ const registerSocketHandlers = (io, socket) => {
         media,
       });
 
-      const chat = await Chat.findById(chatId).lean();
-      if (!chat || !chat.participants.some((p) => p.toString() === currentUserId)) {
-        if (typeof acknowledgement === "function") {
-          acknowledgement({ ok: false, error: "Chat not found or access denied" });
-        }
-        return;
+      if (clientTempId) {
+        await storeDedup(currentUserId, clientTempId, message._id.toString());
       }
 
-      const participantIds = chat.participants.map((participantId) => participantId.toString());
       const receiverIds = participantIds.filter((participantId) => participantId !== currentUserId);
-      const deliveredToOnlineUser = receiverIds.some((participantId) => isUserOnline(participantId));
+      const receiverOnlineFlags = await Promise.all(receiverIds.map((participantId) => isUserOnline(participantId)));
+      const firstOnlineReceiverId = receiverIds.find((id, idx) => receiverOnlineFlags[idx]);
+      const offlineReceiverIds = receiverIds.filter((_, index) => !receiverOnlineFlags[index]);
 
-      if (deliveredToOnlineUser && message.status === "sent") {
-        message = await markMessageAsDelivered({
+      if (firstOnlineReceiverId && message.status === "sent") {
+        const deliveredMessage = await markMessageAsDelivered({
           messageId: message._id,
+          userId: firstOnlineReceiverId,
         });
+        if (deliveredMessage) {
+          message = deliveredMessage;
+        }
       }
 
-      await Promise.all(
-        participantIds.map(async (participantId) => {
-          const chatSummary = await getChatSummary(chatId, participantId);
-          emitToUser(io, participantId, SOCKET_EVENTS.NEW_MESSAGE, {
-            message,
-            chat: chatSummary,
-            clientTempId: participantId === currentUserId ? clientTempId : undefined,
-          });
-        })
-      );
+      await emitMessageCreated(message, chatId, currentUserId, currentUserName, clientTempId, participantIds);
 
-      if (deliveredToOnlineUser) {
+      if (firstOnlineReceiverId) {
         emitToUser(io, currentUserId, SOCKET_EVENTS.MESSAGE_DELIVERED, {
           chatId,
           messageId: message._id,
+          userId: firstOnlineReceiverId,
         });
       }
 
       await Promise.all(
-        receiverIds
-          .filter((participantId) => !isUserOnline(participantId))
-          .map((participantId) =>
-            sendUserPushNotification(participantId, {
-              title: currentUserName,
-              body: type === "text" ? trimmedContent || "Sent you a message" : `Sent a ${type === "voice" ? "voice note" : type} message`,
-              data: {
-                kind: "message",
-                chatId,
-                messageId: message._id.toString(),
-              },
-            })
-          )
+        offlineReceiverIds.map((participantId) =>
+          sendUserPushNotification(participantId, {
+            title: currentUserName,
+            body:
+              type === "text"
+                ? trimmedContent || "Sent you a message"
+                : `Sent a ${type === "voice" ? "voice note" : type} message`,
+            data: {
+              kind: "message",
+              chatId,
+              messageId: message._id.toString(),
+            },
+          })
+        )
       );
 
       if (typeof acknowledgement === "function") {
@@ -238,31 +317,15 @@ const registerSocketHandlers = (io, socket) => {
         scope,
       });
 
-      const chat = await Chat.findById(result.message.chatId).lean();
-
-      if (scope === "everyone" && chat) {
-        chat.participants.forEach((participantId) => {
-          emitToUser(io, participantId.toString(), SOCKET_EVENTS.MESSAGE_DELETED, {
-            scope,
-            message: result.message,
-            chatId: result.message.chatId.toString(),
-          });
-        });
-      } else {
-        emitToUser(io, currentUserId, SOCKET_EVENTS.MESSAGE_DELETED, {
-          scope,
-          messageId: result.messageId,
-          chatId: result.chatId,
-        });
-      }
+      await emitMessageDeleted(result, scope, currentUserId);
 
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: true });
       }
     } catch (error) {
-      logger.error("DELETE_MESSAGE failed", { userId: currentUserId, error: error.message });
+      logger.error("DELETE_MESSAGE failed", { userId: currentUserId, error: error?.message });
       if (typeof acknowledgement === "function") {
-        acknowledgement({ ok: false, error: error.message || "Failed to delete message" });
+        acknowledgement({ ok: false, error: error?.message || "Failed to delete message" });
       }
     }
   });
@@ -284,17 +347,7 @@ const registerSocketHandlers = (io, socket) => {
         emoji,
       });
 
-      const chat = await Chat.findById(message.chatId).lean();
-      if (chat) {
-        chat.participants.forEach((participantId) => {
-          emitToUser(io, participantId.toString(), SOCKET_EVENTS.REACTION_ADDED, {
-            message,
-            userId: currentUserId,
-            userName: currentUserName,
-            emoji,
-          });
-        });
-      }
+      await emitReactionAdded(message, currentUserId, currentUserName, emoji);
 
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: true, message });
@@ -324,16 +377,7 @@ const registerSocketHandlers = (io, socket) => {
         emoji,
       });
 
-      const chat = await Chat.findById(message.chatId).lean();
-      if (chat) {
-        chat.participants.forEach((participantId) => {
-          emitToUser(io, participantId.toString(), SOCKET_EVENTS.REACTION_REMOVED, {
-            message,
-            userId: currentUserId,
-            emoji,
-          });
-        });
-      }
+      await emitReactionRemoved(message, currentUserId, emoji);
 
       if (typeof acknowledgement === "function") {
         acknowledgement({ ok: true, message });
@@ -349,6 +393,10 @@ const registerSocketHandlers = (io, socket) => {
   socket.on(SOCKET_EVENTS.TYPING, async ({ chatId }) => {
     try {
       if (!chatId) {
+        return;
+      }
+
+      if (!typingRateLimiter.check(currentUserId)) {
         return;
       }
 
@@ -395,6 +443,68 @@ const registerSocketHandlers = (io, socket) => {
       });
     } catch (error) {
       logger.error("STOP_TYPING failed", { userId: currentUserId, error: error.message });
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.MESSAGE_EDITED, async (payload, acknowledgement) => {
+    try {
+      const { messageId, chatId, content } = payload || {};
+
+      if (!messageId || !chatId || !content) {
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "messageId, chatId, and content are required" });
+        }
+        return;
+      }
+
+      const message = await editMessageService({
+        messageId,
+        chatId,
+        currentUserId,
+        content,
+      });
+
+      await emitMessageEdited(message, chatId, currentUserId);
+
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: true, message });
+      }
+    } catch (error) {
+      logger.error("MESSAGE_EDITED failed", { userId: currentUserId, error: error.message });
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: false, error: error.message || "Failed to edit message" });
+      }
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.MESSAGE_FORWARDED, async (payload, acknowledgement) => {
+    try {
+      const { messageId, chatId, targetChatId } = payload || {};
+
+      if (!messageId || !chatId || !targetChatId) {
+        if (typeof acknowledgement === "function") {
+          acknowledgement({ ok: false, error: "messageId, chatId, and targetChatId are required" });
+        }
+        return;
+      }
+
+      const message = await forwardMessageService({
+        messageId,
+        chatId,
+        currentUserId,
+        targetChatId,
+      });
+
+      await emitForwardedMessage(message, targetChatId, currentUserId);
+
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: true, message });
+      }
+    } catch (error) {
+      logger.error("MESSAGE_FORWARDED failed", { userId: currentUserId, error: error.message });
+      if (typeof acknowledgement === "function") {
+        acknowledgement({ ok: false, error: error.message || "Failed to forward message" });
+      }
     }
   });
 

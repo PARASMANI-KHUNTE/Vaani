@@ -12,7 +12,7 @@ const mediaSchema = new mongoose.Schema(
     },
     resourceType: {
       type: String,
-      enum: ["image", "raw"],
+      enum: ["image", "video", "raw"],
       required: true,
     },
     mimeType: {
@@ -53,6 +53,27 @@ const mediaSchema = new mongoose.Schema(
   }
 );
 
+const receiptSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
+    seenAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     chatId: {
@@ -86,18 +107,9 @@ const messageSchema = new mongoose.Schema(
       type: mediaSchema,
       default: null,
     },
-    status: {
-      type: String,
-      enum: ["sent", "delivered", "seen"],
-      default: "sent",
-    },
-    deliveredAt: {
-      type: Date,
-      default: null,
-    },
-    seenAt: {
-      type: Date,
-      default: null,
+    receipts: {
+      type: [receiptSchema],
+      default: [],
     },
     reactions: [
       {
@@ -174,5 +186,10 @@ const messageSchema = new mongoose.Schema(
 );
 
 messageSchema.index({ chatId: 1, createdAt: -1 });
+messageSchema.index({ chatId: 1, senderId: 1 });
+messageSchema.index({ chatId: 1, deletedForEveryone: 1, deletedFor: 1 });
+messageSchema.index({ "reactions.userId": 1 });
+messageSchema.index({ senderId: 1, createdAt: -1 });
+messageSchema.index({ "receipts.userId": 1 });
 
 module.exports = mongoose.model("Message", messageSchema);

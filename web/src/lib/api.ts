@@ -8,6 +8,8 @@ import {
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000;
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -15,6 +17,13 @@ class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const calculateBackoff = (attempt: number) => {
+  const delay = Math.min(INITIAL_RETRY_DELAY * Math.pow(2, attempt), 10000);
+  return delay + Math.random() * 1000;
+};
 
 async function request<T>(
   path: string,
@@ -24,38 +33,69 @@ async function request<T>(
     body?: string | FormData;
     headers?: Record<string, string>;
     signal?: AbortSignal;
+    retries?: number;
   } = {}
 ): Promise<T> {
-  const { method = "GET", token, body, headers = {}, signal } = options;
+  const { method = "GET", token, body, headers = {}, signal, retries = MAX_RETRIES } = options;
   const url = `${API_BASE_URL}${path}`;
+  let lastError: Error | null = null;
 
-  const requestHeaders: Record<string, string> = {
-    ...headers,
-  };
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (signal?.aborted) {
+      throw new Error("Request cancelled");
+    }
 
-  if (token) {
-    requestHeaders["Authorization"] = `Bearer ${token}`;
+    try {
+      const requestHeaders: Record<string, string> = {
+        ...headers,
+      };
+
+      if (token) {
+        requestHeaders["Authorization"] = `Bearer ${token}`;
+      }
+
+      if (!(body instanceof FormData) && !requestHeaders["Content-Type"]) {
+        requestHeaders["Content-Type"] = "application/json";
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: requestHeaders,
+        body,
+        signal,
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const errorMessage = payload?.message || `Request failed with status ${response.status}`;
+        throw new ApiError(response.status, errorMessage);
+      }
+
+      return (payload?.data ?? null) as T;
+    } catch (error) {
+      lastError = error as Error;
+
+      if (
+        error instanceof ApiError &&
+        (error.status >= 400 && error.status < 500) &&
+        error.status !== 408 &&
+        error.status !== 429
+      ) {
+        throw error;
+      }
+
+      if (attempt < retries) {
+        const delay = calculateBackoff(attempt);
+        await sleep(delay);
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-  if (!(body instanceof FormData) && !requestHeaders["Content-Type"]) {
-    requestHeaders["Content-Type"] = "application/json";
-  }
-
-  const response = await fetch(url, {
-    method,
-    headers: requestHeaders,
-    body,
-    signal,
-  });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const errorMessage = payload?.message || `Request failed with status ${response.status}`;
-    throw new ApiError(response.status, errorMessage);
-  }
-
-  return (payload?.data ?? null) as T;
+  throw lastError || new Error("Request failed");
 }
 
 async function uploadWithProgress<T>(
@@ -88,7 +128,8 @@ async function uploadWithProgress<T>(
       options.onXhrChange?.(null);
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText));
+          const payload = JSON.parse(xhr.responseText);
+          resolve(payload?.data ?? payload);
         } catch {
           reject(new Error("Failed to parse response"));
         }
@@ -111,11 +152,19 @@ async function uploadWithProgress<T>(
   });
 }
 
-export const getChats = async (token: string) =>
-  request<{ chats: Chat[] }>("/chats", { token });
+export const getChats = async (token: string, options?: { limit?: number; offset?: number }) => {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set("limit", String(options.limit));
+  if (options?.offset) params.set("offset", String(options.offset));
+  const queryString = params.toString();
+  return request<{ chats: Chat[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean } }>(
+    `/chats${queryString ? `?${queryString}` : ""}`,
+    { method: "GET", token }
+  );
+};
 
 export const getChatById = async (token: string, chatId: string) =>
-  request<{ chat: Chat }>(`/chats/${chatId}`, { token });
+  request<{ chat: Chat }>(`/chats/${chatId}`, { method: "GET", token });
 
 export const createChat = async (token: string, participantId: string) =>
   request<{ chat: Chat }>("/chats", {
@@ -138,13 +187,13 @@ export const createGroupChat = async (token: string, input: { groupName: string;
 export const createGroup = createGroupChat;
 
 export const searchUsers = async (token: string, query: string, signal?: AbortSignal) =>
-  request<{ users: BackendUser[] }>(`/users/search?q=${encodeURIComponent(query)}`, { token, signal });
+  request<{ users: BackendUser[] }>(`/users/search?q=${encodeURIComponent(query)}`, { method: "GET", token, signal });
 
 export const exploreUsers = async (token: string) =>
-  request<{ users: BackendUser[] }>("/users/explore", { token });
+  request<{ users: BackendUser[] }>("/users/explore", { method: "GET", token });
 
 export const getMyProfile = async (token: string) =>
-  request<{ profile: UserProfile }>("/users/me", { token });
+  request<{ profile: UserProfile }>("/users/me", { method: "GET", token });
 
 export const updateMyProfile = async (
   token: string,
@@ -306,9 +355,7 @@ export const uploadMessageMedia = async (
   const body = new FormData();
   body.append("file", file);
 
-  const payload = await uploadWithProgress<{
-    media: MediaAttachment;
-  }>(`${API_BASE_URL}/messages/upload`, {
+  const raw = await uploadWithProgress<{ media: MediaAttachment }>(`${API_BASE_URL}/messages/upload`, {
     body,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -317,8 +364,12 @@ export const uploadMessageMedia = async (
     onXhrChange,
   });
 
+  if (!raw?.media) {
+    throw new Error("Upload failed: no media in response");
+  }
+
   onProgress?.(100);
-  return payload;
+  return raw;
 };
 
 export const uploadMedia = async (

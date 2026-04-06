@@ -1,16 +1,30 @@
 const jwt = require("jsonwebtoken");
 const env = require("../../config/env");
+const { getRedisClient, isRedisConnected } = require("../../config/redis.client");
 const User = require("../user/user.model");
+
+const PRESENCE_KEY_PREFIX = "presence:user:";
+const PRESENCE_TTL = 3600;
 
 const onlineUsers = new Map();
 
 const getUserRoom = (userId) => `user:${userId}`;
 const getChatRoom = (chatId) => `chat:${chatId}`;
 
+const getRedisPresenceKey = (userId) => `${PRESENCE_KEY_PREFIX}${userId}`;
+
 const addOnlineUser = (userId, socketId) => {
   const userSockets = onlineUsers.get(userId) || new Set();
   userSockets.add(socketId);
   onlineUsers.set(userId, userSockets);
+
+  if (env.redis.enabled && isRedisConnected()) {
+    const redis = getRedisClient();
+    if (redis) {
+      redis.sAdd(getRedisPresenceKey(userId), socketId).catch(console.error);
+      redis.expire(getRedisPresenceKey(userId), PRESENCE_TTL).catch(console.error);
+    }
+  }
 };
 
 const removeOnlineUser = (userId, socketId) => {
@@ -24,16 +38,54 @@ const removeOnlineUser = (userId, socketId) => {
 
   if (userSockets.size === 0) {
     onlineUsers.delete(userId);
+    if (env.redis.enabled && isRedisConnected()) {
+      const redis = getRedisClient();
+      if (redis) {
+        redis.del(getRedisPresenceKey(userId)).catch(console.error);
+      }
+    }
     return true;
   }
 
   onlineUsers.set(userId, userSockets);
+  if (env.redis.enabled && isRedisConnected()) {
+    const redis = getRedisClient();
+    if (redis) {
+      redis.sRem(getRedisPresenceKey(userId), socketId).catch(console.error);
+    }
+  }
   return false;
 };
 
-const isUserOnline = (userId) => onlineUsers.has(userId.toString());
+const isUserOnline = async (userId) => {
+  if (env.redis.enabled && isRedisConnected()) {
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const exists = await redis.exists(getRedisPresenceKey(userId));
+        return exists === 1;
+      } catch {
+        return onlineUsers.has(userId.toString());
+      }
+    }
+  }
+  return onlineUsers.has(userId.toString());
+};
 
-const getOnlineUserIds = () => Array.from(onlineUsers.keys());
+const getOnlineUserIds = async () => {
+  if (env.redis.enabled && isRedisConnected()) {
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const keys = await redis.keys(`${PRESENCE_KEY_PREFIX}*`);
+        return keys.map((key) => key.replace(PRESENCE_KEY_PREFIX, ""));
+      } catch {
+        return Array.from(onlineUsers.keys());
+      }
+    }
+  }
+  return Array.from(onlineUsers.keys());
+};
 
 const authenticateSocket = async (socket, next) => {
   const token =

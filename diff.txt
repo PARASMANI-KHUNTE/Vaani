@@ -1,0 +1,6 @@
+﻿web/src/components/ChatWindow/ChatWindow.tsx
+web/src/components/MessageBubble/MessageBubble.tsx
+web/src/components/chat-shell.tsx
+web/src/components/explore-panel.tsx
+web/src/main.tsx
+web/src/pages/explore-page.tsx

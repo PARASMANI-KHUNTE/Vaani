@@ -22,7 +22,7 @@ export type MessageType = "text" | "image" | "file" | "video" | "voice";
 export type MediaAttachment = {
   url: string;
   publicId: string;
-  resourceType: "image" | "raw";
+  resourceType: string;
   mimeType?: string | null;
   originalName?: string | null;
   format?: string | null;
@@ -92,6 +92,7 @@ export type Message = {
   } | null;
   optimistic?: boolean;
   edited?: boolean;
+  failed?: boolean;
 };
 
 export type SocketNewMessagePayload = {

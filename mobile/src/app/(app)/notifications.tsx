@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useRef } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/screen-shell";
 import { useMobileSocial } from "@/hooks/use-mobile-social";
@@ -35,7 +36,80 @@ export default function NotificationsScreen() {
   const notifications = useNotificationStore((state) => state.notifications);
   const markRead = useNotificationStore((state) => state.markRead);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
+  const updateNotificationAction = useNotificationStore((state) => state.updateNotificationAction);
+  const updateFriendStatus = useNotificationStore((state) => state.updateFriendStatus);
+  const removeFriendRequest = useNotificationStore((state) => state.removeFriendRequest);
   const { acceptRequest, rejectRequest } = useMobileSocial({ token });
+  const pendingRequestsRef = useRef<Set<string>>(new Set());
+
+  const handleAccept = (userId: string, notificationId: string) => {
+    const requestKey = `accept:${userId}:${notificationId}`;
+    if (pendingRequestsRef.current.has(requestKey)) return;
+    pendingRequestsRef.current.add(requestKey);
+
+    const notification = useNotificationStore.getState().notifications.find(n => n.id === notificationId);
+    const previousAction = notification?.action;
+    const previousStatus = useNotificationStore.getState().directoryUsers[userId];
+
+    updateNotificationAction(notificationId, "accepted");
+    updateFriendStatus({
+      userId,
+      isFriend: true,
+      requestSent: false,
+      requestReceived: false,
+    });
+    markRead(notificationId);
+    
+    acceptRequest(userId).catch((err) => {
+      if (previousAction) {
+        updateNotificationAction(notificationId, previousAction);
+      }
+      if (previousStatus) {
+        updateFriendStatus({
+          userId,
+          isFriend: previousStatus.isFriend,
+          requestSent: previousStatus.requestSent,
+          requestReceived: previousStatus.requestReceived,
+          friendsCount: previousStatus.friendsCount,
+        });
+      }
+      console.error("Failed to accept friend request:", err);
+    }).finally(() => {
+      pendingRequestsRef.current.delete(requestKey);
+    });
+  };
+
+  const handleReject = (userId: string, notificationId: string) => {
+    const requestKey = `reject:${userId}:${notificationId}`;
+    if (pendingRequestsRef.current.has(requestKey)) return;
+    pendingRequestsRef.current.add(requestKey);
+
+    const notification = useNotificationStore.getState().notifications.find(n => n.id === notificationId);
+    const previousAction = notification?.action;
+    const previousStatus = useNotificationStore.getState().directoryUsers[userId];
+
+    updateNotificationAction(notificationId, "rejected");
+    removeFriendRequest(userId);
+    markRead(notificationId);
+
+    rejectRequest(userId).catch((err) => {
+      if (previousAction) {
+        updateNotificationAction(notificationId, previousAction);
+      }
+      if (previousStatus) {
+        updateFriendStatus({
+          userId,
+          isFriend: previousStatus.isFriend,
+          requestSent: previousStatus.requestSent,
+          requestReceived: previousStatus.requestReceived,
+          friendsCount: previousStatus.friendsCount,
+        });
+      }
+      console.error("Failed to reject friend request:", err);
+    }).finally(() => {
+      pendingRequestsRef.current.delete(requestKey);
+    });
+  };
 
   return (
     <ScreenShell eyebrow="Alerts" title="Notifications" subtitle="Realtime messages and relationship updates from the existing socket system.">
@@ -77,22 +151,30 @@ export default function NotificationsScreen() {
               <View style={styles.inlineActions}>
                 <Pressable
                   style={styles.acceptButton}
-                  onPress={() => {
-                    markRead(item.id);
-                    void acceptRequest(item.userId!);
-                  }}
+                  onPress={() => handleAccept(item.userId!, item.id)}
                 >
                   <Text style={styles.acceptText}>Accept</Text>
                 </Pressable>
                 <Pressable
                   style={styles.rejectButton}
-                  onPress={() => {
-                    markRead(item.id);
-                    void rejectRequest(item.userId!);
-                  }}
+                  onPress={() => handleReject(item.userId!, item.id)}
                 >
                   <Text style={styles.rejectText}>Reject</Text>
                 </Pressable>
+              </View>
+            ) : item.kind === "friend_request" && (item.action === "accepted" || item.action === "rejected") ? (
+              <View style={styles.actionStatus}>
+                <Ionicons
+                  name={item.action === "accepted" ? "checkmark-circle" : "close-circle"}
+                  size={14}
+                  color={item.action === "accepted" ? "#059669" : "#64748b"}
+                />
+                <Text style={[
+                  styles.actionText,
+                  { color: item.action === "accepted" ? "#059669" : "#64748b" }
+                ]}>
+                  You {item.action === "accepted" ? "accepted" : "declined"}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -128,6 +210,8 @@ const styles = StyleSheet.create({
   acceptText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   rejectButton: { borderRadius: 999, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", paddingHorizontal: 12, paddingVertical: 10 },
   rejectText: { color: "#0f172a", fontWeight: "700", fontSize: 12 },
+  actionStatus: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 12, marginLeft: 52 },
+  actionText: { fontSize: 12, fontWeight: "600" },
   emptyCard: { borderRadius: 24, backgroundColor: "#fffdf8", padding: 32, gap: 12, alignItems: "center" },
   emptyTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a" },
   emptyBody: { fontSize: 14, lineHeight: 20, color: "#64748b", textAlign: "center" },

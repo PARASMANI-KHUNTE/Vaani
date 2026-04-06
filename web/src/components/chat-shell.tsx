@@ -90,7 +90,12 @@ export const ChatShell = () => {
   }, [chats, debouncedSearch]);
 
   const activeChat = chats.find((chat) => chat._id === selectedChatId) || null;
-  const activeTyping = selectedChatId ? typingByChat[selectedChatId] : null;
+  const activeTypers = selectedChatId ? typingByChat[selectedChatId] || [] : [];
+  const typingLabel = !activeTypers.length
+    ? null
+    : activeTypers.length === 1
+      ? `${activeTypers[0].userName} is typing...`
+      : `${activeTypers[0].userName} and ${activeTypers.length - 1} other${activeTypers.length - 1 === 1 ? "" : "s"} are typing...`;
   const isActiveUserOnline = activeChat
     ? !activeChat.isGroup && onlineUserIds.includes(activeChat.otherParticipant?._id || "")
     : false;
@@ -218,7 +223,7 @@ export const ChatShell = () => {
         onMarkRead={markNotificationRead} 
       />
 
-      <NavHeader title="Messages" showNav />
+      <NavHeader title="Messages" showNav={!selectedChatId} />
 
       {isSelectionMode && selectedChatIds.length > 0 && (
         <div className="z-40 flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50/50 px-6 py-2 dark:border-blue-900/30 dark:bg-blue-950/20">
@@ -232,30 +237,37 @@ export const ChatShell = () => {
       )}
 
       <main className="flex min-h-0 flex-1 overflow-hidden pb-safe">
-        <Sidebar
-          chats={filteredChats}
-          selectedChatId={selectedChatId}
-          onSelectChat={selectChat}
-          onDeleteChat={(chatId) => void deleteSelectedChat(chatId)}
-          onClearChatMessages={(chatId) => void clearSelectedChatMessages(chatId)}
-          onMarkChatRead={(chatId) => void markSelectedChatRead(chatId)}
-          onMarkChatUnread={(chatId) => void markSelectedChatUnread(chatId)}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          isLoading={isLoadingChats}
-          onlineUserIds={onlineUserIds}
-          selectedChatIds={selectedChatIds}
-          onSelectChats={setSelectedChatIds}
-          isSelectionMode={isSelectionMode}
-          onToggleSelectionMode={() => {
-            setIsSelectionMode(!isSelectionMode);
-            if (isSelectionMode) setSelectedChatIds([]);
-          }}
-          onOpenNewChat={() => setIsNewChatModalOpen(true)}
-          isCollapsed={isSidebarCollapsed}
-          onCollapse={() => setIsSidebarCollapsed(true)}
-          onExpand={() => setIsSidebarCollapsed(false)}
-        />
+        {/* Sidebar - always visible on mobile as collapsed, or full on desktop */}
+        <div className={cn(
+          "h-full",
+          selectedChatId ? "flex sm:hidden" : "flex",
+          isSidebarCollapsed ? "w-12" : "w-full sm:w-auto"
+        )}>
+          <Sidebar
+            chats={filteredChats}
+            selectedChatId={selectedChatId}
+            onSelectChat={selectChat}
+            onDeleteChat={(chatId) => void deleteSelectedChat(chatId)}
+            onClearChatMessages={(chatId) => void clearSelectedChatMessages(chatId)}
+            onMarkChatRead={(chatId) => void markSelectedChatRead(chatId)}
+            onMarkChatUnread={(chatId) => void markSelectedChatUnread(chatId)}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            isLoading={isLoadingChats}
+            onlineUserIds={onlineUserIds}
+            selectedChatIds={selectedChatIds}
+            onSelectChats={setSelectedChatIds}
+            isSelectionMode={isSelectionMode}
+            onToggleSelectionMode={() => {
+              setIsSelectionMode(!isSelectionMode);
+              if (isSelectionMode) setSelectedChatIds([]);
+            }}
+            onOpenNewChat={() => setIsNewChatModalOpen(true)}
+            isCollapsed={isSidebarCollapsed}
+            onCollapse={() => setIsSidebarCollapsed(true)}
+            onExpand={() => setIsSidebarCollapsed(false)}
+          />
+        </div>
         <div className={cn("h-full min-w-0 flex-1", !selectedChatId ? "hidden sm:block" : "block")}>
           <ChatWindow
             chat={activeChat}
@@ -271,7 +283,7 @@ export const ChatShell = () => {
             onClose={selectedChatId ? () => selectChat(null) : undefined}
             isOnline={isActiveUserOnline}
             onlineUserIds={onlineUserIds}
-            typingLabel={activeTyping ? `${activeTyping.userName} is typing...` : null}
+            typingLabel={typingLabel}
             onOpenUserProfile={(user) => navigate(`/profile/user/${user._id}`)}
             mediaTransfer={mediaTransfer}
             onRetryMedia={retryLastMediaUpload}

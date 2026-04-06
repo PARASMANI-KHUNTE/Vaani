@@ -106,8 +106,8 @@ const createInviteLinkValidator = [
   ...chatIdParamValidator,
   body("expiresInHours")
     .optional()
-    .isInt({ min: 1, max: 24 * 30 })
-    .withMessage("expiresInHours must be between 1 and 720"),
+    .isInt({ min: 1, max: 87600 })
+    .withMessage("expiresInHours must be between 1 and 87600"),
   body("maxUses")
     .optional()
     .isInt({ min: 0, max: 500 })

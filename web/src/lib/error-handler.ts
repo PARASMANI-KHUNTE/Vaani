@@ -66,7 +66,7 @@ export const handleError = (
   } = {}
 ): AppError => {
   let message = "An unexpected error occurred";
-  let originalError: unknown = error;
+  const originalError: unknown = error;
 
   if (error instanceof Error) {
     message = error.message;

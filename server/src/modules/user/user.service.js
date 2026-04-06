@@ -4,6 +4,7 @@ const Message = require("../message/message.model");
 const ApiError = require("../../utils/apiError");
 const { isExpoPushToken } = require("../../utils/pushNotifications");
 const { destroyMediaAssets } = require("../../utils/mediaUpload");
+const { startSession, isTransactionSupported } = require("../../config/database");
 const {
   notifyFriendRequestReceived,
   notifyFriendRequestAccepted,
@@ -25,6 +26,41 @@ const permanentlyDeleteChatById = async (chatId) => {
   await destroyMediaAssets(messages.map((message) => message.media));
   await Message.deleteMany({ chatId });
   await Chat.deleteOne({ _id: chatId });
+};
+
+const anonymizeUserMessages = async (userId, session = null) => {
+  await Message.updateMany(
+    { senderId: userId },
+    {
+      $set: {
+        senderId: null,
+        content: "[Deleted user message]",
+        media: null,
+        deletedForEveryone: true,
+        deletedAt: new Date(),
+        deletedBy: userId,
+      },
+    },
+    { session }
+  );
+};
+
+const handleUserDeletionFromChats = async (userId, session = null) => {
+  const userChats = await Chat.find({ participants: userId }).lean();
+  
+  for (const chat of userChats) {
+    if (chat.isGroup) {
+      await Chat.updateOne(
+        { _id: chat._id },
+        {
+          $pull: { participants: userId, admins: userId },
+          $pull: { "userStates.userId": userId },
+        },
+        { session }
+      );
+    }
+    await anonymizeUserMessages(userId, session);
+  }
 };
 
 const sanitizeUsername = (value) =>
@@ -357,9 +393,6 @@ const requestFriend = async ({ currentUserId, targetUserId }) => {
   assertAccountIsActive(currentUser, "Your account is unavailable");
   assertAccountIsActive(targetUser, "This user is unavailable for interaction");
 
-  assertAccountIsActive(currentUser, "Your account is unavailable");
-  assertAccountIsActive(targetUser, "Target user account is unavailable");
-
   assertRelationshipAllowed(currentUser, targetUser, targetUserId);
 
   const relationship = getRelationship(currentUser, targetUserId);
@@ -376,14 +409,41 @@ const requestFriend = async ({ currentUserId, targetUserId }) => {
     throw new ApiError(400, "This user has already sent you a request");
   }
 
-  await Promise.all([
-    User.findByIdAndUpdate(currentUserId, {
-      $addToSet: { sentFriendRequests: targetUserId },
-    }),
-    User.findByIdAndUpdate(targetUserId, {
-      $addToSet: { receivedFriendRequests: currentUserId },
-    }),
-  ]);
+  const supportsTransactions = isTransactionSupported();
+
+  if (supportsTransactions) {
+    const session = await startSession();
+    try {
+      session.startTransaction();
+
+      await User.findByIdAndUpdate(
+        currentUserId,
+        { $addToSet: { sentFriendRequests: targetUserId } },
+        { session }
+      );
+      await User.findByIdAndUpdate(
+        targetUserId,
+        { $addToSet: { receivedFriendRequests: currentUserId } },
+        { session }
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } else {
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, {
+        $addToSet: { sentFriendRequests: targetUserId },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $addToSet: { receivedFriendRequests: currentUserId },
+      }),
+    ]);
+  }
 
   notifyFriendRequestReceived(targetUserId, currentUser);
 
@@ -412,16 +472,49 @@ const acceptFriendRequest = async ({ currentUserId, targetUserId }) => {
     throw new ApiError(400, "No pending friend request found");
   }
 
-  await Promise.all([
-    User.findByIdAndUpdate(currentUserId, {
-      $pull: { receivedFriendRequests: targetUserId },
-      $addToSet: { friends: targetUserId },
-    }),
-    User.findByIdAndUpdate(targetUserId, {
-      $pull: { sentFriendRequests: currentUserId },
-      $addToSet: { friends: currentUserId },
-    }),
-  ]);
+  const supportsTransactions = isTransactionSupported();
+
+  if (supportsTransactions) {
+    const session = await startSession();
+    try {
+      session.startTransaction();
+
+      await User.findByIdAndUpdate(
+        currentUserId,
+        {
+          $pull: { receivedFriendRequests: targetUserId },
+          $addToSet: { friends: targetUserId },
+        },
+        { session }
+      );
+      await User.findByIdAndUpdate(
+        targetUserId,
+        {
+          $pull: { sentFriendRequests: currentUserId },
+          $addToSet: { friends: currentUserId },
+        },
+        { session }
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } else {
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, {
+        $pull: { receivedFriendRequests: targetUserId },
+        $addToSet: { friends: targetUserId },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $pull: { sentFriendRequests: currentUserId },
+        $addToSet: { friends: currentUserId },
+      }),
+    ]);
+  }
 
   notifyFriendRequestAccepted(targetUserId, currentUser);
 
@@ -444,14 +537,47 @@ const rejectFriendRequest = async ({ currentUserId, targetUserId }) => {
   assertAccountIsActive(currentUser, "Your account is unavailable");
   assertAccountIsActive(targetUser, "Target user account is unavailable");
 
-  await Promise.all([
-    User.findByIdAndUpdate(currentUserId, {
-      $pull: { receivedFriendRequests: targetUserId },
-    }),
-    User.findByIdAndUpdate(targetUserId, {
-      $pull: { sentFriendRequests: currentUserId },
-    }),
-  ]);
+  const relationship = getRelationship(currentUser, targetUserId);
+
+  if (!relationship.hasReceivedRequest) {
+    throw new ApiError(400, "No pending friend request found");
+  }
+
+  const supportsTransactions = isTransactionSupported();
+
+  if (supportsTransactions) {
+    const session = await startSession();
+    try {
+      session.startTransaction();
+
+      await User.findByIdAndUpdate(
+        currentUserId,
+        { $pull: { receivedFriendRequests: targetUserId } },
+        { session }
+      );
+      await User.findByIdAndUpdate(
+        targetUserId,
+        { $pull: { sentFriendRequests: currentUserId } },
+        { session }
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } else {
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, {
+        $pull: { receivedFriendRequests: targetUserId },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $pull: { sentFriendRequests: currentUserId },
+      }),
+    ]);
+  }
 
   notifyFriendRequestRejected(targetUserId, currentUser);
 
@@ -470,14 +596,41 @@ const removeFriend = async ({ currentUserId, targetUserId }) => {
 
   assertAccountIsActive(targetUser, "Target user account is unavailable");
 
-  await Promise.all([
-    User.findByIdAndUpdate(currentUserId, {
-      $pull: { friends: targetUserId },
-    }),
-    User.findByIdAndUpdate(targetUserId, {
-      $pull: { friends: currentUserId },
-    }),
-  ]);
+  const supportsTransactions = isTransactionSupported();
+
+  if (supportsTransactions) {
+    const session = await startSession();
+    try {
+      session.startTransaction();
+
+      await User.findByIdAndUpdate(
+        currentUserId,
+        { $pull: { friends: targetUserId } },
+        { session }
+      );
+      await User.findByIdAndUpdate(
+        targetUserId,
+        { $pull: { friends: currentUserId } },
+        { session }
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } else {
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, {
+        $pull: { friends: targetUserId },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $pull: { friends: currentUserId },
+      }),
+    ]);
+  }
 
   return getProfileByUserId({
     userId: targetUserId,
@@ -494,23 +647,63 @@ const blockUser = async ({ currentUserId, targetUserId }) => {
 
   assertAccountIsActive(targetUser, "Target user account is unavailable");
 
-  await Promise.all([
-    User.findByIdAndUpdate(currentUserId, {
-      $addToSet: { blockedUsers: targetUserId },
-      $pull: {
-        friends: targetUserId,
-        sentFriendRequests: targetUserId,
-        receivedFriendRequests: targetUserId,
-      },
-    }),
-    User.findByIdAndUpdate(targetUserId, {
-      $pull: {
-        friends: currentUserId,
-        sentFriendRequests: currentUserId,
-        receivedFriendRequests: currentUserId,
-      },
-    }),
-  ]);
+  const supportsTransactions = isTransactionSupported();
+
+  if (supportsTransactions) {
+    const session = await startSession();
+    try {
+      session.startTransaction();
+
+      await User.findByIdAndUpdate(
+        currentUserId,
+        {
+          $addToSet: { blockedUsers: targetUserId },
+          $pull: {
+            friends: targetUserId,
+            sentFriendRequests: targetUserId,
+            receivedFriendRequests: targetUserId,
+          },
+        },
+        { session }
+      );
+      await User.findByIdAndUpdate(
+        targetUserId,
+        {
+          $pull: {
+            friends: currentUserId,
+            sentFriendRequests: currentUserId,
+            receivedFriendRequests: currentUserId,
+          },
+        },
+        { session }
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } else {
+    await Promise.all([
+      User.findByIdAndUpdate(currentUserId, {
+        $addToSet: { blockedUsers: targetUserId },
+        $pull: {
+          friends: targetUserId,
+          sentFriendRequests: targetUserId,
+          receivedFriendRequests: targetUserId,
+        },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $pull: {
+          friends: currentUserId,
+          sentFriendRequests: currentUserId,
+          receivedFriendRequests: currentUserId,
+        },
+      }),
+    ]);
+  }
 
   return getProfileByUserId({
     userId: targetUserId,
@@ -612,11 +805,17 @@ const deleteOwnAccount = async ({ userId }) => {
     return { deleted: true };
   }
 
-  const userChats = await Chat.find({ participants: userId }).select("_id").lean();
-  await Promise.all(userChats.map((chat) => permanentlyDeleteChatById(chat._id.toString())));
+  const supportsTransactions = isTransactionSupported();
+  const session = await startSession();
+  
+  try {
+    if (supportsTransactions) {
+      session.startTransaction();
+    }
 
-  await Promise.all([
-    User.updateMany(
+    await handleUserDeletionFromChats(userId, session);
+
+    await User.updateMany(
       { _id: { $ne: userId } },
       {
         $pull: {
@@ -625,35 +824,51 @@ const deleteOwnAccount = async ({ userId }) => {
           receivedFriendRequests: userId,
           blockedUsers: userId,
         },
-      }
-    ),
-  ]);
+      },
+      { session }
+    );
 
-  const deletedEmail = `deleted-${Date.now()}-${String(userId).slice(-6)}@deleted.local`;
-  const deletedName = `Deleted User ${String(userId).slice(-4)}`;
-  const deletedUsername = `deleted_${Date.now().toString().slice(-8)}${String(userId).slice(-4)}`.slice(0, 30);
+    const deletedEmail = `deleted-${Date.now()}-${String(userId).slice(-6)}@deleted.local`;
+    const deletedName = `Deleted User ${String(userId).slice(-4)}`;
+    const deletedUsername = `deleted_${Date.now().toString().slice(-8)}${String(userId).slice(-4)}`.slice(0, 30);
 
-  await User.findByIdAndUpdate(userId, {
-    $set: {
-      username: deletedUsername,
-      name: deletedName,
-      email: deletedEmail,
-      avatar: null,
-      tagline: "",
-      bio: "",
-      friends: [],
-      sentFriendRequests: [],
-      receivedFriendRequests: [],
-      blockedUsers: [],
-      pushTokens: [],
-      accountStatus: "deleted",
-      disabledAt: null,
-      deletedAt: new Date(),
-      lastSeen: new Date(),
-    },
-  });
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          username: deletedUsername,
+          name: deletedName,
+          email: deletedEmail,
+          avatar: null,
+          tagline: "",
+          bio: "",
+          friends: [],
+          sentFriendRequests: [],
+          receivedFriendRequests: [],
+          blockedUsers: [],
+          pushTokens: [],
+          accountStatus: "deleted",
+          disabledAt: null,
+          deletedAt: new Date(),
+          lastSeen: new Date(),
+        },
+      },
+      { session }
+    );
 
-  return { deleted: true };
+    if (supportsTransactions) {
+      await session.commitTransaction();
+    }
+
+    return { deleted: true };
+  } catch (error) {
+    if (supportsTransactions) {
+      await session.abortTransaction();
+    }
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 module.exports = {

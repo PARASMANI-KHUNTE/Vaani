@@ -4,14 +4,28 @@ import { Chat, Message, NotificationItem } from "@/lib/types";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+type FriendStatusUpdate = {
+  userId: string;
+  isFriend: boolean;
+  requestSent: boolean;
+  requestReceived: boolean;
+  friendsCount?: number;
+};
+
 type ChatState = {
   chats: Chat[];
   selectedChatId: string | null;
   hasExplicitlyClosedChat: boolean;
   messagesByChat: Record<string, Message[]>;
-  typingByChat: Record<string, { userId: string; userName: string } | null>;
+  typingByChat: Record<string, { userId: string; userName: string }[]>;
   onlineUserIds: string[];
   notifications: NotificationItem[];
+  directoryUsers: Record<string, {
+    isFriend: boolean;
+    requestSent: boolean;
+    requestReceived: boolean;
+    friendsCount: number;
+  }>;
   setChats: (chats: Chat[]) => void;
   selectChat: (chatId: string | null) => void;
   setMessages: (chatId: string, messages: Message[]) => void;
@@ -19,15 +33,21 @@ type ChatState = {
   updateMessage: (chatId: string, messageId: string, updater: (message: Message) => Message) => void;
   removeMessage: (chatId: string, messageId: string) => void;
   replaceOptimisticMessage: (chatId: string, optimisticId: string, message: Message) => void;
+  markMessageFailed: (chatId: string, optimisticId: string) => void;
   upsertChat: (chat: Chat) => void;
   removeChat: (chatId: string) => void;
-  setTypingState: (chatId: string, value: { userId: string; userName: string } | null) => void;
+  setTypingState: (chatId: string, userId: string, userName: string, isTyping: boolean) => void;
   setOnlineUsers: (userIds: string[]) => void;
   setUserOnlineState: (userId: string, isOnline: boolean) => void;
   addNotification: (notification: NotificationItem) => void;
   markNotificationRead: (notificationId: string) => void;
   markNotificationsRead: () => void;
+  removeNotification: (notificationId: string) => void;
   clearNotifications: () => void;
+  updateFriendStatus: (update: FriendStatusUpdate) => void;
+  batchUpdateFriendStatuses: (updates: FriendStatusUpdate[]) => void;
+  removeFriendRequest: (userId: string) => void;
+  updateNotificationAction: (notificationId: string, action: "accepted" | "rejected") => void;
 };
 
 export const useChatStore = create<ChatState>()(
@@ -40,6 +60,7 @@ export const useChatStore = create<ChatState>()(
       typingByChat: {},
       onlineUserIds: [],
       notifications: [],
+      directoryUsers: {},
       setChats: (chats) => {
         const state = get();
         const selectedChatStillExists = state.selectedChatId
@@ -132,6 +153,15 @@ export const useChatStore = create<ChatState>()(
             ),
           },
         })),
+      markMessageFailed: (chatId, optimisticId) =>
+        set((state) => ({
+          messagesByChat: {
+            ...state.messagesByChat,
+            [chatId]: (state.messagesByChat[chatId] || []).map((entry) =>
+              entry._id === optimisticId ? { ...entry, failed: true } : entry
+            ),
+          },
+        })),
       upsertChat: (chat) =>
         set((state) => {
           const chatWithDefaults = { ...chat, unreadCount: chat.unreadCount || 0 };
@@ -164,13 +194,26 @@ export const useChatStore = create<ChatState>()(
             messagesByChat: nextMessagesByChat,
           };
         }),
-      setTypingState: (chatId, value) =>
-        set((state) => ({
-          typingByChat: {
-            ...state.typingByChat,
-            [chatId]: value,
-          },
-        })),
+      setTypingState: (chatId, userId, userName, isTyping) =>
+        set((state) => {
+          const currentTyping = state.typingByChat[chatId] || [];
+          let newTyping = [...currentTyping];
+
+          if (isTyping) {
+            if (!newTyping.some((t) => t.userId === userId)) {
+              newTyping.push({ userId, userName });
+            }
+          } else {
+            newTyping = newTyping.filter((t) => t.userId !== userId);
+          }
+
+          return {
+            typingByChat: {
+              ...state.typingByChat,
+              [chatId]: newTyping,
+            },
+          };
+        }),
       setOnlineUsers: (userIds) => set({ onlineUserIds: userIds }),
       setUserOnlineState: (userId, isOnline) =>
         set((state) => ({
@@ -188,8 +231,12 @@ export const useChatStore = create<ChatState>()(
               ),
             };
           }
+          const newNotifications = [notification, ...state.notifications];
+          if (newNotifications.length <= 20) {
+            return { notifications: newNotifications };
+          }
           return {
-            notifications: [notification, ...state.notifications].slice(0, 20),
+            notifications: newNotifications.slice(0, 20),
           };
         }),
       markNotificationRead: (notificationId) =>
@@ -205,7 +252,73 @@ export const useChatStore = create<ChatState>()(
             read: true,
           })),
         })),
+      removeNotification: (notificationId) =>
+        set((state) => ({
+          notifications: state.notifications.filter((notification) => notification.id !== notificationId),
+        })),
       clearNotifications: () => set({ notifications: [] }),
+      updateFriendStatus: (update) =>
+        set((state) => {
+          const existing = state.directoryUsers[update.userId] || {
+            isFriend: false,
+            requestSent: false,
+            requestReceived: false,
+            friendsCount: 0,
+          };
+          return {
+            directoryUsers: {
+              ...state.directoryUsers,
+              [update.userId]: {
+                ...existing,
+                isFriend: update.isFriend,
+                requestSent: update.requestSent,
+                requestReceived: update.requestReceived,
+                friendsCount: update.friendsCount ?? existing.friendsCount,
+              },
+            },
+          };
+        }),
+      batchUpdateFriendStatuses: (updates) =>
+        set((state) => {
+          const nextDirectoryUsers = { ...state.directoryUsers };
+          updates.forEach((update) => {
+            const existing = nextDirectoryUsers[update.userId] || {
+              isFriend: false,
+              requestSent: false,
+              requestReceived: false,
+              friendsCount: 0,
+            };
+            nextDirectoryUsers[update.userId] = {
+              ...existing,
+              isFriend: update.isFriend,
+              requestSent: update.requestSent,
+              requestReceived: update.requestReceived,
+              friendsCount: update.friendsCount ?? existing.friendsCount,
+            };
+          });
+          return { directoryUsers: nextDirectoryUsers };
+        }),
+      removeFriendRequest: (userId) =>
+        set((state) => {
+          const existing = state.directoryUsers[userId];
+          if (!existing) return state;
+          return {
+            directoryUsers: {
+              ...state.directoryUsers,
+              [userId]: {
+                ...existing,
+                requestSent: false,
+                requestReceived: false,
+              },
+            },
+          };
+        }),
+      updateNotificationAction: (notificationId, action) =>
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.id === notificationId ? { ...n, action } : n
+          ),
+        })),
     }),
     {
       name: "canvas-chat-ui-state",
@@ -213,6 +326,7 @@ export const useChatStore = create<ChatState>()(
       partialize: (state) => ({
         selectedChatId: state.selectedChatId,
         hasExplicitlyClosedChat: state.hasExplicitlyClosedChat,
+        directoryUsers: state.directoryUsers,
       }),
     }
   )

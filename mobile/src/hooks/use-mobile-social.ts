@@ -13,11 +13,14 @@ import {
   updateMobileProfile,
 } from "@/lib/api/client";
 import { ChatParticipant, MobileProfile } from "@/lib/types";
+import { useNotificationStore } from "@/store/notification-store";
 
 type UseMobileSocialParams = {
   token?: string;
   query?: string;
 };
+
+const pendingRequests = new Set<string>();
 
 export const useMobileSocial = ({ token, query }: UseMobileSocialParams) => {
   const [profile, setProfile] = useState<MobileProfile | null>(null);
@@ -117,31 +120,110 @@ export const useMobileSocial = ({ token, query }: UseMobileSocialParams) => {
 
   const sendRequest = async (userId: string) => {
     if (!token) return;
+
+    const requestKey = `send:${userId}`;
+    if (pendingRequests.has(requestKey)) return;
+    pendingRequests.add(requestKey);
+
+    const previousState = useNotificationStore.getState().directoryUsers[userId];
+    useNotificationStore.getState().updateFriendStatus({
+      userId,
+      isFriend: false,
+      requestSent: true,
+      requestReceived: false,
+    });
+
     try {
       const response = await sendMobileFriendRequest(token, userId);
+      if (!response?.profile) {
+        throw new Error("Invalid server response");
+      }
       patchDirectoryUser(userId, response.profile);
     } catch (requestError) {
+      if (previousState) {
+        useNotificationStore.getState().updateFriendStatus({
+          userId,
+          isFriend: previousState.isFriend,
+          requestSent: previousState.requestSent,
+          requestReceived: previousState.requestReceived,
+          friendsCount: previousState.friendsCount,
+        });
+      } else {
+        useNotificationStore.getState().removeFriendRequest(userId);
+      }
       setError(requestError instanceof Error ? requestError.message : "Failed to send friend request");
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   };
 
   const acceptRequest = async (userId: string) => {
     if (!token) return;
+
+    const requestKey = `accept:${userId}`;
+    if (pendingRequests.has(requestKey)) return;
+    pendingRequests.add(requestKey);
+
+    const previousState = useNotificationStore.getState().directoryUsers[userId];
+    useNotificationStore.getState().updateFriendStatus({
+      userId,
+      isFriend: true,
+      requestSent: false,
+      requestReceived: false,
+      friendsCount: (previousState?.friendsCount ?? 0) + 1,
+    });
+
     try {
       const response = await acceptMobileFriendRequest(token, userId);
+      if (!response?.profile) {
+        throw new Error("Invalid server response");
+      }
       patchDirectoryUser(userId, response.profile);
     } catch (requestError) {
+      if (previousState) {
+        useNotificationStore.getState().updateFriendStatus({
+          userId,
+          isFriend: previousState.isFriend,
+          requestSent: previousState.requestSent,
+          requestReceived: previousState.requestReceived,
+          friendsCount: previousState.friendsCount,
+        });
+      }
       setError(requestError instanceof Error ? requestError.message : "Failed to accept request");
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   };
 
   const rejectRequest = async (userId: string) => {
     if (!token) return;
+
+    const requestKey = `reject:${userId}`;
+    if (pendingRequests.has(requestKey)) return;
+    pendingRequests.add(requestKey);
+
+    const previousState = useNotificationStore.getState().directoryUsers[userId];
+    useNotificationStore.getState().removeFriendRequest(userId);
+
     try {
       const response = await rejectMobileFriendRequest(token, userId);
+      if (!response?.profile) {
+        throw new Error("Invalid server response");
+      }
       patchDirectoryUser(userId, response.profile);
     } catch (requestError) {
+      if (previousState) {
+        useNotificationStore.getState().updateFriendStatus({
+          userId,
+          isFriend: previousState.isFriend,
+          requestSent: previousState.requestSent,
+          requestReceived: previousState.requestReceived,
+          friendsCount: previousState.friendsCount,
+        });
+      }
       setError(requestError instanceof Error ? requestError.message : "Failed to reject request");
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   };
 

@@ -3,6 +3,7 @@ const app = require("./app");
 const env = require("./config/env");
 const logger = require("./utils/logger");
 const { connectDatabase } = require("./config/database");
+const { connectRedis } = require("./config/redis.client");
 const { initializeSocketServer } = require("./modules/socket/socket.server");
 const { initializeRetentionCleanup } = require("./utils/retentionCleanup");
 
@@ -10,8 +11,10 @@ const startServer = async () => {
   await connectDatabase();
   logger.info("MongoDB connected");
 
+  await connectRedis();
+
   const server = http.createServer(app);
-  initializeSocketServer(server);
+  await initializeSocketServer(server);
   initializeRetentionCleanup();
 
   server.listen(env.port, () => {

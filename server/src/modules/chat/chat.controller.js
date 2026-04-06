@@ -1,7 +1,7 @@
 const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess } = require("../../utils/apiResponse");
 const { SOCKET_EVENTS } = require("../socket/socket.constants");
-const { emitToUser } = require("../socket/socket.notifications");
+const { emitToUser, emitToUsers } = require("../socket/socket.notifications");
 const {
   addGroupMembers,
   createGroupInviteLink,
@@ -36,11 +36,12 @@ const broadcastChatUpdate = async ({ participantIds = [], chatId, auditMessage =
 };
 
 const getChats = asyncHandler(async (req, res) => {
-  const chats = await listUserChats(req.user._id.toString());
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+  const offset = parseInt(req.query.offset, 10) || 0;
+  
+  const result = await listUserChats(req.user._id.toString(), { limit, offset });
 
-  return sendSuccess(res, 200, "Chats fetched successfully", {
-    chats,
-  });
+  return sendSuccess(res, 200, "Chats fetched successfully", result);
 });
 
 const getChat = asyncHandler(async (req, res) => {
@@ -60,6 +61,15 @@ const createChat = asyncHandler(async (req, res) => {
         participantIds: req.body.participantIds || [],
       })
     : await createOrGetDirectChat(currentUserId, req.body.participantId);
+
+  // Broadcast to other participants that a chat was created
+  const otherParticipantIds = chat.participants
+    .map(p => p._id ? p._id.toString() : p.toString())
+    .filter(id => id !== currentUserId);
+    
+  if (otherParticipantIds.length > 0) {
+    emitToUsers(otherParticipantIds, SOCKET_EVENTS.CHAT_CREATED, { chat });
+  }
 
   return sendSuccess(res, 201, "Chat ready", {
     chat,
@@ -131,17 +141,43 @@ const patchChatSettings = asyncHandler(async (req, res) => {
 
 const addMembers = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id.toString();
+  const memberIdsToAdd = req.body.memberIds || [];
+  
   const result = await addGroupMembers({
     chatId: req.params.chatId,
     currentUserId,
-    memberIds: req.body.memberIds || [],
+    memberIds: memberIdsToAdd,
   });
 
+  // the service returns participantIds (which includes the existing and newly added members)
+  const existingParticipantIds = result.participantIds.filter(id => !memberIdsToAdd.includes(id));
+  
+  // existing members just get a CHAT_UPDATED + optional message
   await broadcastChatUpdate({
-    participantIds: result.participantIds,
+    participantIds: existingParticipantIds,
     chatId: req.params.chatId,
     auditMessage: result.auditMessage,
   });
+
+  // new members get MEMBER_ADDED_TO_GROUP
+  if (memberIdsToAdd.length > 0) {
+    await Promise.all(
+      memberIdsToAdd.map(async (memberId) => {
+        const chatSummary = await getChatSummary(req.params.chatId, memberId);
+        emitToUser(memberId, SOCKET_EVENTS.MEMBER_ADDED_TO_GROUP, { 
+          chat: chatSummary,
+          addedByUserId: currentUserId,
+          addedByUserName: req.user.name,
+          addedUserId: memberId,
+          chatId: req.params.chatId
+        });
+        // Also send them the audit message as a NEW_MESSAGE so they see the context
+        if (result.auditMessage) {
+          emitToUser(memberId, SOCKET_EVENTS.NEW_MESSAGE, { message: result.auditMessage, chat: chatSummary });
+        }
+      })
+    );
+  }
 
   const chat = await getChatSummary(req.params.chatId, currentUserId);
   return sendSuccess(res, 200, "Members added successfully", { chat });

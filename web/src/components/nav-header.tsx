@@ -35,7 +35,12 @@ export const NavHeader = ({
   const notifications = useChatStore((state) => state.notifications);
   const markNotificationRead = useChatStore((state) => state.markNotificationRead);
   const markNotificationsRead = useChatStore((state) => state.markNotificationsRead);
+  const removeNotification = useChatStore((state) => state.removeNotification);
+  const clearNotifications = useChatStore((state) => state.clearNotifications);
   const selectChat = useChatStore((state) => state.selectChat);
+  const updateNotificationAction = useChatStore((state) => state.updateNotificationAction);
+  const updateFriendStatus = useChatStore((state) => state.updateFriendStatus);
+  const removeFriendRequest = useChatStore((state) => state.removeFriendRequest);
 
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [notificationToneEnabled, setNotificationToneEnabled] = useLocalStorageBoolean("notificationToneEnabled", true);
@@ -64,23 +69,82 @@ export const NavHeader = ({
     else logout();
   };
 
+  const pendingRequestsRef = useRef<Set<string>>(new Set());
+
   const handleAcceptFriendRequest = async (userId: string, notificationId: string) => {
     if (!session?.backendAccessToken) return;
+    
+    const requestKey = `accept:${userId}:${notificationId}`;
+    if (pendingRequestsRef.current.has(requestKey)) return;
+    pendingRequestsRef.current.add(requestKey);
+
+    const notification = useChatStore.getState().notifications.find(n => n.id === notificationId);
+    const previousAction = notification?.action;
+    const previousStatus = useChatStore.getState().directoryUsers[userId];
+
+    updateNotificationAction(notificationId, "accepted");
+    updateFriendStatus({
+      userId,
+      isFriend: true,
+      requestSent: false,
+      requestReceived: false,
+    });
+    
     try {
       await acceptFriendRequest(session.backendAccessToken, userId);
       markNotificationRead(notificationId);
     } catch (err) {
-      console.error(err);
+      if (previousAction === "accepted" || previousAction === "rejected") {
+        updateNotificationAction(notificationId, previousAction);
+      }
+      if (previousStatus) {
+        updateFriendStatus({
+          userId,
+          isFriend: previousStatus.isFriend,
+          requestSent: previousStatus.requestSent,
+          requestReceived: previousStatus.requestReceived,
+          friendsCount: previousStatus.friendsCount,
+        });
+      }
+      console.error("Failed to accept friend request:", err);
+    } finally {
+      pendingRequestsRef.current.delete(requestKey);
     }
   };
 
   const handleRejectFriendRequest = async (userId: string, notificationId: string) => {
     if (!session?.backendAccessToken) return;
+    
+    const requestKey = `reject:${userId}:${notificationId}`;
+    if (pendingRequestsRef.current.has(requestKey)) return;
+    pendingRequestsRef.current.add(requestKey);
+
+    const notification = useChatStore.getState().notifications.find(n => n.id === notificationId);
+    const previousAction = notification?.action;
+    const previousStatus = useChatStore.getState().directoryUsers[userId];
+
+    updateNotificationAction(notificationId, "rejected");
+    removeFriendRequest(userId);
+    
     try {
       await rejectFriendRequest(session.backendAccessToken, userId);
       markNotificationRead(notificationId);
     } catch (err) {
-      console.error(err);
+      if (previousAction === "accepted" || previousAction === "rejected") {
+        updateNotificationAction(notificationId, previousAction);
+      }
+      if (previousStatus) {
+        updateFriendStatus({
+          userId,
+          isFriend: previousStatus.isFriend,
+          requestSent: previousStatus.requestSent,
+          requestReceived: previousStatus.requestReceived,
+          friendsCount: previousStatus.friendsCount,
+        });
+      }
+      console.error("Failed to reject friend request:", err);
+    } finally {
+      pendingRequestsRef.current.delete(requestKey);
     }
   };
 
@@ -178,6 +242,11 @@ export const NavHeader = ({
             }}
             onMarkAllRead={markNotificationsRead}
             onMarkRead={markNotificationRead}
+            onDelete={removeNotification}
+            onClear={() => {
+              clearNotifications();
+              setIsNotificationPanelOpen(false);
+            }}
             onAcceptFriendRequest={handleAcceptFriendRequest}
             onRejectFriendRequest={handleRejectFriendRequest}
             notificationToneEnabled={notificationToneEnabled}

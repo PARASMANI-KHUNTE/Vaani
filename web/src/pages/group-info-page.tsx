@@ -128,21 +128,29 @@ export const GroupInfoPage = () => {
   }, [chat, showEditGroup]);
 
   const copyInviteLink = async () => {
-    const inviteUrl = `${window.location.origin}/?chat=${chatId}`;
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!session?.backendAccessToken || !chat) return;
+    try {
+      const response = await createGroupInviteLink(session.backendAccessToken, chatId, {
+        expiresInHours: 24,
+      });
+      const inviteUrl = `${window.location.origin}/groups/join/${response.invite.token}`;
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate invite link");
+    }
   };
 
   const generateNewInviteLink = async () => {
     if (!session?.backendAccessToken || !chat) return;
     setShowInviteOptions(false);
     try {
-      await createGroupInviteLink(session.backendAccessToken, chatId, {
+      const response = await createGroupInviteLink(session.backendAccessToken, chatId, {
         expiresInHours: inviteExpiresInHours,
         maxUses: inviteMaxUses,
       });
-      const inviteUrl = `${window.location.origin}/?chat=${chatId}`;
+      const inviteUrl = `${window.location.origin}/groups/join/${response.invite.token}`;
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -817,7 +825,7 @@ export const GroupInfoPage = () => {
                   <option value={168}>7 days</option>
                   <option value={720}>30 days</option>
                   <option value={8760}>1 year</option>
-                  <option value={87600}>Never expires</option>
+                  <option value={87600}>10 years</option>
                 </select>
               </div>
               
@@ -837,6 +845,9 @@ export const GroupInfoPage = () => {
                   <option value={25}>25 uses</option>
                   <option value={50}>50 uses</option>
                   <option value={100}>100 uses</option>
+                  <option value={200}>200 uses</option>
+                  <option value={300}>300 uses</option>
+                  <option value={500}>500 uses</option>
                 </select>
               </div>
             </div>

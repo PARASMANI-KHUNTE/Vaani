@@ -26,6 +26,8 @@ type ExplorePanelProps = {
   onQueryChange: (value: string) => void;
   onStartChat: (userId: string) => void;
   onSendRequest: (user: BackendUser) => void;
+  onAcceptRequest: (user: BackendUser) => void;
+  onRejectRequest?: (user: BackendUser) => void;
   onUnfriend: (user: BackendUser) => void;
   onToggleBlock: (user: BackendUser) => void;
   onOpenProfile: (user: BackendUser) => void;
@@ -43,6 +45,7 @@ export const ExplorePanel = ({
   onQueryChange,
   onStartChat,
   onSendRequest,
+  onAcceptRequest,
   onUnfriend,
   onToggleBlock,
   onOpenProfile,
@@ -185,7 +188,7 @@ export const ExplorePanel = ({
           </button>
         ) : user.requestReceived ? (
           <button
-            onClick={(e) => { e.stopPropagation(); onSendRequest(user); }}
+            onClick={(e) => { e.stopPropagation(); onAcceptRequest(user); }}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 active:scale-95"
           >
             <UserCheck className="h-4 w-4" />

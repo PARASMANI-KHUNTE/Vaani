@@ -30,6 +30,8 @@ export const ExplorePage = () => {
     clearError: clearSocialError,
     isLoadingDirectory,
     sendRequest,
+    acceptRequest,
+    rejectRequest,
     unfriend,
     toggleBlock,
   } = useSocialData({
@@ -64,6 +66,8 @@ export const ExplorePage = () => {
             navigate("/");
           }}
           onSendRequest={(user) => void sendRequest(user)}
+          onAcceptRequest={(user) => void acceptRequest(user)}
+          onRejectRequest={(user) => void rejectRequest(user)}
           onUnfriend={(user) => void unfriend(user)}
           onToggleBlock={(user) => void toggleBlock(user)}
           onOpenProfile={(user) => {

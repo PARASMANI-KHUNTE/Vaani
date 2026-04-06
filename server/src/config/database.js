@@ -2,11 +2,27 @@ const mongoose = require("mongoose");
 const env = require("./env");
 
 const connectDatabase = async () => {
-  await mongoose.connect(env.mongodbUri, {
+  const options = {
     autoIndex: env.nodeEnv !== "production",
-  });
+  };
+
+  await mongoose.connect(env.mongodbUri, options);
 
   return mongoose.connection;
 };
 
-module.exports = { connectDatabase };
+const getConnection = () => mongoose.connection;
+
+const startSession = () => mongoose.startSession();
+
+const isTransactionSupported = () => {
+  const state = mongoose.connection.readyState;
+  return state === 1;
+};
+
+module.exports = {
+  connectDatabase,
+  getConnection,
+  startSession,
+  isTransactionSupported,
+};

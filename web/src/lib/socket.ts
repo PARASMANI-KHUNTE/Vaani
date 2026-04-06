@@ -12,6 +12,7 @@ export const socketEvents = {
   messageDelivered: "MESSAGE_DELIVERED",
   messageSeen: "MESSAGE_SEEN",
   messageDeleted: "MESSAGE_DELETED",
+  messageEdited: "MESSAGE_EDITED",
   chatUpdated: "CHAT_UPDATED",
   chatRemoved: "CHAT_REMOVED",
   chatCreated: "CHAT_CREATED",

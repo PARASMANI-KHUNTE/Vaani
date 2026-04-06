@@ -1,13 +1,35 @@
 const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess } = require("../../utils/apiResponse");
 const ApiError = require("../../utils/apiError");
-const { loginWithGoogleProfile } = require("./auth.service");
+const { loginWithGoogleProfile, refreshAccessToken, revokeRefreshToken } = require("./auth.service");
 const { issueMobileAuthCode, redeemMobileAuthCode } = require("./mobileAuthCodeStore");
 
 const login = asyncHandler(async (req, res) => {
   const session = await loginWithGoogleProfile(req.body.idToken);
 
   return sendSuccess(res, 200, "Login successful", session);
+});
+
+const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    throw new ApiError(400, "Refresh token is required");
+  }
+
+  const result = await refreshAccessToken(refreshToken);
+
+  return sendSuccess(res, 200, "Token refreshed successfully", result);
+});
+
+const logout = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (refreshToken) {
+    await revokeRefreshToken(refreshToken);
+  }
+
+  return sendSuccess(res, 200, "Logged out successfully");
 });
 
 const me = asyncHandler(async (req, res) => {
@@ -43,6 +65,8 @@ const redeemMobileCode = asyncHandler(async (req, res) => {
 
 module.exports = {
   login,
+  refreshToken,
+  logout,
   me,
   issueMobileCode,
   redeemMobileCode,

@@ -54,6 +54,10 @@ const env = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || "",
     folder: process.env.CLOUDINARY_FOLDER || "canvas-chat",
   },
+  redis: {
+    url: process.env.REDIS_URL || "redis://localhost:6379",
+    enabled: process.env.REDIS_ENABLED === "true",
+  },
   retention: {
     messageDays: Number(process.env.MESSAGE_RETENTION_DAYS || 90),
     chatDays: Number(process.env.CHAT_RETENTION_DAYS || 120),

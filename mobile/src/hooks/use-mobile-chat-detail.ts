@@ -59,7 +59,7 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     const socket = getMobileSocket(token);
     socket.emit(mobileSocketEvents.joinChat, { chatId: chat._id });
 
-    const handleNewMessage = ({ message, chat: nextChat }: { message: MobileMessage; chat: MobileChat }) => {
+    const handleNewMessage = ({ message, chat: nextChat, clientTempId }: { message: MobileMessage; chat: MobileChat; clientTempId?: string }) => {
       if (nextChat._id !== chat._id) {
         return;
       }
@@ -67,6 +67,10 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
       setMessages((current) => {
         if (current.some((entry) => entry._id === message._id)) {
           return current;
+        }
+
+        if (clientTempId && current.some((entry) => entry._id === clientTempId)) {
+          return current.map((entry) => (entry._id === clientTempId ? message : entry));
         }
 
         return [...current, message];
@@ -197,29 +201,37 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
 
     setMessages((current) => [...current, optimisticMessage]);
 
-    try {
-      setIsSending(true);
+    setIsSending(true);
+
+    const socketAckPromise = new Promise<void>((resolve, reject) => {
       const socket = getMobileSocket(token);
-      
-      return new Promise<void>((resolve) => {
-        socket.emit(
-          mobileSocketEvents.sendMessage,
-          {
-            chatId: chat._id,
-            content: content.trim(),
-            type: "text",
-            replyToId: replyToId || null,
-            clientTempId: tempId,
-          },
-          (acknowledgement: { ok: boolean; error?: string }) => {
-            if (!acknowledgement?.ok) {
-              throw new Error(acknowledgement.error || "Failed to send message");
-            }
-            resolve();
+      const timeout = setTimeout(() => {
+        reject(new Error("Socket acknowledgement timed out"));
+      }, 10000);
+
+      socket.emit(
+        mobileSocketEvents.sendMessage,
+        {
+          chatId: chat._id,
+          content: content.trim(),
+          type: "text",
+          replyToId: replyToId || null,
+          clientTempId: tempId,
+        },
+        (acknowledgement: { ok: boolean; error?: string }) => {
+          clearTimeout(timeout);
+          if (!acknowledgement?.ok) {
+            reject(new Error(acknowledgement?.error || "Failed to send message"));
+            return;
           }
-        );
-      });
-    } catch {
+          resolve();
+        }
+      );
+    });
+
+    try {
+      await socketAckPromise;
+    } catch (socketError) {
       try {
         const response = await postMobileMessage(token, {
           chatId: chat._id,
@@ -236,9 +248,9 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
       } catch (fallbackError) {
         setMessages((current) => current.filter((msg) => msg._id !== tempId));
         setError(fallbackError instanceof Error ? fallbackError.message : "Failed to send message");
-      } finally {
-        setIsSending(false);
       }
+    } finally {
+      setIsSending(false);
     }
   };
 

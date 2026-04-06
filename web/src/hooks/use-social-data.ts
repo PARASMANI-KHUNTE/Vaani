@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   acceptFriendRequest,
   blockUser,
@@ -17,6 +17,7 @@ import {
   updateMyProfile,
 } from "@/lib/api";
 import { BackendUser, UserProfile } from "@/lib/types";
+import { useChatStore } from "@/store/chat-store";
 
 type UseSocialDataParams = {
   token?: string;
@@ -29,6 +30,9 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingRequestsRef = useRef(new Set<string>());
+  const storeRef = useRef<ReturnType<typeof useChatStore.getState> | null>(null);
+  storeRef.current = useChatStore.getState();
 
   useEffect(() => {
     if (!token) {
@@ -148,11 +152,44 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
       return;
     }
 
+    const requestKey = `send:${user._id}`;
+    if (pendingRequestsRef.current.has(requestKey)) {
+      return;
+    }
+    pendingRequestsRef.current.add(requestKey);
+
+    const store = storeRef.current;
+    const previousState = store?.directoryUsers[user._id];
+
+    store?.updateFriendStatus({
+      userId: user._id,
+      isFriend: false,
+      requestSent: true,
+      requestReceived: false,
+    });
+
     try {
       const response = await sendFriendRequest(token, user._id);
+      if (!response?.profile) {
+        throw new Error("Invalid server response");
+      }
       patchDirectoryUser(user._id, response.profile);
     } catch (requestError) {
+      const currentStore = storeRef.current;
+      if (previousState) {
+        currentStore?.updateFriendStatus({
+          userId: user._id,
+          isFriend: previousState.isFriend,
+          requestSent: previousState.requestSent,
+          requestReceived: previousState.requestReceived,
+          friendsCount: previousState.friendsCount,
+        });
+      } else {
+        currentStore?.removeFriendRequest(user._id);
+      }
       setError(requestError instanceof Error ? requestError.message : "Failed to send request");
+    } finally {
+      pendingRequestsRef.current.delete(requestKey);
     }
   };
 
@@ -165,12 +202,44 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
       return;
     }
 
+    const requestKey = `accept:${userId}`;
+    if (pendingRequestsRef.current.has(requestKey)) {
+      return;
+    }
+    pendingRequestsRef.current.add(requestKey);
+
+    const store = storeRef.current;
+    const previousState = store?.directoryUsers[userId];
+
+    store?.updateFriendStatus({
+      userId,
+      isFriend: true,
+      requestSent: false,
+      requestReceived: false,
+      friendsCount: (previousState?.friendsCount ?? 0) + 1,
+    });
+
     try {
       const response = await acceptFriendRequest(token, userId);
+      if (!response?.profile) {
+        throw new Error("Invalid server response");
+      }
       patchRelationship(userId, response.profile);
       return response.profile;
     } catch (requestError) {
+      const currentStore = storeRef.current;
+      if (previousState) {
+        currentStore?.updateFriendStatus({
+          userId,
+          isFriend: previousState.isFriend,
+          requestSent: previousState.requestSent,
+          requestReceived: previousState.requestReceived,
+          friendsCount: previousState.friendsCount,
+        });
+      }
       setError(requestError instanceof Error ? requestError.message : "Failed to accept request");
+    } finally {
+      pendingRequestsRef.current.delete(requestKey);
     }
   };
 
@@ -183,12 +252,38 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
       return;
     }
 
+    const requestKey = `reject:${userId}`;
+    if (pendingRequestsRef.current.has(requestKey)) {
+      return;
+    }
+    pendingRequestsRef.current.add(requestKey);
+
+    const store = storeRef.current;
+    const previousState = store?.directoryUsers[userId];
+
+    store?.removeFriendRequest(userId);
+
     try {
       const response = await rejectFriendRequest(token, userId);
+      if (!response?.profile) {
+        throw new Error("Invalid server response");
+      }
       patchRelationship(userId, response.profile);
       return response.profile;
     } catch (requestError) {
+      const currentStore = storeRef.current;
+      if (previousState) {
+        currentStore?.updateFriendStatus({
+          userId,
+          isFriend: previousState.isFriend,
+          requestSent: previousState.requestSent,
+          requestReceived: previousState.requestReceived,
+          friendsCount: previousState.friendsCount,
+        });
+      }
       setError(requestError instanceof Error ? requestError.message : "Failed to reject request");
+    } finally {
+      pendingRequestsRef.current.delete(requestKey);
     }
   };
 

@@ -86,7 +86,7 @@ const forwardMessage = async ({ messageId, chatId, currentUserId, targetChatId }
     type: message.type,
     media: message.media,
     replyTo: null,
-    status: "sent",
+    receipts: [],
     deletedForEveryone: false,
     deletedFor: [],
   });
@@ -140,7 +140,7 @@ const createMessage = async ({ chatId, senderId, content, type = "text", replyTo
     content: safeContent,
     type,
     media: normalizedMedia,
-    status: "sent",
+    receipts: [],
     deletedForEveryone: false,
     deletedFor: [],
   });
@@ -153,9 +153,6 @@ const createMessage = async ({ chatId, senderId, content, type = "text", replyTo
         "userStates.$[senderState].clearedAt": null,
         "userStates.$[senderState].manualUnread": false,
         "userStates.$[senderState].hidden": false,
-        // Do NOT reset clearedAt for receivers — if they previously deleted
-        // the chat, old messages must stay permanently gone. Only this new
-        // message (which is after their clearedAt) will be visible to them.
         "userStates.$[receiverState].manualUnread": true,
         "userStates.$[receiverState].hidden": false,
       },
@@ -168,12 +165,19 @@ const createMessage = async ({ chatId, senderId, content, type = "text", replyTo
     }
   );
 
-  return Message.findById(message._id)
+  const populatedMessage = await Message.findById(message._id)
     .populate(basePopulate)
     .lean();
+
+  const participantIds = chat.participants.map((p) => p.toString());
+
+  return {
+    message: populatedMessage,
+    participantIds,
+  };
 };
 
-const getMessagesByChat = async ({ chatId, userId, page = 1, limit = 20 }) => {
+const getMessagesByChat = async ({ chatId, userId, page = 1, limit = 20, cursor = null }) => {
   const chat = await ensureChatMember(chatId, userId);
   const currentUserState = getChatUserState(chat, userId);
   const visibilityFilter = {
@@ -196,18 +200,46 @@ const getMessagesByChat = async ({ chatId, userId, page = 1, limit = 20 }) => {
   const safeLimit = Number(limit);
   const skip = (safePage - 1) * safeLimit;
 
-  const [messages, total] = await Promise.all([
-    Message.find({ chatId, ...visibilityFilter })
+  const baseQuery = { chatId, ...visibilityFilter };
+  
+  let messages;
+  if (cursor) {
+    messages = await Message.find({
+      ...baseQuery,
+      _id: { $lt: cursor },
+    })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .populate(basePopulate)
+      .lean();
+    
+    const total = await Message.countDocuments(baseQuery);
+    const hasMore = messages.length === safeLimit;
+    
+    return {
+      messages: messages.reverse(),
+      deliveredCount,
+      pagination: {
+        cursor: messages[0]?._id.toString() || null,
+        limit: safeLimit,
+        total,
+        hasNextPage: hasMore,
+      },
+    };
+  }
+
+  const [messagesList, total] = await Promise.all([
+    Message.find(baseQuery)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(safeLimit)
       .populate(basePopulate)
       .lean(),
-    Message.countDocuments({ chatId, ...visibilityFilter }),
+    Message.countDocuments(baseQuery),
   ]);
 
   return {
-    messages: messages.reverse(),
+    messages: messagesList.reverse(),
     deliveredCount,
     pagination: {
       page: safePage,
@@ -220,16 +252,19 @@ const getMessagesByChat = async ({ chatId, userId, page = 1, limit = 20 }) => {
 };
 
 const markMessagesAsDelivered = async ({ chatId, currentUserId }) => {
+  const now = new Date();
   const result = await Message.updateMany(
     {
       chatId,
       senderId: { $ne: currentUserId },
-      status: "sent",
+      "receipts.userId": { $ne: currentUserId },
     },
     {
-      $set: {
-        status: "delivered",
-        deliveredAt: new Date(),
+      $push: {
+        receipts: {
+          userId: currentUserId,
+          deliveredAt: now,
+        },
       },
     }
   );
@@ -237,13 +272,19 @@ const markMessagesAsDelivered = async ({ chatId, currentUserId }) => {
   return result.modifiedCount;
 };
 
-const markMessageAsDelivered = async ({ messageId }) => {
-  return Message.findByIdAndUpdate(
-    messageId,
+const markMessageAsDelivered = async ({ messageId, userId }) => {
+  const now = new Date();
+  const message = await Message.findOneAndUpdate(
     {
-      $set: {
-        status: "delivered",
-        deliveredAt: new Date(),
+      _id: messageId,
+      "receipts.userId": { $ne: userId },
+    },
+    {
+      $push: {
+        receipts: {
+          userId,
+          deliveredAt: now,
+        },
       },
     },
     {
@@ -252,21 +293,27 @@ const markMessageAsDelivered = async ({ messageId }) => {
   )
     .populate(basePopulate)
     .lean();
+  
+  return message;
 };
 
 const markMessagesAsSeen = async ({ chatId, currentUserId }) => {
   await ensureChatMember(chatId, currentUserId);
+  const now = new Date();
 
   const result = await Message.updateMany(
     {
       chatId,
       senderId: { $ne: currentUserId },
-      status: { $in: ["sent", "delivered"] },
+      "receipts.userId": { $ne: currentUserId },
     },
     {
-      $set: {
-        status: "seen",
-        seenAt: new Date(),
+      $push: {
+        receipts: {
+          userId: currentUserId,
+          deliveredAt: now,
+          seenAt: now,
+        },
       },
     }
   );
@@ -289,7 +336,7 @@ const deleteMessage = async ({ messageId, currentUserId, scope }) => {
     }
 
     if (message.media?.publicId) {
-      await destroyMediaAsset(message.media);
+      await destroyMediaAsset(message.media, message.chatId.toString());
     }
 
     const updatedMessage = await Message.findByIdAndUpdate(
@@ -402,6 +449,8 @@ module.exports = {
   createSignedMediaUpload,
   createMessage,
   deleteMessage,
+  editMessage,
+  forwardMessage,
   getMessagesByChat,
   markMessageAsDelivered,
   markMessagesAsDelivered,

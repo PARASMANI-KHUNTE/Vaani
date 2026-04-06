@@ -116,5 +116,12 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ tagline: "text", name: "text", email: "text", username: "text" });
+userSchema.index({ friends: 1 });
+userSchema.index({ friends: 1, accountStatus: 1 });
+userSchema.index({ sentFriendRequests: 1 });
+userSchema.index({ receivedFriendRequests: 1 });
+userSchema.index({ blockedUsers: 1 });
+userSchema.index({ accountStatus: 1 });
+userSchema.index({ lastSeen: -1 });
 
 module.exports = mongoose.model("User", userSchema);

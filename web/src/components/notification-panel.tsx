@@ -3,7 +3,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, BellOff, Check, MessageCircle, Smile, UserPlus, Volume2, VolumeX, Settings } from "lucide-react";
+import { Bell, BellOff, Check, MessageCircle, Smile, Trash2, UserPlus, Volume2, VolumeX, Settings, X } from "lucide-react";
 import { NotificationItem } from "@/lib/types";
 import { cn, formatConversationDate } from "@/lib/utils";
 
@@ -14,6 +14,8 @@ type NotificationPanelProps = {
   onOpenChat: (chatId?: string, notificationId?: string) => void;
   onMarkAllRead: () => void;
   onMarkRead: (notificationId: string) => void;
+  onDelete: (notificationId: string) => void;
+  onClear: () => void;
   onAcceptFriendRequest?: (userId: string, notificationId: string) => Promise<void> | void;
   onRejectFriendRequest?: (userId: string, notificationId: string) => Promise<void> | void;
   notificationToneEnabled?: boolean;
@@ -51,12 +53,15 @@ export const NotificationPanel = ({
   onOpenChat,
   onMarkAllRead,
   onMarkRead,
+  onDelete,
+  onClear,
   onAcceptFriendRequest,
   onRejectFriendRequest,
   notificationToneEnabled = true,
   onNotificationToneChange,
 }: NotificationPanelProps) => {
   const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const hasNotifications = notifications.length > 0;
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -274,10 +279,23 @@ export const NotificationPanel = ({
 
           <div className="flex-1 overflow-y-auto p-3" role="list" aria-label="Notification list">
             {filtered.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-12 text-center dark:border-slate-800 dark:bg-slate-900/40">
-                <Bell className="mx-auto mb-3 h-8 w-8 text-slate-300 dark:text-slate-600" />
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">You're all caught up 🎉</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">New notifications will show up here.</p>
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-12 text-center dark:border-slate-800 dark:bg-slate-900/40">
+                  <Bell className="mx-auto mb-3 h-8 w-8 text-slate-300 dark:text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">You're all caught up 🎉</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">New notifications will show up here.</p>
+                </div>
+                {hasNotifications ? (
+                  <button
+                    type="button"
+                    onClick={onClear}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:border-slate-800 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                    aria-label="Clear notifications"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Clear notifications
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-3">
@@ -376,11 +394,48 @@ export const NotificationPanel = ({
                                       Decline
                                     </button>
                                   </div>
+                                ) : notification.kind === "friend_request" &&
+                                  (notification.action === "accepted" || notification.action === "rejected") ? (
+                                  <div className="mt-3">
+                                    <span className={cn(
+                                      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                                      notification.action === "accepted"
+                                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                    )}>
+                                      {notification.action === "accepted" ? (
+                                        <>
+                                          <Check className="h-3 w-3" />
+                                          You accepted
+                                        </>
+                                      ) : (
+                                        <>
+                                          <X className="h-3 w-3" />
+                                          You declined
+                                        </>
+                                      )}
+                                    </span>
+                                  </div>
                                 ) : null}
                               </div>
-                              {!notification.read ? (
-                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-600" aria-label="Unread" />
-                              ) : null}
+                              <div className="flex shrink-0 flex-col items-end gap-2">
+                                {!notification.read ? (
+                                  <span className="mt-1.5 h-2 w-2 rounded-full bg-blue-600" aria-label="Unread" />
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onDelete(notification.id);
+                                  }}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+                                  aria-label="Delete notification"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </div>
                             </motion.div>
                           ))}
                         </AnimatePresence>
@@ -388,6 +443,16 @@ export const NotificationPanel = ({
                     </div>
                   ) : null
                 )}
+
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:border-slate-800 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                  aria-label="Clear notifications"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Clear notifications
+                </button>
               </div>
             )}
           </div>
