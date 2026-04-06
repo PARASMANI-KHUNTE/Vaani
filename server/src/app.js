@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
 const env = require("./config/env");
 const { sendSuccess } = require("./utils/apiResponse");
 const ApiError = require("./utils/apiError");
@@ -44,10 +45,18 @@ app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/monitoring", (_req, res) => {
+  return res
+    .status(200)
+    .type("html")
+    .sendFile(path.join(__dirname, "public", "monitoring.html"));
+});
 const getHealthSnapshot = () => {
   const mongoState = getConnection()?.readyState ?? 0;
   const mongoConnected = mongoState === 1;
   const redisEnabled = Boolean(env.redis.enabled);
+  const isUpstash = Boolean(env.redis.upstashUrl);
+  const isLocal = env.redis.useLocal && Boolean(env.redis.url);
 
   return {
     timestamp: new Date().toISOString(),
@@ -60,8 +69,8 @@ const getHealthSnapshot = () => {
     redis: {
       enabled: redisEnabled,
       connected: redisEnabled ? isRedisConnected() : false,
-      mode: env.redis.useLocal ? "local" : env.redis.upstashUrl ? "upstash" : "disabled",
-      url: env.redis.url,
+      mode: isUpstash ? "upstash" : isLocal ? "local" : "disabled",
+      url: isUpstash ? env.redis.upstashUrl : isLocal ? env.redis.url : null,
     },
   };
 };
