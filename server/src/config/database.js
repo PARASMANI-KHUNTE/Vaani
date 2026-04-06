@@ -15,6 +15,12 @@ const getConnection = () => mongoose.connection;
 
 const startSession = () => mongoose.startSession();
 
+const disconnectDatabase = async () => {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+};
+
 const isTransactionSupported = () => {
   const state = mongoose.connection.readyState;
   return state === 1;
@@ -22,6 +28,7 @@ const isTransactionSupported = () => {
 
 module.exports = {
   connectDatabase,
+  disconnectDatabase,
   getConnection,
   startSession,
   isTransactionSupported,

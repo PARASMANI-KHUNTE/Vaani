@@ -70,17 +70,55 @@ const getRedisClient = () => {
     // NOTE: Upstash REST client only implements commands currently used by message deduplication.
     // Presence features (sets/keys/exists) require a full Redis protocol client.
     return {
-      async get(key) {
-        try {
-          const response = await fetch(`${env.redis.upstashUrl}/get/${encodeURIComponent(key)}`, {
-            headers: { Authorization: `Bearer ${env.redis.upstashToken}` },
-          });
+      async request(command, ...args) {
+        const lower = String(command).toLowerCase();
+        const upper = String(command).toUpperCase();
+        const encodedArgs = args.map((arg) => encodeURIComponent(String(arg)));
+        const headers = { Authorization: `Bearer ${env.redis.upstashToken}` };
+
+        const tryPath = async () => {
+          const url = `${env.redis.upstashUrl}/${lower}/${encodedArgs.join("/")}`;
+          const response = await fetch(url, { headers });
+          if (!response.ok) {
+            return null;
+          }
           const data = await response.json();
-          return data.result || null;
+          return data.result;
+        };
+
+        const tryCommand = async () => {
+          const url = `${env.redis.upstashUrl}/command`;
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ command: [upper, ...args.map((arg) => String(arg))] }),
+          });
+          if (!response.ok) {
+            return null;
+          }
+          const data = await response.json();
+          return data.result;
+        };
+
+        try {
+          const result = await tryPath();
+          if (result !== null && result !== undefined) {
+            return result;
+          }
+          const fallback = await tryCommand();
+          return fallback;
         } catch (error) {
-          logger.error("Redis GET error", { error: error.message });
+          logger.error(`Redis ${upper} error`, { error: error.message });
           return null;
         }
+      },
+
+      async get(key) {
+        const result = await this.request("get", key);
+        return result || null;
       },
 
       async set(key, value, options = {}) {
@@ -109,16 +147,28 @@ const getRedisClient = () => {
       },
 
       async del(key) {
-        try {
-          const response = await fetch(`${env.redis.upstashUrl}/del/${encodeURIComponent(key)}`, {
-            headers: { Authorization: `Bearer ${env.redis.upstashToken}` },
-          });
-          const data = await response.json();
-          return data.result;
-        } catch (error) {
-          logger.error("Redis DEL error", { error: error.message });
-          return 0;
-        }
+        const result = await this.request("del", key);
+        return typeof result === "number" ? result : 0;
+      },
+
+      async exists(key) {
+        const result = await this.request("exists", key);
+        return typeof result === "number" ? result : 0;
+      },
+
+      async expire(key, seconds) {
+        const result = await this.request("expire", key, seconds);
+        return typeof result === "number" ? result : 0;
+      },
+
+      async sAdd(key, member) {
+        const result = await this.request("sadd", key, member);
+        return typeof result === "number" ? result : 0;
+      },
+
+      async sRem(key, member) {
+        const result = await this.request("srem", key, member);
+        return typeof result === "number" ? result : 0;
       },
 
       duplicate() {
@@ -138,7 +188,6 @@ const getRedisClient = () => {
       },
     };
   }
-
   return redisClient;
 };
 
