@@ -1,10 +1,10 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LinkUp � Monitoring</title>
+  <title>LinkUp - Monitoring</title>
   <meta name="description" content="Health and readiness dashboard for canvas-chat." />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -61,7 +61,7 @@
           <div class="flex items-center justify-between gap-4">
             <div>
               <h2 class="text-base font-semibold">Snapshot</h2>
-              <p class="mt-1 text-xs text-slate-300" id="subtitle">Fetching�</p>
+              <p class="mt-1 text-xs text-slate-300" id="subtitle">Fetching—</p>
             </div>
             <div class="flex items-center gap-2">
               <span id="badgeEnv"
@@ -75,27 +75,27 @@
             <div class="rounded-xl bg-slate-950/40 p-4 ring-1 ring-white/10">
               <div class="flex items-center justify-between">
                 <p class="text-xs text-slate-300">MongoDB</p>
-                <span id="mongoPill" class="rounded-full px-2 py-0.5 text-xs ring-1">�</span>
+                <span id="mongoPill" class="rounded-full px-2 py-0.5 text-xs ring-1">—</span>
               </div>
-              <p class="mt-2 text-lg font-semibold" id="mongoState">�</p>
-              <p class="mt-1 text-xs text-slate-400" id="mongoDetail">readyState: �</p>
+              <p class="mt-2 text-lg font-semibold" id="mongoState">—</p>
+              <p class="mt-1 text-xs text-slate-400" id="mongoDetail">readyState: —</p>
             </div>
 
             <div class="rounded-xl bg-slate-950/40 p-4 ring-1 ring-white/10">
               <div class="flex items-center justify-between">
                 <p class="text-xs text-slate-300">Redis</p>
-                <span id="redisPill" class="rounded-full px-2 py-0.5 text-xs ring-1">�</span>
+                <span id="redisPill" class="rounded-full px-2 py-0.5 text-xs ring-1">—</span>
               </div>
-              <p class="mt-2 text-lg font-semibold" id="redisMode">�</p>
-              <p class="mt-1 text-xs text-slate-400" id="redisDetail">enabled: �</p>
+              <p class="mt-2 text-lg font-semibold" id="redisMode">—</p>
+              <p class="mt-1 text-xs text-slate-400" id="redisDetail">enabled: —</p>
             </div>
 
             <div class="rounded-xl bg-slate-950/40 p-4 ring-1 ring-white/10">
               <div class="flex items-center justify-between">
                 <p class="text-xs text-slate-300">Readiness</p>
-                <span id="readyPill" class="rounded-full px-2 py-0.5 text-xs ring-1">�</span>
+                <span id="readyPill" class="rounded-full px-2 py-0.5 text-xs ring-1">—</span>
               </div>
-              <p class="mt-2 text-lg font-semibold" id="readyState">�</p>
+              <p class="mt-2 text-lg font-semibold" id="readyState">—</p>
               <p class="mt-1 text-xs text-slate-400">/readyz</p>
             </div>
           </div>
@@ -183,7 +183,7 @@
     </section>
 
     <footer class="mt-10 text-center text-xs text-slate-500">
-      <p>canvas-chat � monitoring</p>
+      <p>canvas-chat - monitoring</p>
     </footer>
   </main>
 
@@ -257,7 +257,7 @@
     };
 
     const refresh = async () => {
-      subtitle.textContent = "Fetching�";
+      subtitle.textContent = "Fetching—";
       setDot(false);
 
       try {
@@ -272,12 +272,12 @@
         const mongoOk = Boolean(data.mongo?.connected);
         pill(mongoPill, mongoOk, mongoOk ? "connected" : "down");
         mongoState.textContent = mongoOk ? "Online" : "Offline";
-        mongoDetail.textContent = `readyState: ${data.mongo?.readyState ?? "�"}`;
+        mongoDetail.textContent = `readyState: ${data.mongo?.readyState ?? "—"}`;
 
         const redisEnabled = Boolean(data.redis?.enabled);
         const redisOk = redisEnabled ? Boolean(data.redis?.connected) : true;
         pill(redisPill, redisOk, redisEnabled ? (redisOk ? "connected" : "down") : "disabled");
-        redisMode.textContent = data.redis?.mode || "�";
+        redisMode.textContent = data.redis?.mode || "—";
         redisDetail.textContent = `enabled: ${redisEnabled ? "true" : "false"}`;
 
         const readyOk = Boolean(ready.json?.success);

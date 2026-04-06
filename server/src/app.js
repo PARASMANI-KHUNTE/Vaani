@@ -40,16 +40,30 @@ app.use((req, res, next) => {
 });
 
 app.use(cors(corsOptions));
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+      },
+    },
+  })
+);
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+const monitoringHtmlPath = path.join(__dirname, "public", "monitoring.html");
 
 app.get("/monitoring", (_req, res) => {
   return res
     .status(200)
     .type("html")
-    .sendFile(path.join(__dirname, "public", "monitoring.html"));
+    .sendFile(monitoringHtmlPath);
 });
 const getHealthSnapshot = () => {
   const mongoState = getConnection()?.readyState ?? 0;
@@ -75,12 +89,20 @@ const getHealthSnapshot = () => {
   };
 };
 
-app.get("/", (_req, res) => {
+app.get("/", (req, res) => {
+  const accept = (req.get("accept") || "").toLowerCase();
+  if (accept.includes("text/html")) {
+    return res.status(200).type("html").sendFile(monitoringHtmlPath);
+  }
+
   return sendSuccess(res, 200, "OK", {
     service: "canvas-chat",
     endpoints: {
       health: "/health",
       readiness: "/readyz",
+      monitoring: "/monitoring",
+      monitoringHealth: "/monitoring/health",
+      monitoringSend: "/monitoring/send",
     },
     ...getHealthSnapshot(),
   });
