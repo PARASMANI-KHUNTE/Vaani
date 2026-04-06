@@ -102,7 +102,7 @@ router.post(
   validateRequest,
   chatController.leaveGroupChat
 );
-router.get("/invite/:token", inviteTokenParamValidator, validateRequest, chatController.previewInviteLink);
+router.get("/invite/:token", authMiddleware, inviteTokenParamValidator, validateRequest, chatController.previewInviteLink);
 router.post(
   "/invite/:token/join",
   groupMutationRateLimiter,

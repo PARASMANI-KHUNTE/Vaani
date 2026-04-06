@@ -10,6 +10,7 @@ const {
   getMessagesValidator,
   reactionValidator,
   removeReactionValidator,
+  forwardMessageValidator,
 } = require("./message.validators");
 
 const router = express.Router();
@@ -24,6 +25,6 @@ router.post("/:messageId/reaction", reactionValidator, validateRequest, messageC
 router.delete("/:messageId/reaction", removeReactionValidator, validateRequest, messageController.removeReaction);
 router.delete("/:messageId", deleteMessageValidator, validateRequest, messageController.removeMessage);
 router.put("/:messageId", messageRateLimiter, createMessageValidator, validateRequest, messageController.editMessage);
-router.post("/:messageId/forward", messageRateLimiter, messageController.forwardMessage);
+router.post("/:messageId/forward", messageRateLimiter, forwardMessageValidator, validateRequest, messageController.forwardMessage);
 
 module.exports = router;

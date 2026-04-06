@@ -2,6 +2,7 @@ const { getRedisClient, isRedisConnected } = require("../config/redis.client");
 
 const DEFAULT_TTL_SECONDS = 600;
 const IDEMPOTENCY_PREFIX = "idempotency:";
+const CLEANUP_INTERVAL_MS = 60000;
 
 const responseCache = new Map();
 
@@ -16,12 +17,24 @@ const getCacheKey = (req, key) =>
 
 const clearExpiredEntries = () => {
   const now = Date.now();
+  const keysToDelete = [];
   for (const [cacheKey, cacheEntry] of responseCache.entries()) {
     if (cacheEntry.expiresAt <= now) {
-      responseCache.delete(cacheKey);
+      keysToDelete.push(cacheKey);
     }
   }
+  keysToDelete.forEach((key) => responseCache.delete(key));
+  
+  if (responseCache.size > 10000) {
+    const entries = Array.from(responseCache.entries());
+    entries.sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+    const toDelete = entries.slice(0, Math.floor(entries.length / 2));
+    toDelete.forEach(([key]) => responseCache.delete(key));
+  }
 };
+
+const cleanupInterval = setInterval(clearExpiredEntries, CLEANUP_INTERVAL_MS);
+cleanupInterval.unref?.();
 
 const getFromRedis = async (key) => {
   if (!isRedisConnected()) return null;
@@ -60,10 +73,6 @@ const createIdempotencyMiddleware = ({ ttlSeconds = DEFAULT_TTL_SECONDS } = {}) 
       return next();
     }
 
-    if (!isRedisConnected()) {
-      clearExpiredEntries();
-    }
-
     const cacheKey = getCacheKey(req, idempotencyKey);
 
     if (isRedisConnected()) {
@@ -72,6 +81,7 @@ const createIdempotencyMiddleware = ({ ttlSeconds = DEFAULT_TTL_SECONDS } = {}) 
         return res.status(cached.statusCode).json(cached.body);
       }
     } else {
+      clearExpiredEntries();
       const cached = responseCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
         return res.status(cached.statusCode).json(cached.body);

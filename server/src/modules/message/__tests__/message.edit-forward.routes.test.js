@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 
 const startServer = (app) =>
   new Promise((resolve) => {
@@ -9,6 +10,46 @@ const startServer = (app) =>
         baseUrl: `http://127.0.0.1:${address.port}`,
       });
     });
+  });
+
+const stopServer = (server) =>
+  new Promise((resolve) => {
+    server.close(() => resolve());
+  });
+
+const requestJson = (url, { method = 'GET', headers = {}, body } = {}) =>
+  new Promise((resolve, reject) => {
+    const target = new URL(url);
+
+    const req = http.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port,
+        path: `${target.pathname}${target.search}`,
+        method,
+        headers: {
+          connection: 'close',
+          ...headers,
+        },
+        agent: false,
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            status: res.statusCode,
+            json: text ? JSON.parse(text) : null,
+          });
+        });
+      }
+    );
+
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
   });
 
 describe('Message edit + forward routes', () => {
@@ -127,27 +168,28 @@ describe('Message edit + forward routes', () => {
     const { server, baseUrl } = await startServer(app);
 
     try {
-      const res = await fetch(`${baseUrl}/messages/${messageId}`, {
+      const payload = JSON.stringify({
+        chatId,
+        content: 'updated content',
+      });
+
+      const { status, json: body } = await requestJson(`${baseUrl}/messages/${messageId}`, {
         method: 'PUT',
         headers: {
           'content-type': 'application/json',
+          'content-length': Buffer.byteLength(payload),
         },
-        body: JSON.stringify({
-          chatId,
-          content: 'updated content',
-        }),
+        body: payload,
       });
 
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
+      expect(status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.message).toBe('Message edited successfully');
       expect(body.data.message.content).toBe('updated content');
       expect(body.data.message.edited).toBe(true);
       expect(messageDoc.save).toHaveBeenCalledTimes(1);
     } finally {
-      server.close();
+      await stopServer(server);
     }
   });
 
@@ -156,25 +198,26 @@ describe('Message edit + forward routes', () => {
     const { server, baseUrl } = await startServer(app);
 
     try {
-      const res = await fetch(`${baseUrl}/messages/${messageId}/forward`, {
+      const payload = JSON.stringify({
+        chatId,
+        targetChatId,
+      });
+
+      const { status, json: body } = await requestJson(`${baseUrl}/messages/${messageId}/forward`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
+          'content-length': Buffer.byteLength(payload),
         },
-        body: JSON.stringify({
-          chatId,
-          targetChatId,
-        }),
+        body: payload,
       });
 
-      const body = await res.json();
-
-      expect(res.status).toBe(201);
+      expect(status).toBe(201);
       expect(body.success).toBe(true);
       expect(body.message).toBe('Message forwarded successfully');
       expect(body.data.message.chatId).toBe(targetChatId);
     } finally {
-      server.close();
+      await stopServer(server);
     }
   });
 });

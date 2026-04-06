@@ -1,5 +1,6 @@
 const { createClient } = require("redis");
 const env = require("./env");
+const logger = require("../utils/logger");
 
 let redisClient = null;
 let isConnected = false;
@@ -9,13 +10,13 @@ const isUpstashConfigured = () => Boolean(env.redis.upstashUrl && env.redis.upst
 
 const connectRedis = async () => {
   if (!isRedisEnabled()) {
-    console.log("Redis disabled - using in-memory fallback");
+    logger.info("Redis disabled - using in-memory fallback");
     return;
   }
 
   if (!env.redis.useLocal && isUpstashConfigured()) {
     isConnected = true;
-    console.log("Redis connected (Upstash)");
+    logger.info("Redis connected (Upstash)");
     return;
   }
 
@@ -24,18 +25,18 @@ const connectRedis = async () => {
       redisClient = createClient({ url: env.redis.url });
 
       redisClient.on("error", (err) => {
-        console.error("Redis Client Error:", err);
+        logger.error("Redis Client Error", { error: err.message });
         isConnected = false;
       });
 
       redisClient.on("connect", () => {
         isConnected = true;
-        console.log("Redis connected (local)");
+        logger.info("Redis connected (local)");
       });
 
       redisClient.on("end", () => {
         isConnected = false;
-        console.log("Redis disconnected");
+        logger.info("Redis disconnected");
       });
     }
 
@@ -46,7 +47,7 @@ const connectRedis = async () => {
     isConnected = true;
   } catch (error) {
     isConnected = false;
-    console.error("Redis connection failed - using in-memory fallback", error);
+    logger.error("Redis connection failed", { error: error.message });
   }
 };
 
@@ -77,7 +78,7 @@ const getRedisClient = () => {
           const data = await response.json();
           return data.result || null;
         } catch (error) {
-          console.error("Redis GET error:", error);
+          logger.error("Redis GET error", { error: error.message });
           return null;
         }
       },
@@ -98,7 +99,7 @@ const getRedisClient = () => {
           const data = await response.json();
           return data.result;
         } catch (error) {
-          console.error("Redis SET error:", error);
+          logger.error("Redis SET error", { error: error.message });
           return null;
         }
       },
@@ -115,7 +116,7 @@ const getRedisClient = () => {
           const data = await response.json();
           return data.result;
         } catch (error) {
-          console.error("Redis DEL error:", error);
+          logger.error("Redis DEL error", { error: error.message });
           return 0;
         }
       },

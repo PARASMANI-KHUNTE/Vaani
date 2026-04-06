@@ -19,6 +19,7 @@ const {
   unregisterPushToken,
   updateOwnProfile,
 } = require("./user.service");
+const { getPendingMessages, clearPendingMessages } = require("../../utils/offlineQueue");
 
 const search = asyncHandler(async (req, res) => {
   const users = await searchUsers({
@@ -38,6 +39,17 @@ const explore = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, 200, "Explore users fetched successfully", {
     users,
+  });
+});
+
+const syncPendingMessages = asyncHandler(async (req, res) => {
+  const userId = req.user._id.toString();
+  const messages = await getPendingMessages(userId);
+  await clearPendingMessages(userId);
+
+  return sendSuccess(res, 200, "Pending messages synced", {
+    messages,
+    count: messages.length,
   });
 });
 
@@ -210,6 +222,7 @@ module.exports = {
   rejectFriend,
   search,
   sendFriendRequest,
+  syncPendingMessages,
   unblock,
   unregisterDevicePushToken,
   unfriend,

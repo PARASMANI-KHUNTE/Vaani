@@ -92,6 +92,7 @@ export type Message = {
   } | null;
   optimistic?: boolean;
   edited?: boolean;
+  forwarded?: boolean;
   failed?: boolean;
 };
 

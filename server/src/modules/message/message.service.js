@@ -87,6 +87,7 @@ const forwardMessage = async ({ messageId, chatId, currentUserId, targetChatId }
     media: message.media,
     replyTo: null,
     receipts: [],
+    forwarded: true,
     deletedForEveryone: false,
     deletedFor: [],
   });
@@ -141,6 +142,7 @@ const createMessage = async ({ chatId, senderId, content, type = "text", replyTo
     type,
     media: normalizedMedia,
     receipts: [],
+    forwarded: true,
     deletedForEveryone: false,
     deletedFor: [],
   });

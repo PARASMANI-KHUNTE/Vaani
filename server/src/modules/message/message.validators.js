@@ -53,6 +53,12 @@ const deleteMessageValidator = [
 
 const reactionValidator = [
   param("messageId").isMongoId().withMessage("messageId must be a valid id"),
+  body("emoji")
+    .trim()
+    .notEmpty()
+    .withMessage("emoji is required")
+    .isLength({ max: 20 })
+    .withMessage("emoji must be 20 characters or fewer"),
 ];
 
 const removeReactionValidator = [
@@ -65,10 +71,17 @@ const removeReactionValidator = [
     .withMessage("emoji must be 20 characters or fewer"),
 ];
 
+const forwardMessageValidator = [
+  param("messageId").isMongoId().withMessage("messageId must be a valid id"),
+  body("chatId").isMongoId().withMessage("chatId must be a valid id"),
+  body("targetChatId").isMongoId().withMessage("targetChatId must be a valid id"),
+];
+
 module.exports = {
   createMessageValidator,
   deleteMessageValidator,
   getMessagesValidator,
   reactionValidator,
   removeReactionValidator,
+  forwardMessageValidator,
 };

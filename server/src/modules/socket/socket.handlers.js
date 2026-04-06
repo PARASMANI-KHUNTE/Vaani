@@ -272,7 +272,7 @@ const registerSocketHandlers = (io, socket) => {
         });
       }
 
-      await Promise.all(
+      await Promise.allSettled(
         offlineReceiverIds.map((participantId) =>
           sendUserPushNotification(participantId, {
             title: currentUserName,

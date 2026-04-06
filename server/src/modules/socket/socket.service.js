@@ -77,8 +77,17 @@ const getOnlineUserIds = async () => {
     const redis = getRedisClient();
     if (redis) {
       try {
-        const keys = await redis.keys(`${PRESENCE_KEY_PREFIX}*`);
-        return keys.map((key) => key.replace(PRESENCE_KEY_PREFIX, ""));
+        if (redis.scan) {
+          const keys = [];
+          let cursor = "0";
+          do {
+            const [newCursor, batch] = await redis.scan(cursor, "MATCH", `${PRESENCE_KEY_PREFIX}*`, "COUNT", 100);
+            cursor = newCursor;
+            keys.push(...batch);
+          } while (cursor !== "0");
+          return keys.map((key) => key.replace(PRESENCE_KEY_PREFIX, ""));
+        }
+        return Array.from(onlineUsers.keys());
       } catch {
         return Array.from(onlineUsers.keys());
       }

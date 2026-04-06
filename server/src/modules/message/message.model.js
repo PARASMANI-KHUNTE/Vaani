@@ -155,6 +155,10 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    forwarded: {
+      type: Boolean,
+      default: false,
+    },
     systemEvent: {
       type: {
         eventType: {
@@ -191,5 +195,6 @@ messageSchema.index({ chatId: 1, deletedForEveryone: 1, deletedFor: 1 });
 messageSchema.index({ "reactions.userId": 1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });
 messageSchema.index({ "receipts.userId": 1 });
+messageSchema.index({ replyTo: 1 });
 
 module.exports = mongoose.model("Message", messageSchema);

@@ -42,13 +42,23 @@ module.exports = {
       .optional()
       .trim()
       .isLength({ min: 4, max: 4 })
-      .matches(/^[a-zA-Z0-9]{4}$/)
+      .matches(/^[A-Za-z0-9]{4}$/)
       .withMessage("Tagline must be exactly 4 letters, numbers, or a mix of both"),
     body("bio")
       .optional()
       .trim()
       .isLength({ max: 280 })
       .withMessage("Bio must be 280 characters or fewer"),
+    body().custom((value) => {
+      const hasName = value.name !== undefined;
+      const hasTagline = value.tagline !== undefined;
+      const hasBio = value.bio !== undefined;
+
+      if (!hasName && !hasTagline && !hasBio) {
+        throw new Error("At least one of name, tagline, or bio must be provided");
+      }
+      return true;
+    }),
   ],
   usernameParamValidator: [
     param("username")

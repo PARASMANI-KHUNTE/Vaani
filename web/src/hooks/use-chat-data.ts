@@ -96,20 +96,22 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
   const messagesByChat = store.messagesByChat;
 
   const getNotificationPreview = (message: Message) => {
+    const prefix = message.forwarded ? "Forwarded: " : "";
     if (message.type === "image") {
-      return message.content ? `📷 ${message.content}` : "Sent a photo";
+      return `${prefix}${message.content ? `📷 ${message.content}` : "Sent a photo"}`;
     }
     if (message.type === "video") {
-      return message.content ? `🎬 ${message.content}` : "Sent a video";
+      return `${prefix}${message.content ? `🎬 ${message.content}` : "Sent a video"}`;
     }
     if (message.type === "voice") {
-      return "Sent a voice note 🎙️";
+      return `${prefix}Sent a voice note 🎙️`;
     }
     if (message.type === "file") {
-      return message.content ? `📎 ${message.content}` : "Sent a file";
+      return `${prefix}${message.content ? `📎 ${message.content}` : "Sent a file"}`;
     }
-    const text = message.content || "";
-    return text.length > 50 ? `${text.slice(0, 50)}...` : text;
+    const text = (message.content || "").trim();
+    const truncated = text.length > 50 ? `${text.slice(0, 50)}...` : text;
+    return `${prefix}${truncated}`;
   };
 
   useEffect(() => {

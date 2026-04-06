@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 const { createAdapter } = require("@socket.io/redis-adapter");
 const { createClient } = require("redis");
 const env = require("../../config/env");
+const logger = require("../../utils/logger");
 const { SOCKET_EVENTS } = require("./socket.constants");
 const { registerSocketHandlers } = require("./socket.handlers");
 const { authenticateSocket } = require("./socket.service");
@@ -9,32 +10,32 @@ const { setSocketIO } = require("./socket.notifications");
 const { isRedisConnected } = require("../../config/redis.client");
 
 const allowedOrigins = [...env.clientUrls, ...env.mobileOrigins].filter(Boolean);
+let pubClient = null;
+let subClient = null;
 
 const initializeSocketServer = async (httpServer) => {
   let adapter = null;
   
-  const useRedis = env.redis.enabled && isRedisConnected();
-  const hasUpstash = env.redis.upstashUrl && env.redis.upstashToken;
+  const useLocalRedis = env.redis.enabled && env.redis.useLocal && isRedisConnected();
   
-  if (useRedis && hasUpstash) {
-    console.log("Socket.IO: Using Upstash Redis (REST API) - single-node mode");
-    console.log("Note: For multi-instance scaling, use @upstash/redis with Redis protocol");
-  } else if (useRedis && env.redis.url) {
+  if (useLocalRedis) {
     try {
-      const pubClient = createClient({ url: env.redis.url });
-      const subClient = pubClient.duplicate();
+      pubClient = createClient({ url: env.redis.url });
+      subClient = pubClient.duplicate();
       
-      pubClient.on("error", (err) => console.error("Redis Pub Client Error:", err));
-      subClient.on("error", (err) => console.error("Redis Sub Client Error:", err));
+      pubClient.on("error", (err) => logger.error("Redis Pub Client Error", { error: err.message }));
+      subClient.on("error", (err) => logger.error("Redis Sub Client Error", { error: err.message }));
       
       await Promise.all([pubClient.connect(), subClient.connect()]);
       adapter = createAdapter(pubClient, subClient);
-      console.log("Socket.IO Redis adapter initialized");
+      logger.info("Socket.IO Redis adapter initialized (multi-instance ready)");
     } catch (error) {
-      console.error("Failed to initialize Socket.IO Redis adapter:", error);
+      logger.error("Failed to initialize Socket.IO Redis adapter", { error: error.message });
     }
+  } else if (env.redis.enabled && env.redis.upstashUrl) {
+    logger.info("Socket.IO: Single-node mode (Upstash REST API - no pub/sub support)");
   } else {
-    console.log("Socket.IO running without Redis adapter (single-node mode)");
+    logger.info("Socket.IO: Single-node mode (no Redis)");
   }
 
   const io = new Server(httpServer, {
@@ -50,6 +51,8 @@ const initializeSocketServer = async (httpServer) => {
       },
       credentials: true,
     },
+    transports: ["websocket", "polling"],
+    allowUpgrades: true,
   });
 
   if (adapter) {
@@ -57,7 +60,7 @@ const initializeSocketServer = async (httpServer) => {
   }
 
   io.on("error", (error) => {
-    console.error("SocketIO Server Error:", error);
+    logger.error("SocketIO Server Error", { error: error.message });
   });
 
   setSocketIO(io);
@@ -67,7 +70,10 @@ const initializeSocketServer = async (httpServer) => {
     registerSocketHandlers(io, socket);
   });
 
-  return io;
+  return { io, adapter, cleanup: async () => {
+    if (pubClient?.isOpen) await pubClient.quit();
+    if (subClient?.isOpen) await subClient.quit();
+  }};
 };
 
 module.exports = {

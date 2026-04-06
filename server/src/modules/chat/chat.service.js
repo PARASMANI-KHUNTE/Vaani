@@ -6,6 +6,7 @@ const Message = require("../message/message.model");
 const User = require("../user/user.model");
 const ApiError = require("../../utils/apiError");
 const { destroyMediaAssets } = require("../../utils/mediaUpload");
+const { startSession, isTransactionSupported } = require("../../config/database");
 const MAX_GROUP_MEMBERS = 50;
 const DEFAULT_INVITE_EXPIRY_HOURS = 24 * 7;
 const MAX_INVITE_EXPIRY_HOURS = 24 * 365 * 10;
@@ -1122,17 +1123,8 @@ const createGroupInviteLink = async ({
   const chat = await ensureGroupChatMember(chatId, currentUserId);
   assertGroupAdmin(chat, currentUserId);
 
-  const safeExpiryHours = Number.isFinite(Number(expiresInHours))
-    ? Number(expiresInHours)
-    : DEFAULT_INVITE_EXPIRY_HOURS;
-  const safeMaxUses = Number.isFinite(Number(maxUses)) ? Number(maxUses) : 0;
-
-  if (safeExpiryHours < 1 || safeExpiryHours > MAX_INVITE_EXPIRY_HOURS) {
-    throw new ApiError(
-      400,
-      `expiresInHours must be between 1 and ${MAX_INVITE_EXPIRY_HOURS} hours`
-    );
-  }
+  const safeExpiryHours = Math.max(1, Math.min(expiresInHours, MAX_INVITE_EXPIRY_HOURS));
+  const safeMaxUses = Math.max(0, Math.min(maxUses, 500));
 
   if (safeMaxUses < 0 || safeMaxUses > 500) {
     throw new ApiError(400, "maxUses must be between 0 and 500");
@@ -1142,32 +1134,56 @@ const createGroupInviteLink = async ({
   const tokenHash = hashInviteToken(token);
   const expiresAt = new Date(Date.now() + safeExpiryHours * 60 * 60 * 1000);
 
-  await GroupInvite.updateMany(
-    {
-      chatId,
-      revokedAt: null,
-      expiresAt: { $gt: new Date() },
-    },
-    {
-      $set: {
-        revokedAt: new Date(),
-      },
+  const session = await startSession();
+  const supportsTransactions = isTransactionSupported();
+
+  try {
+    if (supportsTransactions) {
+      session.startTransaction();
     }
-  );
 
-  await GroupInvite.create({
-    chatId,
-    createdBy: currentUserId,
-    tokenHash,
-    expiresAt,
-    maxUses: safeMaxUses,
-  });
+    await GroupInvite.updateMany(
+      {
+        chatId,
+        revokedAt: null,
+        expiresAt: { $gt: new Date() },
+      },
+      {
+        $set: {
+          revokedAt: new Date(),
+        },
+      },
+      { session }
+    );
 
-  return {
-    token,
-    expiresAt,
-    maxUses: safeMaxUses,
-  };
+    await GroupInvite.create(
+      [{
+        chatId,
+        createdBy: currentUserId,
+        tokenHash,
+        expiresAt,
+        maxUses: safeMaxUses,
+      }],
+      { session }
+    );
+
+    if (supportsTransactions) {
+      await session.commitTransaction();
+    }
+
+    return {
+      token,
+      expiresAt,
+      maxUses: safeMaxUses,
+    };
+  } catch (error) {
+    if (supportsTransactions) {
+      await session.abortTransaction();
+    }
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 const resolveValidInvite = async (token) => {

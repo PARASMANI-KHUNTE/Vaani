@@ -17,6 +17,7 @@ router.use(authMiddleware);
 
 router.get("/me", userController.me);
 router.get("/me/blocked", userController.getBlocked);
+router.get("/me/sync", userController.syncPendingMessages);
 router.patch("/me", updateProfileValidator, validateRequest, userController.updateMe);
 router.post("/push-token", registerPushTokenValidator, validateRequest, userController.registerDevicePushToken);
 router.delete("/push-token", unregisterPushTokenValidator, validateRequest, userController.unregisterDevicePushToken);
