@@ -24,6 +24,7 @@ import {
   ImagePlus,
   Smile,
   Mic,
+  SendHorizontal,
 } from "lucide-react";
 import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -806,7 +807,7 @@ export const ChatWindow = ({
                 "text-white"
               )}
             >
-              <SendHorizonal className="h-5 w-5 -rotate-45" />
+              <SendHorizontal className="h-5 w-5 -rotate-45" />
             </button>
           ) : (
             <button
