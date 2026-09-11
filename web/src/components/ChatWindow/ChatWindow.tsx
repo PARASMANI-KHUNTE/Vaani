@@ -33,6 +33,7 @@ import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
 import { MediaPreview, type PreviewItem } from "@/components/MediaPreview/MediaPreview";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ForwardModal } from "@/components/ForwardModal";
+import { useSpeechToText } from "@/hooks/use-speech-to-text";
 import { BackendUser, Chat, Message } from "@/lib/types";
 import { cn, formatDateSeparator } from "@/lib/utils";
 
@@ -143,6 +144,39 @@ export const ChatWindow = ({
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const baseDraftRef = useRef("");
+
+  const {
+    isSupported: isSpeechSupported,
+    isListening: isSpeechListening,
+    errorMessage: speechErrorMessage,
+    startListening: startSpeechListening,
+    stopListening: stopSpeechListening,
+    clearError: clearSpeechError,
+  } = useSpeechToText({
+    onTranscriptChange: (text) => {
+      const base = baseDraftRef.current;
+      const prefix = base ? (base.endsWith(" ") ? base : base + " ") : "";
+      setDraft(prefix + text);
+      onTyping?.();
+    },
+  });
+
+  const handleToggleDictation = () => {
+    if (isSpeechListening) {
+      stopSpeechListening();
+    } else {
+      baseDraftRef.current = draft;
+      startSpeechListening();
+    }
+  };
+
+  useEffect(() => {
+    if (isSpeechListening) {
+      stopSpeechListening();
+    }
+  }, [chat?._id, isSpeechListening, stopSpeechListening]);
 
   const themeConfig: Record<string, string> = {
     default: "bg-[#6d7af7]",
@@ -384,6 +418,9 @@ export const ChatWindow = ({
   };
 
   const submitMessage = async () => {
+    if (isSpeechListening) {
+      stopSpeechListening();
+    }
     if (editingMessage) {
       const trimmed = draft.trim();
       if (!trimmed) return;
@@ -820,6 +857,63 @@ export const ChatWindow = ({
 
       {/* Input Bar - Sticky Bottom */}
       <footer className="shrink-0 px-2 pb-2 pt-2 sm:px-4 sm:pb-4 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/50 dark:border-slate-800/50">
+        {/* Voice-to-Text Dictating Banner */}
+        <AnimatePresence>
+          {isSpeechListening && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-2 flex items-center justify-between rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 px-3 py-2 text-xs text-blue-800 dark:text-blue-200 shadow-sm backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+                </span>
+                <div className="truncate">
+                  <span className="font-semibold">Voice Dictation Active:</span>
+                  <span className="ml-1 text-slate-600 dark:text-slate-300">Speak into your microphone to transcribe text</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <button
+                  type="button"
+                  onClick={stopSpeechListening}
+                  className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-sm"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Speech Recognition Error Banner */}
+        <AnimatePresence>
+          {speechErrorMessage && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-2 flex items-center justify-between rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 shadow-sm"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span className="truncate">{speechErrorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearSpeechError}
+                className="rounded p-1 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 transition-colors"
+                title="Dismiss error"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Editing Message Banner */}
         <AnimatePresence>
           {editingMessage && (
@@ -1101,12 +1195,59 @@ export const ChatWindow = ({
             ) : (
               <textarea
                 value={draft}
-                onChange={(e) => { setDraft(e.target.value); onTyping?.(); }}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitMessage(); } }}
-                placeholder="Message"
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  if (!isSpeechListening) {
+                    baseDraftRef.current = e.target.value;
+                  }
+                  onTyping?.();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitMessage();
+                  }
+                }}
+                placeholder={isSpeechListening ? "Listening... Speak now" : "Message"}
                 rows={1}
                 className="max-h-28 flex-1 bg-transparent py-0.5 text-[15px] text-slate-900 placeholder:text-slate-400 outline-none dark:text-white resize-none"
               />
+            )}
+
+            {/* Voice-to-Text Dictation Button */}
+            {!isRecording && (
+              <button
+                type="button"
+                id="voice-dictation-button"
+                onClick={handleToggleDictation}
+                title={
+                  !isSpeechSupported
+                    ? "Speech recognition is not supported in this browser"
+                    : isSpeechListening
+                    ? "Stop voice dictation"
+                    : "Voice-to-text dictation (Click to speak)"
+                }
+                className={cn(
+                  "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200",
+                  isSpeechListening
+                    ? "bg-red-500 text-white shadow-md ring-2 ring-red-300 dark:ring-red-900 animate-pulse"
+                    : isSpeechSupported
+                    ? "text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 active:scale-95"
+                    : "text-slate-300 dark:text-slate-600 opacity-60 cursor-not-allowed"
+                )}
+              >
+                {isSpeechListening ? (
+                  <span className="relative flex items-center justify-center">
+                    <Mic className="h-4 w-4 text-white" />
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-90" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+                    </span>
+                  </span>
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </button>
             )}
 
           </div>
@@ -1115,7 +1256,8 @@ export const ChatWindow = ({
           {isRecording ? (
             <button
               onClick={stopRecording}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500 text-white active:scale-95"
+              title="Stop audio recording"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500 text-white active:scale-95 shadow-sm"
             >
               <Square className="h-4 w-4 fill-current" />
             </button>
@@ -1127,8 +1269,9 @@ export const ChatWindow = ({
                 isSendingMedia ||
                 Boolean(mediaTransfer?.isUploading)
               }
+              title="Send message"
               className={cn(
-                "flex h-11 w-11 items-center justify-center rounded-full active:scale-95",
+                "flex h-11 w-11 items-center justify-center rounded-full active:scale-95 shadow-sm transition-transform",
                 currentThemeClass,
                 "text-white"
               )}
@@ -1139,7 +1282,8 @@ export const ChatWindow = ({
             <button
               onClick={startRecording}
               disabled={isSendingMedia}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d9e0e7] text-slate-500 active:scale-95 dark:bg-slate-700 dark:text-slate-300"
+              title="Record voice message (Audio)"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d9e0e7] text-slate-500 active:scale-95 dark:bg-slate-700 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100 shadow-sm"
             >
               <Mic className="h-5 w-5" />
             </button>
