@@ -207,7 +207,7 @@ export const ChatShell = () => {
   }
 
   return (
-    <div className="flex h-dvh w-full flex-col bg-[#f8f9fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden relative">
+    <div className="flex h-dvh w-full flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden relative">
       {error ? (
         <Toast
           message={error}

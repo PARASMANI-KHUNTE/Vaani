@@ -26,13 +26,13 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 const THEMES = [
-  { id: "default", name: "Classic Blue", color: "bg-[var(--primary-blue)]" },
-  { id: "emerald", name: "Emerald", color: "bg-emerald-500" },
-  { id: "rose", name: "Rose", color: "bg-rose-500" },
-  { id: "amber", name: "Amber", color: "bg-amber-500" },
-  { id: "violet", name: "Violet", color: "bg-violet-500" },
-  { id: "cyan", name: "Cyan", color: "bg-cyan-500" },
-  { id: "dark", name: "Dark", color: "bg-slate-900" },
+  { id: "default", name: "Classic Blue", color: "bg-blue-600" },
+  { id: "emerald", name: "Emerald", color: "bg-emerald-600" },
+  { id: "rose", name: "Rose", color: "bg-rose-600" },
+  { id: "amber", name: "Amber", color: "bg-amber-600" },
+  { id: "violet", name: "Violet", color: "bg-violet-600" },
+  { id: "cyan", name: "Cyan", color: "bg-cyan-600" },
+  { id: "dark", name: "Dark", color: "bg-slate-800" },
 ];
 
 const WALLPAPERS = [
@@ -213,15 +213,15 @@ export const SettingsPage = () => {
         </aside>
 
         {/* Mobile tabs */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 lg:hidden">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/70 bg-white/95 pb-safe backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">
           <div className="flex">
             {sections.map((section) => (
               <button
                 key={section.id}
                 onClick={() => setActiveSection(section.id)}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 py-3 transition-all",
-                  activeSection === section.id ? "text-[var(--primary-blue)]" : "text-slate-400"
+                  "flex flex-1 flex-col items-center gap-1 py-2.5 transition-all active:scale-95",
+                  activeSection === section.id ? "text-blue-600 dark:text-blue-400 font-bold" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 )}
               >
                 <section.icon className="h-5 w-5" />

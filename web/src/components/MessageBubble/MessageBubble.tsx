@@ -399,7 +399,7 @@ const MessageBubbleBase = ({
         {isSelectionMode && (
           <div className={cn(
             "mb-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-            isSelected ? "bg-[#0084ff] border-[#0084ff]" : "bg-white border-slate-300 dark:bg-slate-700 dark:border-slate-500"
+            isSelected ? "bg-blue-600 border-blue-600 shadow-sm" : "bg-white border-slate-300 dark:bg-slate-700 dark:border-slate-500"
           )}>
             {isSelected && <Check className="h-3 w-3 text-white stroke-[3]" />}
           </div>
@@ -409,22 +409,22 @@ const MessageBubbleBase = ({
         <div
           style={getBorderRadius()}
           className={cn(
-            "relative px-3 py-2 text-[14px] leading-[1.4]",
+            "relative px-3.5 py-2.5 text-[14px] leading-[1.45] shadow-sm transition-shadow",
             isOwnMessage
-              ? "bg-[#d9fdd3] dark:bg-[#005c4b] text-slate-900 dark:text-white rounded-tr-[4px]"
-              : "bg-white dark:bg-[#1f232b] text-slate-900 dark:text-white rounded-tl-[4px] shadow-sm",
-            isSelectionMode && isSelected && "ring-2 ring-[#0084ff]"
+              ? "bg-blue-600 text-white dark:bg-blue-600"
+              : "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700/60",
+            isSelectionMode && isSelected && "ring-2 ring-blue-500"
           )}
         >
           {/* Reply Preview */}
           {message.replyTo && (
             <div className={cn(
-              "mb-2 overflow-hidden rounded-lg border-l-2 px-2 py-1.5 text-[12px]",
+              "mb-2 overflow-hidden rounded-lg border-l-2 px-2.5 py-1.5 text-[12px]",
               isOwnMessage
-                ? "bg-black/5 border-white/40 text-slate-700 dark:text-slate-300"
-                : "bg-slate-100 border-[#0084ff]/40 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300"
+                ? "bg-white/15 border-white/80 text-white/90"
+                : "bg-slate-50 border-blue-500 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200"
             )}>
-              <p className="font-semibold text-[10px] uppercase tracking-wide opacity-60">
+              <p className="font-semibold text-[10px] uppercase tracking-wide opacity-80">
                 {message.replyTo.senderId?.name || message.replyTo.senderId?.username || "Reply"}
               </p>
               <p className="mt-0.5 line-clamp-1 italic">
@@ -589,7 +589,7 @@ const MessageBubbleBase = ({
                       title="Save"
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95",
-                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#0084ff] text-white"
+                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
                       )}
                     >
                       <Download className="h-4 w-4" />
@@ -605,9 +605,9 @@ const MessageBubbleBase = ({
                   )}>
                     <div className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                      isOwnMessage ? "bg-white/20" : "bg-[#0084ff]/10"
+                      isOwnMessage ? "bg-white/20" : "bg-blue-50 dark:bg-blue-950/40"
                     )}>
-                      <FileText className={cn("h-5 w-5", isOwnMessage ? "text-white/80" : "text-[#0084ff]")} />
+                      <FileText className={cn("h-5 w-5", isOwnMessage ? "text-white/80" : "text-blue-600 dark:text-blue-400")} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={cn("truncate text-sm font-medium", isOwnMessage ? "text-white" : "text-slate-800 dark:text-white")}>
@@ -622,7 +622,7 @@ const MessageBubbleBase = ({
                       title="Save"
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95",
-                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#0084ff] text-white"
+                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
                       )}
                     >
                       <Download className="h-4 w-4" />
@@ -641,19 +641,19 @@ const MessageBubbleBase = ({
           </div>
 
           {/* Timestamp + Status */}
-          <div className={cn("mt-1 flex items-center justify-end gap-1 text-[10px] tabular-nums", isOwnMessage ? "text-slate-500 dark:text-white/50" : "text-slate-400")}>
+          <div className={cn("mt-1 flex items-center justify-end gap-1 text-[10px] tabular-nums", isOwnMessage ? "text-white/75" : "text-slate-400 dark:text-slate-500")}>
             {message.edited && (
-              <span className="italic text-[9px] opacity-75 mr-0.5">edited</span>
+              <span className="italic text-[9px] opacity-80 mr-0.5">edited</span>
             )}
             <span>{formatMessageTime(message.createdAt)}</span>
             {isOwnMessage && message.status === "seen" && (
-              <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" />
+              <CheckCheck className="h-3.5 w-3.5 text-white stroke-[2.5]" />
             )}
             {isOwnMessage && message.status === "delivered" && (
-              <CheckCheck className="h-3.5 w-3.5 text-slate-400" />
+              <CheckCheck className="h-3.5 w-3.5 text-white/70" />
             )}
             {isOwnMessage && (!message.status || message.status === "sent") && (
-              <Check className="h-3.5 w-3.5 text-slate-400" />
+              <Check className="h-3.5 w-3.5 text-white/70" />
             )}
           </div>
         </div>

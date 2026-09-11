@@ -179,13 +179,13 @@ export const ChatWindow = ({
   }, [chat?._id, isSpeechListening, stopSpeechListening]);
 
   const themeConfig: Record<string, string> = {
-    default: "bg-[#6d7af7]",
-    emerald: "bg-emerald-500",
-    rose: "bg-rose-500",
-    amber: "bg-amber-500",
-    violet: "bg-violet-500",
-    cyan: "bg-cyan-500",
-    dark: "bg-slate-900",
+    default: "bg-blue-600 hover:bg-blue-700",
+    emerald: "bg-emerald-600 hover:bg-emerald-700",
+    rose: "bg-rose-600 hover:bg-rose-700",
+    amber: "bg-amber-600 hover:bg-amber-700",
+    violet: "bg-violet-600 hover:bg-violet-700",
+    cyan: "bg-cyan-600 hover:bg-cyan-700",
+    dark: "bg-slate-800 hover:bg-slate-700",
   };
 
   const currentTheme = chat?.theme || localStorage.getItem("chatTheme") || "default";
@@ -856,7 +856,7 @@ export const ChatWindow = ({
       </div>
 
       {/* Input Bar - Sticky Bottom */}
-      <footer className="shrink-0 px-2 pb-2 pt-2 sm:px-4 sm:pb-4 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/50 dark:border-slate-800/50">
+      <footer className="shrink-0 px-2.5 pb-2.5 pt-2 sm:px-4 sm:pb-4 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-t border-slate-200/70 dark:border-slate-800">
         {/* Voice-to-Text Dictating Banner */}
         <AnimatePresence>
           {isSpeechListening && (
@@ -1107,7 +1107,8 @@ export const ChatWindow = ({
             <button
               id="attach-btn"
               onClick={() => setShowAttachMenu(!showAttachMenu)}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d9e0e7] text-slate-500 active:scale-95 dark:bg-slate-700 dark:text-slate-300"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors shadow-sm"
+              title="Attach media or file"
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -1283,7 +1284,7 @@ export const ChatWindow = ({
               onClick={startRecording}
               disabled={isSendingMedia}
               title="Record voice message (Audio)"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d9e0e7] text-slate-500 active:scale-95 dark:bg-slate-700 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100 shadow-sm"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-95 dark:bg-slate-800 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm"
             >
               <Mic className="h-5 w-5" />
             </button>
