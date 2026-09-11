@@ -9,7 +9,9 @@ import {
   CornerUpLeft,
   Download,
   FileText,
+  Forward,
   Pause,
+  Pencil,
   Play,
   Smile,
   Trash2,
@@ -50,6 +52,8 @@ type MessageBubbleProps = {
   currentUserId?: string;
   showSenderName?: boolean;
   onReply?: (message: Message) => void;
+  onEdit?: (message: Message) => void;
+  onForward?: (message: Message) => void;
   onDelete?: (message: Message, scope: "me" | "everyone") => void;
   onReact?: (message: Message, emoji: string) => void;
   onMediaPreview?: (items: PreviewItem[], startIndex: number) => void;
@@ -310,6 +314,8 @@ const MessageBubbleBase = ({
   currentUserId,
   showSenderName,
   onReply,
+  onEdit,
+  onForward,
   onDelete,
   onReact,
   onMediaPreview,
@@ -636,6 +642,9 @@ const MessageBubbleBase = ({
 
           {/* Timestamp + Status */}
           <div className={cn("mt-1 flex items-center justify-end gap-1 text-[10px] tabular-nums", isOwnMessage ? "text-slate-500 dark:text-white/50" : "text-slate-400")}>
+            {message.edited && (
+              <span className="italic text-[9px] opacity-75 mr-0.5">edited</span>
+            )}
             <span>{formatMessageTime(message.createdAt)}</span>
             {isOwnMessage && message.status === "seen" && (
               <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" />
@@ -662,6 +671,24 @@ const MessageBubbleBase = ({
             <CornerUpLeft className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
           </button>
           
+          <button
+            onClick={() => onForward?.(message)}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+            title="Forward"
+          >
+            <Forward className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+          </button>
+
+          {isOwnMessage && message.type === "text" && !message.deletedForEveryone && (
+            <button
+              onClick={() => onEdit?.(message)}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+              title="Edit message"
+            >
+              <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+            </button>
+          )}
+
           <div className="relative">
             <button
               onClick={() => setShowReactionPicker(!showReactionPicker)}

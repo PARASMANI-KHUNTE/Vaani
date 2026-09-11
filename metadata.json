@@ -1,0 +1,10 @@
+{
+  "name": "LinkUp",
+  "description": "Connect and collaborate seamlessly with the next generation of professional messaging.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

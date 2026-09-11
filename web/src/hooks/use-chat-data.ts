@@ -10,6 +10,8 @@ import {
   demoteGroupAdmin,
   deleteChat,
   deleteMessage,
+  editMessage,
+  forwardMessage,
   getChats,
   getMessages,
   leaveGroup,
@@ -51,12 +53,16 @@ type MediaMessageInput = {
 
 export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataParams) => {
   const storeRef = useRef<ReturnType<typeof useChatStore.getState> | null>(null);
-  
   const store = useChatStore();
-  storeRef.current = store;
+
+  useEffect(() => {
+    storeRef.current = store;
+  });
 
   const currentUserIdRef = useRef<string | undefined>(currentUserId);
-  currentUserIdRef.current = currentUserId;
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
   const {
     setChats,
     setMessages,
@@ -1190,6 +1196,38 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     }
   };
 
+  const editChatMessage = async (messageId: string, content: string) => {
+    if (!token || !selectedChatId) {
+      return;
+    }
+
+    try {
+      const result = await editMessage(token, messageId, selectedChatId, content);
+      if (result?.message) {
+        updateMessage(selectedChatId, messageId, () => result.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to edit message");
+      throw err;
+    }
+  };
+
+  const forwardChatMessage = async (messageId: string, targetChatId: string) => {
+    if (!token || !selectedChatId) {
+      return;
+    }
+
+    try {
+      const result = await forwardMessage(token, messageId, selectedChatId, targetChatId);
+      if (result?.message) {
+        upsertMessage(targetChatId, result.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to forward message");
+      throw err;
+    }
+  };
+
   const toggleReaction = async (messageId: string, emoji: string) => {
     if (!token || !selectedChatId) {
       return;
@@ -1306,6 +1344,8 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     retryLastMediaUpload,
     notifyTyping,
     deleteChatMessage,
+    editChatMessage,
+    forwardChatMessage,
     toggleReaction,
     clearSelectedChatMessages,
     deleteSelectedChat,

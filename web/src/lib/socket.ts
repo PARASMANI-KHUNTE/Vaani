@@ -35,12 +35,14 @@ export type SocketErrorPayload = {
 };
 
 export const getSocketClient = (token: string) => {
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const apiUrl =
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!socketInstance) {
     socketInstance = io(apiUrl, {
       autoConnect: false,
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

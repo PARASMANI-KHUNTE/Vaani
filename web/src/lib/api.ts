@@ -7,7 +7,7 @@ import {
   MediaAttachment 
 } from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 
@@ -478,6 +478,18 @@ export const editMessage = async (
     method: "PUT",
     token,
     body: JSON.stringify({ chatId, content }),
+  });
+
+export const forwardMessage = async (
+  token: string,
+  messageId: string,
+  chatId: string,
+  targetChatId: string
+) =>
+  request<{ message: Message }>(`/messages/${messageId}/forward`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ chatId, targetChatId }),
   });
 
 export const addReaction = async (

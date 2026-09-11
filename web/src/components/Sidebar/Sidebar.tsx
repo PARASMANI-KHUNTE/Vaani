@@ -13,6 +13,8 @@ import {
   Archive,
   Copy,
   Palette,
+  Video,
+  Mic,
 } from "lucide-react";
 import { useState } from "react";
 import { Chat } from "@/lib/types";
@@ -45,8 +47,8 @@ type SidebarProps = {
 const MessageTypeIcon = ({ type }: { type: string }) => {
   switch (type) {
     case "image": return <ImageIcon className="h-3.5 w-3.5" />;
-    case "video": return <Check className="h-3.5 w-3.5" />; 
-    case "voice": return <Check className="h-3.5 w-3.5" />; 
+    case "video": return <Video className="h-3.5 w-3.5" />; 
+    case "voice": return <Mic className="h-3.5 w-3.5" />; 
     default: return <Paperclip className="h-3.5 w-3.5" />;
   }
 };

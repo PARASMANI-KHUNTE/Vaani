@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const env = require("../config/env");
 const logger = require("./logger");
 const Chat = require("../modules/chat/chat.model");
@@ -16,7 +17,7 @@ const daysToCutoff = (days) => {
 };
 
 const runRetentionCleanup = async () => {
-  if (cleanupInProgress) {
+  if (cleanupInProgress || mongoose.connection.readyState !== 1) {
     return { skipped: true };
   }
 

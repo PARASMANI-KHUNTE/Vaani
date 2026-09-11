@@ -25,10 +25,14 @@ import {
   Smile,
   Mic,
   SendHorizontal,
+  Pencil,
+  Compass,
+  MessageSquare,
 } from "lucide-react";
 import { MessageBubble } from "@/components/MessageBubble/MessageBubble";
 import { MediaPreview, type PreviewItem } from "@/components/MediaPreview/MediaPreview";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ForwardModal } from "@/components/ForwardModal";
 import { BackendUser, Chat, Message } from "@/lib/types";
 import { cn, formatDateSeparator } from "@/lib/utils";
 
@@ -48,6 +52,9 @@ type ChatWindowProps = {
   currentUserId?: string;
   isLoading: boolean;
   onSendMessage: (content: string, replyToId?: string | null) => Promise<void>;
+  onEditMessage?: (messageId: string, content: string) => Promise<void>;
+  onForwardMessage?: (messageId: string, targetChatId: string) => Promise<void>;
+  chats?: Chat[];
   onSendMedia?: (input: {
     file: File;
     content?: string;
@@ -88,6 +95,9 @@ export const ChatWindow = ({
   currentUserId,
   isLoading,
   onSendMessage,
+  onEditMessage,
+  onForwardMessage,
+  chats,
   onSendMedia,
   onTyping,
   onDeleteMessage,
@@ -102,9 +112,13 @@ export const ChatWindow = ({
   onLeaveGroup,
   onOpenGroupInfo,
   onClearChat,
+  onOpenNewChat,
+  navigate,
 }: ChatWindowProps) => {
   const [draft, setDraft] = useState("");
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<{
@@ -370,6 +384,17 @@ export const ChatWindow = ({
   };
 
   const submitMessage = async () => {
+    if (editingMessage) {
+      const trimmed = draft.trim();
+      if (!trimmed) return;
+      const target = editingMessage;
+      setEditingMessage(null);
+      setDraft("");
+      if (onEditMessage) {
+        await onEditMessage(target._id, trimmed);
+      }
+      return;
+    }
     if (pendingMedia) {
       await sendPendingMedia();
       return;
@@ -500,12 +525,38 @@ export const ChatWindow = ({
 
   if (!chat) {
     return (
-      <section className="flex h-full flex-col items-center justify-center bg-[#f8f9fb] p-6 text-center dark:bg-slate-950 sm:bg-transparent sm:dark:bg-transparent">
-        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <MessageCircle className="h-7 w-7 text-slate-300" />
+      <section className="flex h-full flex-col items-center justify-center bg-slate-50/50 p-6 text-center dark:bg-slate-950/40">
+        <div className="max-w-md w-full rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-8 shadow-sm backdrop-blur-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+            <MessageCircle className="h-7 w-7" />
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Welcome to LinkUp</h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Select a conversation from the sidebar or start a new message to begin chatting in real-time.
+          </p>
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            {onOpenNewChat && (
+              <button
+                type="button"
+                onClick={onOpenNewChat}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+              >
+                <MessageSquare className="h-4 w-4" />
+                New Message
+              </button>
+            )}
+            {navigate && (
+              <button
+                type="button"
+                onClick={() => navigate("/explore")}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition-all"
+              >
+                <Compass className="h-4 w-4" />
+                Explore People
+              </button>
+            )}
+          </div>
         </div>
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">No conversation selected</h2>
-        <p className="mt-1.5 max-w-[200px] text-sm text-slate-500">Select a chat to start messaging</p>
       </section>
     );
   }
@@ -527,9 +578,9 @@ export const ChatWindow = ({
   }
 
   return (
-    <section className="relative flex h-full flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+    <section className={cn("relative flex h-full flex-col overflow-hidden bg-slate-50 dark:bg-slate-950", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}>
       {/* Compact Header - 56px mobile */}
-      <header className="z-30 shrink-0 bg-[#f0f2f5] dark:bg-[#1f232b] border-b border-slate-200/50 dark:border-slate-700/50">
+      <header className="z-30 shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800">
         {/* Mobile Header */}
         <div className="flex h-14 items-center px-2 sm:px-4">
           {/* Left: Back + Avatar */}
@@ -714,7 +765,7 @@ export const ChatWindow = ({
       {/* Messages Area */}
       <div 
         ref={scrollContainerRef} 
-        className="flex-1 overflow-y-auto px-3 py-2 sm:px-4 sm:py-3"
+        className={cn("flex-1 overflow-y-auto px-3 py-2 sm:px-4 sm:py-3 transition-colors", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}
       >
         {/* Loading */}
         {isLoading && messages.length === 0 ? (
@@ -731,7 +782,7 @@ export const ChatWindow = ({
                 <div key={message._id}>
                   {showDate && (
                     <div className="flex items-center justify-center py-4 sm:py-6">
-                      <span className="rounded-full bg-[#d9e0e7]/70 px-4 py-1 text-[11px] font-medium text-slate-600 backdrop-blur-sm dark:bg-slate-800/70 dark:text-slate-400">
+                      <span className="rounded-full bg-slate-200/70 dark:bg-slate-800/80 px-4 py-1 text-[11px] font-medium text-slate-600 backdrop-blur-sm dark:text-slate-300">
                         {formatDateSeparator(message.createdAt)}
                       </span>
                     </div>
@@ -743,6 +794,11 @@ export const ChatWindow = ({
                     showSenderName={chat.isGroup && isGroupStart && (!prev || getSenderId(prev.senderId) !== getSenderId(message.senderId))}
                     onReact={(msg, emoji) => onReact?.(msg._id, emoji)}
                     onDelete={(msg, scope) => onDeleteMessage?.(msg._id, scope)}
+                    onEdit={(msg) => {
+                      setEditingMessage(msg);
+                      setDraft(msg.content);
+                    }}
+                    onForward={(msg) => setForwardingMessage(msg)}
                     onReply={() => setReplyTarget(message)}
                     onMediaPreview={handleMediaPreview}
                     isGroupStart={isGroupStart}
@@ -763,7 +819,35 @@ export const ChatWindow = ({
       </div>
 
       {/* Input Bar - Sticky Bottom */}
-      <footer className="shrink-0 px-2 pb-2 pt-2 sm:px-4 sm:pb-4 bg-[#f0f2f5] dark:bg-[#1f232b]">
+      <footer className="shrink-0 px-2 pb-2 pt-2 sm:px-4 sm:pb-4 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/50 dark:border-slate-800/50">
+        {/* Editing Message Banner */}
+        <AnimatePresence>
+          {editingMessage && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-2 flex items-center justify-between rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-2 text-xs shadow-sm"
+            >
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 min-w-0">
+                <Pencil className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="truncate">
+                  <span className="font-semibold">Editing message:</span>
+                  <span className="ml-1.5 opacity-80 truncate italic">"{editingMessage.content}"</span>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => { setEditingMessage(null); setDraft(""); }}
+                className="ml-2 rounded-lg p-1 text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40 transition-colors"
+                title="Cancel edit"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Reply Preview */}
         <AnimatePresence>
           {replyTarget && (
@@ -1116,6 +1200,20 @@ export const ChatWindow = ({
         initialIndex={previewIndex}
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
+      />
+
+      {/* Forward Message Modal */}
+      <ForwardModal
+        isOpen={Boolean(forwardingMessage)}
+        onClose={() => setForwardingMessage(null)}
+        chats={chats || []}
+        currentChatId={chat?._id}
+        message={forwardingMessage}
+        onForward={async (targetChatId) => {
+          if (onForwardMessage && forwardingMessage) {
+            await onForwardMessage(forwardingMessage._id, targetChatId);
+          }
+        }}
       />
     </section>
   );

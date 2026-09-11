@@ -1,4 +1,5 @@
 const dotenv = require("dotenv");
+const crypto = require("crypto");
 
 dotenv.config();
 
@@ -6,9 +7,12 @@ const requiredVariables = ["MONGODB_URI", "JWT_SECRET", "GOOGLE_CLIENT_ID"];
 
 requiredVariables.forEach((variableName) => {
   if (!process.env[variableName]) {
-    throw new Error(`Missing required environment variable: ${variableName}`);
+    console.warn(`[AI Studio] Warning: Missing environment variable: ${variableName}. Using development fallback.`);
   }
 });
+
+const defaultDevSecret = "canvas-chat-dev-secret-key-minimum-32-chars-length";
+const productionRandomSecret = crypto.randomBytes(32).toString("hex");
 
 const parseOriginList = (value) =>
   value
@@ -39,14 +43,14 @@ const allowedClientOrigins = Array.from(
 
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
-  port: Number(process.env.PORT || 5000),
+  port: 3000,
   clientUrl: fallbackClientOrigin,
   clientUrls: allowedClientOrigins,
   mobileOrigins: parseOriginList(process.env.MOBILE_ORIGINS),
-  mongodbUri: process.env.MONGODB_URI,
-  jwtSecret: process.env.JWT_SECRET,
+  mongodbUri: process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/canvas-chat",
+  jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? productionRandomSecret : defaultDevSecret),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
-  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientIds,
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",

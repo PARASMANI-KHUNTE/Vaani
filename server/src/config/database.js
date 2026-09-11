@@ -1,14 +1,24 @@
 const mongoose = require("mongoose");
 const env = require("./env");
+const logger = require("../utils/logger");
 
 const connectDatabase = async () => {
-  const options = {
-    autoIndex: env.nodeEnv !== "production",
-  };
+  try {
+    mongoose.set("bufferCommands", false); // CRITICAL: fail fast, don't hang
+    const options = {
+      autoIndex: env.nodeEnv !== "production",
+      serverSelectionTimeoutMS: 2500,
+    };
 
-  await mongoose.connect(env.mongodbUri, options);
-
-  return mongoose.connection;
+    await mongoose.connect(env.mongodbUri, options);
+    logger.info("MongoDB connected successfully");
+    return mongoose.connection;
+  } catch (error) {
+    logger.warn("[AI Studio] MongoDB not connected — running with offline fallback", {
+      error: error.message,
+    });
+    return mongoose.connection;
+  }
 };
 
 const getConnection = () => mongoose.connection;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
-import { Compass, MailCheck, MailMinus, MessageSquare, Sparkles, Trash2, UserRound } from "lucide-react";
+import { Compass, MailCheck, MailMinus, MessageSquare, Settings, Sparkles, Trash2, UserRound } from "lucide-react";
 import { ChatWindow } from "@/components/ChatWindow/ChatWindow";
 import { ConfirmDialog, AlertDialog } from "@/components/confirm-dialog";
 import { NotificationToastStack } from "@/components/notification-toast-stack";
@@ -57,6 +57,8 @@ export const ChatShell = () => {
     sendMediaMessage,
     notifyTyping,
     deleteChatMessage,
+    editChatMessage,
+    forwardChatMessage,
     toggleReaction,
     deleteSelectedChat,
     markSelectedChatRead,
@@ -288,6 +290,9 @@ export const ChatShell = () => {
               onSendMedia={sendMediaMessage}
               onTyping={notifyTyping}
               onDeleteMessage={deleteChatMessage}
+              onEditMessage={editChatMessage}
+              onForwardMessage={forwardChatMessage}
+              chats={chats}
               onReact={toggleReaction}
               onBack={selectedChatId ? () => selectChat(null) : undefined}
               onClose={selectedChatId ? () => selectChat(null) : undefined}
@@ -342,6 +347,13 @@ export const ChatShell = () => {
           >
             <UserRound className="h-6 w-6" />
             <span className="text-[10px] font-bold uppercase tracking-tight">Profile</span>
+          </button>
+          <button 
+            onClick={() => navigate("/settings")}
+            className="flex flex-col items-center gap-1 px-4 py-2 text-slate-400 transition-all hover:text-slate-900 dark:hover:text-slate-100"
+          >
+            <Settings className="h-6 w-6" />
+            <span className="text-[10px] font-bold uppercase tracking-tight">Settings</span>
           </button>
         </nav>
       )}
