@@ -12,6 +12,18 @@ import { sendPushNotification } from '../../shared/utils/pushNotifications';
 import { socketEmitters } from '../../core/socket/server';
 import { NotificationType } from '@chat-app/shared/types';
 
+// NotificationType is a union type, not an enum - use string literals directly
+const NOTIFICATION_TYPES = {
+  MESSAGE: 'message' as NotificationType,
+  REACTION: 'reaction' as NotificationType,
+  FRIEND_REQUEST: 'friend_request' as NotificationType,
+  FRIEND_ACCEPTED: 'friend_accepted' as NotificationType,
+  FRIEND_REJECTED: 'friend_rejected' as NotificationType,
+  GROUP_INVITE: 'group_invite' as NotificationType,
+  MENTION: 'mention' as NotificationType,
+  SYSTEM: 'system' as NotificationType,
+};
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -84,11 +96,12 @@ export const createNotification = async (input: CreateNotificationInput): Promis
     type: notification.type,
     title: notification.title,
     body: notification.body,
-    data: notification.data,
+    data: notification.data as Record<string, unknown>,
     read: notification.isRead,
     chatId: notification.data.chatId?.toString(),
     actorId: notification.data.actorId?.toString(),
     createdAt: notification.createdAt.toISOString(),
+    updatedAt: notification.updatedAt.toISOString(),
   });
 
   // Send push notification if user is offline and has push tokens
@@ -144,8 +157,9 @@ export const getNotifications = async (input: GetNotificationsInput): Promise<{
   pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean };
 }> => {
   const { userId, page = 1, limit = 20, unreadOnly = false, type, before } = input;
+  const userObjectId = new mongoose.Types.ObjectId(userId);
 
-  const notifications = await Notification.getNotifications(userId, {
+  const notifications = await Notification.getNotifications(userObjectId, {
     page,
     limit,
     unreadOnly,
@@ -154,7 +168,7 @@ export const getNotifications = async (input: GetNotificationsInput): Promise<{
   });
 
   const total = await Notification.countDocuments({
-    userId,
+    userId: userObjectId,
     ...(unreadOnly ? { isRead: false } : {}),
     ...(type ? { type } : {}),
     ...(before ? { createdAt: { $lt: before } } : {}),
@@ -179,7 +193,8 @@ export const getNotifications = async (input: GetNotificationsInput): Promise<{
 // ============================================================================
 
 export const markAsRead = async (notificationId: string, userId: string): Promise<INotification | null> => {
-  const notification = await Notification.findOne({ _id: notificationId, userId });
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  const notification = await Notification.findOne({ _id: notificationId, userId: userObjectId });
   if (!notification) {
     throw new ApiError(404, 'Notification not found', 'NOTIFICATION_NOT_FOUND');
   }
@@ -193,7 +208,8 @@ export const markAsRead = async (notificationId: string, userId: string): Promis
 };
 
 export const markAllAsRead = async (userId: string): Promise<void> => {
-  await Notification.markAllAsRead(userId);
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  await Notification.markAllAsRead(userObjectId);
 
   // Emit real-time event
   socketEmitters.allNotificationsRead(userId);
@@ -204,7 +220,8 @@ export const markAllAsRead = async (userId: string): Promise<void> => {
 // ============================================================================
 
 export const getUnreadCount = async (userId: string): Promise<number> => {
-  return Notification.getUnreadCount(userId);
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  return Notification.getUnreadCount(userObjectId);
 };
 
 // ============================================================================
@@ -243,7 +260,7 @@ export const notifyNewMessage = async (
 
   await createNotification({
     userId: recipientId,
-    type: NotificationType.MESSAGE,
+    type: NOTIFICATION_TYPES.MESSAGE,
     title,
     body,
     data: {
@@ -274,7 +291,7 @@ export const notifyGroupInvite = async (
 ): Promise<void> => {
   await createNotification({
     userId: recipientId,
-    type: NotificationType.GROUP_INVITE,
+    type: NOTIFICATION_TYPES.GROUP_INVITE,
     title: 'Group Invitation',
     body: `${inviterName} invited you to join "${chatName}"`,
     data: {
@@ -299,7 +316,7 @@ export const notifyFriendRequest = async (
 ): Promise<void> => {
   await createNotification({
     userId: recipientId,
-    type: NotificationType.FRIEND_REQUEST,
+    type: NOTIFICATION_TYPES.FRIEND_REQUEST,
     title: 'New Friend Request',
     body: `${senderName} wants to be your friend`,
     data: {
@@ -319,7 +336,7 @@ export const notifyFriendAccepted = async (
 ): Promise<void> => {
   await createNotification({
     userId: recipientId,
-    type: NotificationType.FRIEND_ACCEPTED,
+    type: NOTIFICATION_TYPES.FRIEND_ACCEPTED,
     title: 'Friend Request Accepted',
     body: `${friendName} accepted your friend request`,
     data: {
@@ -344,7 +361,7 @@ export const notifyMention = async (
 ): Promise<void> => {
   await createNotification({
     userId: recipientId,
-    type: NotificationType.MENTION,
+    type: NOTIFICATION_TYPES.MENTION,
     title: `Mention in ${chatName}`,
     body: `${actorName} mentioned you: ${messageContent.substring(0, 100)}`,
     data: {
@@ -374,7 +391,7 @@ export const notifyReaction = async (
 ): Promise<void> => {
   await createNotification({
     userId: recipientId,
-    type: NotificationType.REACTION,
+    type: NOTIFICATION_TYPES.REACTION,
     title: 'New Reaction',
     body: `${actorName} reacted ${emoji} to your message`,
     data: {
@@ -398,7 +415,7 @@ export const notifySystem = async (
 ): Promise<void> => {
   await createNotification({
     userId,
-    type: NotificationType.SYSTEM,
+    type: NOTIFICATION_TYPES.SYSTEM,
     title,
     body,
     data: { metadata: data },

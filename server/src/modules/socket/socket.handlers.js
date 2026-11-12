@@ -234,7 +234,7 @@ const registerSocketHandlers = (io, socket) => {
         assertSafeMessageContent(trimmedContent);
       }
 
-      const { message, participantIds } = await createMessage({
+      let { message, participantIds } = await createMessage({
         chatId,
         senderId: currentUserId,
         content: trimmedContent,

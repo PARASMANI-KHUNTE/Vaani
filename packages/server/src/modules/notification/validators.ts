@@ -10,6 +10,9 @@ import { validationResult } from 'express-validator';
 import { ApiError } from '../../shared/utils/apiError';
 import { NotificationType } from '@chat-app/shared/types';
 
+// NotificationType is a union type, not an enum - define valid values as array
+const NOTIFICATION_TYPE_VALUES: NotificationType[] = ['message', 'reaction', 'friend_request', 'friend_accepted', 'friend_rejected', 'group_invite', 'mention', 'system'];
+
 // ============================================================================
 // Validation Chains
 // ============================================================================
@@ -35,7 +38,7 @@ export const getNotificationsQueryValidator: ValidationChain[] = [
     .withMessage('unreadOnly must be a boolean'),
   query('type')
     .optional()
-    .isIn(Object.values(NotificationType))
+    .isIn(NOTIFICATION_TYPE_VALUES)
     .withMessage('Invalid notification type'),
   query('before')
     .optional()
@@ -50,7 +53,7 @@ export const getNotificationsQueryValidator: ValidationChain[] = [
 export const validate = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const messages = errors.array().map((e) => `${e.path}: ${e.msg}`).join('; ');
+    const messages = errors.array().map((e: any) => `${e.path || e.param}: ${e.msg}`).join('; ');
     throw new ApiError(400, messages, 'VALIDATION_ERROR');
   }
   next();

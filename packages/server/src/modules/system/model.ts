@@ -23,6 +23,22 @@ export interface IAuditLog extends Document {
   success: boolean;
   errorMessage?: string;
   createdAt: Date;
+  [key: string]: unknown;
+}
+
+export interface IAuditLogModel extends mongoose.Model<IAuditLog> {
+  log(data: {
+    actorId?: mongoose.Types.ObjectId;
+    actorType: 'user' | 'system' | 'admin';
+    action: string;
+    resourceType: string;
+    resourceId?: mongoose.Types.ObjectId;
+    metadata?: Record<string, unknown>;
+    ipAddress?: string;
+    userAgent?: string;
+    success?: boolean;
+    errorMessage?: string;
+  }): Promise<IAuditLog>;
 }
 
 const AuditLogSchema = createBaseSchema<IAuditLog>({
@@ -75,6 +91,7 @@ export interface ISystemSettings extends Document {
   updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  [key: string]: unknown;
 }
 
 const SystemSettingsSchema = createBaseSchema<ISystemSettings>({

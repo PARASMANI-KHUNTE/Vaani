@@ -307,7 +307,13 @@ const updateOwnProfile = async ({ userId, name, tagline, bio }) => {
 };
 
 const registerPushToken = async ({ userId, token, platform = "android" }) => {
-  if (!isExpoPushToken(token)) {
+  if (!token || typeof token !== "string" || !token.trim()) {
+    throw new ApiError(400, "Push token is required");
+  }
+
+  // Web push subscriptions are stored as endpoint URLs; native clients must
+  // provide a valid Expo push token.
+  if (platform !== "web" && !isExpoPushToken(token)) {
     throw new ApiError(400, "Invalid Expo push token");
   }
 

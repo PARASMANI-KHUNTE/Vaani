@@ -22,6 +22,73 @@ import { Message as SharedMessage, InAppNotification } from '@chat-app/shared/ty
 type MessagePayload = SharedMessage;
 type NotificationPayload = InAppNotification;
 
+// Socket event types for type-safe server
+type ClientToServerEvents = {
+  [SocketEvents.SEND_MESSAGE]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.JOIN_CHAT]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.LEAVE_CHAT]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.TYPING]: (data: any) => void;
+  [SocketEvents.STOP_TYPING]: (data: any) => void;
+  [SocketEvents.DELETE_MESSAGE]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.EDIT_MESSAGE]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.MARK_DELIVERED]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.MARK_SEEN]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.MARK_CHAT_SEEN]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.ADD_REACTION]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.REMOVE_REACTION]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.FORWARD_MESSAGE]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.CREATE_CHAT]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.UPDATE_CHAT]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.ADD_GROUP_MEMBERS]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.REMOVE_GROUP_MEMBER]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.PROMOTE_ADMIN]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.DEMOTE_ADMIN]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.TRANSFER_OWNERSHIP]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.LEAVE_GROUP]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.JOIN_GROUP_INVITE]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.GET_ONLINE_USERS]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.GET_PRESENCE]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.MARK_NOTIFICATION_READ]: (data: any, callback?: (response: any) => void) => void;
+  [SocketEvents.MARK_ALL_NOTIFICATIONS_READ]: (data: any, callback?: (response: any) => void) => void;
+};
+
+type ServerToClientEvents = {
+  [SocketEvents.CONNECTED]: (data: any) => void;
+  [SocketEvents.NEW_MESSAGE]: (data: any) => void;
+  [SocketEvents.MESSAGE_DELIVERED]: (data: any) => void;
+  [SocketEvents.MESSAGE_SEEN]: (data: any) => void;
+  [SocketEvents.MESSAGE_DELETED]: (data: any) => void;
+  [SocketEvents.MESSAGE_EDITED]: (data: any) => void;
+  [SocketEvents.CHAT_UPDATED]: (data: any) => void;
+  [SocketEvents.CHAT_REMOVED]: (data: any) => void;
+  [SocketEvents.CHAT_CREATED]: (data: any) => void;
+  [SocketEvents.CHAT_DELETED]: (data: any) => void;
+  [SocketEvents.USER_ONLINE]: (data: any) => void;
+  [SocketEvents.USER_OFFLINE]: (data: any) => void;
+  [SocketEvents.PRESENCE_SYNC]: (data: any) => void;
+  [SocketEvents.PRESENCE_UPDATE]: (data: any) => void;
+  [SocketEvents.TYPING_START]: (data: any) => void;
+  [SocketEvents.TYPING_STOP]: (data: any) => void;
+  [SocketEvents.REACTION_ADDED]: (data: any) => void;
+  [SocketEvents.REACTION_REMOVED]: (data: any) => void;
+  [SocketEvents.FRIEND_REQUEST_RECEIVED]: (data: any) => void;
+  [SocketEvents.FRIEND_REQUEST_ACCEPTED]: (data: any) => void;
+  [SocketEvents.FRIEND_REQUEST_REJECTED]: (data: any) => void;
+  [SocketEvents.MEMBER_ADDED_TO_GROUP]: (data: any) => void;
+  [SocketEvents.MEMBER_ADDED_TO_GROUP_LOCAL]: (data: any) => void;
+  [SocketEvents.MEMBER_ADDED]: (data: any) => void;
+  [SocketEvents.MEMBER_REMOVED]: (data: any) => void;
+  [SocketEvents.NOTIFICATION_CREATED]: (data: any) => void;
+  [SocketEvents.NOTIFICATION_READ]: (data: any) => void;
+  [SocketEvents.ALL_NOTIFICATIONS_READ]: (data: any) => void;
+  [SocketEvents.SOCKET_ERROR]: (data: any) => void;
+  [SocketEvents.ONLINE_USERS_LIST]: (data: any) => void;
+  [SocketEvents.CALL_INCOMING]: (data: any) => void;
+  [SocketEvents.CALL_ACCEPTED]: (data: any) => void;
+  [SocketEvents.CALL_REJECTED]: (data: any) => void;
+  [SocketEvents.CALL_ENDED]: (data: any) => void;
+};
+
 // ============================================================================
 // Socket.IO Server Instance
 // ============================================================================
@@ -37,7 +104,7 @@ let redisSubClient: any = null;
 export const initializeSocketServer = async (httpServer: any): Promise<Server> => {
   io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: {
-      origin: config.cors.origin,
+      origin: config.clientUrl,
       credentials: true,
     },
     pingTimeout: 60000,
@@ -61,7 +128,7 @@ export const initializeSocketServer = async (httpServer: any): Promise<Server> =
   }
 
   // Register event handlers
-  const { registerSocketHandlers } = await import('./handlers');
+  const { registerSocketHandlers } = await import('./handlers.js');
   registerSocketHandlers(io);
 
   logger.info('Socket.IO server initialized');
@@ -151,11 +218,11 @@ export const socketEmitters = {
 
   // Typing events
   userTyping: (chatId: string, userId: string, userName: string) => {
-    io?.to(`chat:${chatId}`).emit(SocketEvents.USER_TYPING, { chatId, userId, userName });
+    io?.to(`chat:${chatId}`).emit(SocketEvents.TYPING_START, { chatId, userId, userName });
   },
 
   userStopTyping: (chatId: string, userId: string) => {
-    io?.to(`chat:${chatId}`).emit(SocketEvents.USER_STOP_TYPING, { chatId, userId });
+    io?.to(`chat:${chatId}`).emit(SocketEvents.TYPING_STOP, { chatId, userId });
   },
 
   // Presence events
@@ -321,7 +388,7 @@ export const getRoomParticipants = async (room: string): Promise<string[]> => {
 // User Socket Management
 // ============================================================================
 
-export const getUserSockets = async (userId: string): Promise<Socket[]> => {
+export const getUserSockets = async (userId: string): Promise<any[]> => {
   if (!io) return [];
   const sockets = await io.in(`user:${userId}`).fetchSockets();
   return sockets;

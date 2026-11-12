@@ -1362,4 +1362,5 @@ module.exports = {
   promoteGroupAdmin,
   removeGroupMember,
   transferGroupOwnership,
+  updateChatSettings,
 };

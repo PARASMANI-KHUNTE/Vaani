@@ -9,7 +9,7 @@ const pushTokenSchema = new mongoose.Schema(
     },
     platform: {
       type: String,
-      enum: ["android", "ios"],
+      enum: ["android", "ios", "web"],
       default: "android",
     },
     updatedAt: {

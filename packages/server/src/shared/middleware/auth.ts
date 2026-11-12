@@ -37,6 +37,7 @@ interface AuthenticatedUser {
   blockedUsers: mongoose.Types.ObjectId[];
   pushTokens: IUser['pushTokens'];
   settings: IUser['settings'];
+  role: 'user' | 'admin' | 'moderator';
   createdAt: Date;
   updatedAt: Date;
 }

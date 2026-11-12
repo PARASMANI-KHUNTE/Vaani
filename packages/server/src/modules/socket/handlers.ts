@@ -4,14 +4,15 @@
  */
 
 import { Server, Socket } from 'socket.io';
-import { verifyAccessToken, extractTokenFromSocket } from '../../shared/utils/jwt';
-import { User } from '../user/model';
-import { Chat } from '../chat/model';
-import { Message } from '../message/model';
-import { Notification } from '../notification/model';
-import { logger } from '../../shared/utils/logger';
-import { socketEmitters } from '../../core/socket/server';
-import { processOfflineQueue } from '../../shared/utils/offlineQueue';
+import mongoose from 'mongoose';
+import { verifyAccessToken, extractTokenFromSocket } from '../../shared/utils/jwt.js';
+import { User } from '../user/model.js';
+import { Chat } from '../chat/model.js';
+import { Message } from '../message/model.js';
+import { Notification } from '../notification/model.js';
+import { logger } from '../../shared/utils/logger.js';
+import { socketEmitters } from '../../core/socket/server.js';
+import { processOfflineQueue } from '../../shared/utils/offlineQueue.js';
 import { NotificationType } from '@chat-app/shared/types';
 import { SocketEvents } from '@chat-app/shared/constants';
 
@@ -90,7 +91,7 @@ export const handleConnection = async (io: Server, socket: AuthenticatedSocket) 
   socketEmitters.userOnline(userId);
 
   // Send initial data
-  socket.emit(SocketEvents.CONNECTED, {
+  socket.emit(SocketEvents.CONNECTED as string, {
     userId,
     socketId: socket.id,
     timestamp: new Date(),
@@ -121,7 +122,11 @@ const handleDisconnect = async (io: Server, socket: AuthenticatedSocket, reason:
   socketEmitters.userOffline(userId);
 
   // Leave all rooms
-  socket.leaveAll();
+  for (const room of socket.rooms) {
+    if (room !== socket.id) {
+      socket.leave(room);
+    }
+  }
 };
 
 // ============================================================================
@@ -139,7 +144,7 @@ export const handleSendMessage = async (io: Server, socket: AuthenticatedSocket,
     }
 
     // Import service dynamically to avoid circular deps
-    const { sendMessage } = await import('../message/service');
+    const { sendMessage } = await import('../message/service.js');
     const message = await sendMessage({
       chatId,
       senderId: userId,
@@ -162,7 +167,7 @@ export const handleEditMessage = async (io: Server, socket: AuthenticatedSocket,
     const userId = socket.userId!;
     const { messageId, chatId, content } = data;
 
-    const { editMessage } = await import('../message/service');
+    const { editMessage } = await import('../message/service.js');
     const message = await editMessage({ messageId, chatId, userId, content });
 
     callback?.({ success: true, message });
@@ -177,7 +182,7 @@ export const handleDeleteMessage = async (io: Server, socket: AuthenticatedSocke
     const userId = socket.userId!;
     const { messageId, chatId, scope } = data;
 
-    const { deleteMessage } = await import('../message/service');
+    const { deleteMessage } = await import('../message/service.js');
     const result = await deleteMessage({ messageId, chatId, userId, scope });
 
     callback?.({ success: true, ...result });
@@ -192,7 +197,7 @@ export const handleForwardMessage = async (io: Server, socket: AuthenticatedSock
     const userId = socket.userId!;
     const { messageId, chatId, targetChatId } = data;
 
-    const { forwardMessage } = await import('../message/service');
+    const { forwardMessage } = await import('../message/service.js');
     const message = await forwardMessage({ messageId, chatId, targetChatId, userId });
 
     callback?.({ success: true, message });
@@ -212,7 +217,7 @@ export const handleAddReaction = async (io: Server, socket: AuthenticatedSocket,
     const userName = socket.user!.name;
     const { messageId, emoji } = data;
 
-    const { addReaction } = await import('../message/service');
+    const { addReaction } = await import('../message/service.js');
     const message = await addReaction({ messageId, userId, userName, emoji });
 
     callback?.({ success: true, message });
@@ -227,7 +232,7 @@ export const handleRemoveReaction = async (io: Server, socket: AuthenticatedSock
     const userId = socket.userId!;
     const { messageId, emoji } = data;
 
-    const { removeReaction } = await import('../message/service');
+    const { removeReaction } = await import('../message/service.js');
     const message = await removeReaction(messageId, userId, emoji);
 
     callback?.({ success: true, message });
@@ -246,7 +251,7 @@ export const handleMarkDelivered = async (io: Server, socket: AuthenticatedSocke
     const userId = socket.userId!;
     const { messageId } = data;
 
-    const { markDelivered } = await import('../message/service');
+    const { markDelivered } = await import('../message/service.js');
     await markDelivered(messageId, userId);
 
     callback?.({ success: true });
@@ -261,7 +266,7 @@ export const handleMarkSeen = async (io: Server, socket: AuthenticatedSocket, da
     const userId = socket.userId!;
     const { messageId } = data;
 
-    const { markSeen } = await import('../message/service');
+    const { markSeen } = await import('../message/service.js');
     await markSeen(messageId, userId);
 
     callback?.({ success: true });
@@ -276,7 +281,7 @@ export const handleMarkChatSeen = async (io: Server, socket: AuthenticatedSocket
     const userId = socket.userId!;
     const { chatId, before } = data;
 
-    const { markChatMessagesSeen } = await import('../message/service');
+    const { markChatMessagesSeen } = await import('../message/service.js');
     await markChatMessagesSeen(chatId, userId, before ? new Date(before) : undefined);
 
     callback?.({ success: true });
@@ -300,7 +305,7 @@ export const handleTypingStart = async (io: Server, socket: AuthenticatedSocket,
     return;
   }
 
-  socket.to(`chat:${chatId}`).emit(SocketEvents.USER_TYPING, {
+  socket.to(`chat:${chatId}`).emit(SocketEvents.TYPING_START, {
     chatId,
     userId,
     userName: socket.user!.name,
@@ -311,7 +316,7 @@ export const handleTypingStop = async (io: Server, socket: AuthenticatedSocket, 
   const userId = socket.userId!;
   const { chatId } = data;
 
-  socket.to(`chat:${chatId}`).emit(SocketEvents.USER_STOP_TYPING, {
+  socket.to(`chat:${chatId}`).emit(SocketEvents.TYPING_STOP, {
     chatId,
     userId,
   });
@@ -379,7 +384,7 @@ export const handleMarkNotificationRead = async (io: Server, socket: Authenticat
     const userId = socket.userId!;
     const { notificationId } = data;
 
-    const { markAsRead } = await import('../notification/service');
+    const { markAsRead } = await import('../notification/service.js');
     await markAsRead(notificationId, userId);
 
     callback?.({ success: true });
@@ -393,7 +398,7 @@ export const handleMarkAllNotificationsRead = async (io: Server, socket: Authent
   try {
     const userId = socket.userId!;
 
-    const { markAllAsRead } = await import('../notification/service');
+    const { markAllAsRead } = await import('../notification/service.js');
     await markAllAsRead(userId);
 
     callback?.({ success: true });
@@ -406,8 +411,6 @@ export const handleMarkAllNotificationsRead = async (io: Server, socket: Authent
 // ============================================================================
 // Register All Handlers
 // ============================================================================
-
-import mongoose from 'mongoose';
 
 export const registerSocketHandlers = (io: Server) => {
   // Authentication middleware

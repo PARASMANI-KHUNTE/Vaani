@@ -457,17 +457,6 @@ export const clearChatMessagesForUser = async (token: string, chatId: string) =>
     token,
   });
 
-export const updateMessageStatus = async (
-  token: string,
-  messageId: string,
-  status: "delivered" | "seen"
-) =>
-  request<{ message: Message }>(`/messages/${messageId}/status`, {
-    method: "PATCH",
-    token,
-    body: JSON.stringify({ status }),
-  });
-
 export const editMessage = async (
   token: string,
   messageId: string,

@@ -19,7 +19,7 @@ const queueOfflineMessage = async (userId, message) => {
         queuedAt: new Date().toISOString(),
       });
       
-      await redis.lpPush(key, serialized);
+      await redis.lPush(key, serialized);
       await redis.lTrim(key, 0, MAX_PENDING_PER_USER - 1);
       
       if (redis.expire) {

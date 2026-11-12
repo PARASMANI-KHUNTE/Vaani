@@ -64,6 +64,28 @@ export interface INotification extends Document {
   [key: string]: unknown;
 }
 
+export interface INotificationModel extends mongoose.Model<INotification> {
+  createNotification(
+    userId: mongoose.Types.ObjectId,
+    type: NotificationType,
+    title: string,
+    body: string,
+    data?: INotificationData
+  ): Promise<INotification>;
+  getUnreadCount(userId: mongoose.Types.ObjectId): Promise<number>;
+  markAllAsRead(userId: mongoose.Types.ObjectId): Promise<void>;
+  getNotifications(
+    userId: mongoose.Types.ObjectId,
+    options: {
+      page?: number;
+      limit?: number;
+      unreadOnly?: boolean;
+      type?: NotificationType;
+      before?: Date;
+    }
+  ): Promise<INotification[]>;
+}
+
 // ============================================================================
 // Sub-schema
 // ============================================================================
@@ -211,5 +233,5 @@ NotificationSchema.statics.getNotifications = async function (
 // Model Export
 // ============================================================================
 
-export const Notification = mongoose.model<INotification>('Notification', NotificationSchema);
+export const Notification = mongoose.model<INotification, INotificationModel>('Notification', NotificationSchema);
 export default Notification;

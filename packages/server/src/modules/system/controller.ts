@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { apiResponse } from '../../shared/utils/apiResponse';
+import { sendSuccess, sendError, HttpStatus } from '../../shared/utils/apiResponse';
 import {
   getHealthStatus,
   getDetailedHealth,
@@ -27,19 +27,19 @@ import {
 export const healthCheckController = asyncHandler(async (_req: Request, res: Response) => {
   const health = await getHealthStatus();
 
-  const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
-  apiResponse.success(res, health, 'Health check completed', statusCode);
+  const statusCode = health.status === 'healthy' ? HttpStatus.OK : health.status === 'degraded' ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;
+  sendSuccess(res, statusCode, 'Health check completed', health);
 });
 
 export const detailedHealthController = asyncHandler(async (req: Request, res: Response) => {
   // Only allow admins to see detailed health
   const user = req.user!;
   if (!['admin', 'moderator'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Insufficient permissions');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Insufficient permissions');
   }
 
   const health = await getDetailedHealth();
-  apiResponse.success(res, health, 'Detailed health check completed');
+  sendSuccess(res, HttpStatus.OK, 'Detailed health check completed', health);
 });
 
 // ============================================================================
@@ -51,16 +51,16 @@ export const getSettingController = asyncHandler(async (req: Request, res: Respo
   const value = await getSystemSetting(key);
 
   if (value === undefined) {
-    return apiResponse.notFound(res, 'Setting not found');
+    return sendError(res, HttpStatus.NOT_FOUND, 'Setting not found');
   }
 
-  apiResponse.success(res, { key, value }, 'Setting retrieved successfully');
+  sendSuccess(res, HttpStatus.OK, 'Setting retrieved successfully', { key, value });
 });
 
 export const setSettingController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user!;
   if (!['admin'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Admin access required');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Admin access required');
   }
 
   const { key } = req.params;
@@ -68,12 +68,12 @@ export const setSettingController = asyncHandler(async (req: Request, res: Respo
 
   await setSystemSetting(key, value, description, user._id.toString());
 
-  apiResponse.success(res, { key, value }, 'Setting updated successfully');
+  sendSuccess(res, HttpStatus.OK, 'Setting updated successfully', { key, value });
 });
 
 export const getPublicSettingsController = asyncHandler(async (_req: Request, res: Response) => {
   const settings = await getPublicSettings();
-  apiResponse.success(res, settings, 'Public settings retrieved successfully');
+  sendSuccess(res, HttpStatus.OK, 'Public settings retrieved successfully', settings);
 });
 
 // ============================================================================
@@ -83,20 +83,20 @@ export const getPublicSettingsController = asyncHandler(async (_req: Request, re
 export const recordMetricController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user!;
   if (!['admin', 'system'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Insufficient permissions');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Insufficient permissions');
   }
 
   const { name, value, tags } = req.body;
 
   await recordMetric(name, value, tags || {});
 
-  apiResponse.success(res, null, 'Metric recorded successfully');
+  sendSuccess(res, HttpStatus.OK, 'Metric recorded successfully', null);
 });
 
 export const getMetricsController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user!;
   if (!['admin', 'moderator'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Insufficient permissions');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Insufficient permissions');
   }
 
   const { name } = req.params;
@@ -109,7 +109,7 @@ export const getMetricsController = asyncHandler(async (req: Request, res: Respo
     tags ? JSON.parse(tags as string) : {}
   );
 
-  apiResponse.success(res, { name, metrics }, 'Metrics retrieved successfully');
+  sendSuccess(res, HttpStatus.OK, 'Metrics retrieved successfully', { name, metrics });
 });
 
 // ============================================================================
@@ -119,7 +119,7 @@ export const getMetricsController = asyncHandler(async (req: Request, res: Respo
 export const getAuditLogsController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user!;
   if (!['admin', 'moderator'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Insufficient permissions');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Insufficient permissions');
   }
 
   const { actorId, action, resourceType, resourceId, start, end, page, limit } = req.query;
@@ -135,7 +135,7 @@ export const getAuditLogsController = asyncHandler(async (req: Request, res: Res
     limit: limit ? parseInt(limit as string, 10) : 50,
   });
 
-  apiResponse.success(res, result, 'Audit logs retrieved successfully');
+  sendSuccess(res, HttpStatus.OK, 'Audit logs retrieved successfully', result);
 });
 
 // ============================================================================
@@ -145,12 +145,12 @@ export const getAuditLogsController = asyncHandler(async (req: Request, res: Res
 export const runCleanupController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user!;
   if (!['admin'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Admin access required');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Admin access required');
   }
 
   const results = await runRetentionCleanup();
 
-  apiResponse.success(res, results, 'Retention cleanup completed');
+  sendSuccess(res, HttpStatus.OK, 'Retention cleanup completed', results);
 });
 
 // ============================================================================
@@ -160,9 +160,9 @@ export const runCleanupController = asyncHandler(async (req: Request, res: Respo
 export const getStatsController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user!;
   if (!['admin', 'moderator'].includes(user.role || '')) {
-    return apiResponse.forbidden(res, 'Insufficient permissions');
+    return sendError(res, HttpStatus.FORBIDDEN, 'Insufficient permissions');
   }
 
   const stats = await getSystemStats();
-  apiResponse.success(res, stats, 'System stats retrieved successfully');
+  sendSuccess(res, HttpStatus.OK, 'System stats retrieved successfully', stats);
 });

@@ -20,17 +20,34 @@ const initializeSocketServer = async (httpServer) => {
   
   if (useLocalRedis) {
     try {
-      pubClient = createClient({ url: env.redis.url });
+      pubClient = createClient({
+        url: env.redis.url,
+        socket: {
+          connectTimeout: 2000,
+          reconnectStrategy: (retries) => (retries >= 3 ? false : Math.min(100 * 2 ** retries, 1000)),
+        },
+      });
       subClient = pubClient.duplicate();
       
-      pubClient.on("error", (err) => logger.error("Redis Pub Client Error", { error: err.message }));
-      subClient.on("error", (err) => logger.error("Redis Sub Client Error", { error: err.message }));
+      pubClient.on("error", (err) => logger.warn("Redis Pub Client Error", { error: err?.message || String(err) }));
+      subClient.on("error", (err) => logger.warn("Redis Sub Client Error", { error: err?.message || String(err) }));
       
       await Promise.all([pubClient.connect(), subClient.connect()]);
       adapter = createAdapter(pubClient, subClient);
       logger.info("Socket.IO Redis adapter initialized (multi-instance ready)");
     } catch (error) {
-      logger.error("Failed to initialize Socket.IO Redis adapter", { error: error.message });
+      logger.warn("Failed to initialize Socket.IO Redis adapter - using single-node mode", {
+        error: error?.message || String(error),
+      });
+      if (pubClient?.isOpen) {
+        await pubClient.quit().catch(() => {});
+      }
+      if (subClient?.isOpen) {
+        await subClient.quit().catch(() => {});
+      }
+      pubClient = null;
+      subClient = null;
+      adapter = null;
     }
   } else if (env.redis.enabled && env.redis.upstashUrl) {
     logger.info("Socket.IO: Single-node mode (Upstash REST API - no pub/sub support)");

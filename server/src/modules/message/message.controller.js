@@ -38,7 +38,7 @@ const postMessage = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id.toString();
   const currentUserName = req.user.name;
   
-  const message = await createMessage({
+  const { message, participantIds } = await createMessage({
     chatId: req.body.chatId,
     senderId: currentUserId,
     content: req.body.content || "",
@@ -48,7 +48,7 @@ const postMessage = asyncHandler(async (req, res) => {
   });
 
   const messageChatId = message.chatId?.toString() || message.chatId;
-  await emitMessageCreated(message, messageChatId, currentUserId, currentUserName, null);
+  await emitMessageCreated(message, messageChatId, currentUserId, currentUserName, null, participantIds);
 
   return sendSuccess(res, 201, "Message sent successfully", {
     message,

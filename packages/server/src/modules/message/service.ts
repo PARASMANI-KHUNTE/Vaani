@@ -250,14 +250,14 @@ export const editMessage = async (input: EditMessageInput): Promise<IMessage> =>
   socketEmitters.messageEdited(populatedMessage! as any);
 
   logger.debug('Message edited', { messageId, chatId, userId });
-  return populatedMessage! as any;
+  return populatedMessage! as Record<string, unknown>;
 };
 
 // ============================================================================
 // Delete Message
 // ============================================================================
 
-export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messageId: string; chatId: string; message?: IMessage }> => {
+export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messageId: string; chatId: string; message?: Record<string, unknown> }> => {
   const { messageId, chatId, userId, scope } = input;
 
   const message = await Message.findOne({ _id: messageId, chatId });
@@ -298,7 +298,7 @@ export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messag
   }
 
   // Populate for response (if not deleted for everyone)
-  let populatedMessage: IMessage | undefined;
+  let populatedMessage: Record<string, unknown> | undefined;
   if (scope === 'me') {
     populatedMessage = await Message.findById(message._id)
       .populate('senderId', '_id name username email avatar')
@@ -317,7 +317,7 @@ export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messag
 // Forward Message
 // ============================================================================
 
-export const forwardMessage = async (input: ForwardMessageInput): Promise<IMessage> => {
+export const forwardMessage = async (input: ForwardMessageInput): Promise<Record<string, unknown>> => {
   const { messageId, chatId, targetChatId, userId } = input;
 
   // Get original message
@@ -370,14 +370,14 @@ export const forwardMessage = async (input: ForwardMessageInput): Promise<IMessa
   socketEmitters.newMessage(targetChatId, populatedMessage! as any);
 
   logger.debug('Message forwarded', { originalMessageId: messageId, targetChatId, userId });
-  return populatedMessage!;
+  return populatedMessage! as Record<string, unknown>;
 };
 
 // ============================================================================
 // Reactions
 // ============================================================================
 
-export const addReaction = async (input: ReactionInput): Promise<IMessage> => {
+export const addReaction = async (input: ReactionInput): Promise<Record<string, unknown>> => {
   const { messageId, userId, userName, emoji } = input;
 
   const message = await Message.findById(messageId);
@@ -405,10 +405,10 @@ export const addReaction = async (input: ReactionInput): Promise<IMessage> => {
   socketEmitters.reactionAdded(populatedMessage! as any, userId, userName, emoji);
 
   logger.debug('Reaction added', { messageId, userId, emoji });
-  return populatedMessage!;
+  return populatedMessage! as Record<string, unknown>;
 };
 
-export const removeReaction = async (messageId: string, userId: string, emoji: string): Promise<IMessage> => {
+export const removeReaction = async (messageId: string, userId: string, emoji: string): Promise<Record<string, unknown>> => {
   const message = await Message.findById(messageId);
   if (!message) throw new ApiError(404, 'Message not found', 'MESSAGE_NOT_FOUND');
 
@@ -425,7 +425,7 @@ export const removeReaction = async (messageId: string, userId: string, emoji: s
   socketEmitters.reactionRemoved(populatedMessage! as any, userId, emoji);
 
   logger.debug('Reaction removed', { messageId, userId, emoji });
-  return populatedMessage!;
+  return populatedMessage! as Record<string, unknown>;
 };
 
 // ============================================================================
