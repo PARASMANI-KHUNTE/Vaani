@@ -46,9 +46,7 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 const startServer = async () => {
-  await connectDatabase();
-  logger.info("MongoDB connected");
-
+  void connectDatabase();
   await connectRedis();
 
   server = http.createServer(app);
@@ -59,8 +57,8 @@ const startServer = async () => {
   
   initializeRetentionCleanup();
 
-  server.listen(env.port, () => {
-    logger.info(`Server listening on port http://localhost:${env.port}`);
+  server.listen(env.port, "0.0.0.0", () => {
+    logger.info(`Server listening on http://0.0.0.0:${env.port}`);
   });
   
   server.timeout = 30000;

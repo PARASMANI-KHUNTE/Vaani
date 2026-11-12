@@ -32,7 +32,10 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
   const [error, setError] = useState<string | null>(null);
   const pendingRequestsRef = useRef(new Set<string>());
   const storeRef = useRef<ReturnType<typeof useChatStore.getState> | null>(null);
-  storeRef.current = useChatStore.getState();
+
+  useEffect(() => {
+    storeRef.current = useChatStore.getState();
+  });
 
   useEffect(() => {
     if (!token) {

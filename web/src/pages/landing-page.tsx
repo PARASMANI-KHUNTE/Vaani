@@ -188,7 +188,7 @@ const LandingPage = () => {
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.4, type: "spring" }}
-          className="mb-20"
+          className="mb-20 flex flex-col items-center gap-3"
         >
           <GoogleLogin
             theme="filled_blue"
@@ -198,6 +198,13 @@ const LandingPage = () => {
             onSuccess={handleGoogleSuccess}
             onError={() => console.error("Login failed")}
           />
+          <button
+            type="button"
+            onClick={() => handleGoogleSuccess({ credential: "demo-token" } as CredentialResponse)}
+            className="text-xs font-medium text-slate-500 hover:text-[#6d7af7] dark:text-slate-400 dark:hover:text-blue-400 transition-colors underline underline-offset-4 cursor-pointer"
+          >
+            Or explore instant preview as Demo User →
+          </button>
         </motion.div>
 
         {/* Chat Preview Mockup */}

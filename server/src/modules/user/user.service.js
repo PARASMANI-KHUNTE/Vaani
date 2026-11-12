@@ -12,6 +12,23 @@ const {
 } = require("../socket/socket.notifications");
 
 const findUserById = async (userId) => {
+  if (require("mongoose").connection.readyState !== 1) {
+    return {
+      _id: userId,
+      username: "alexdemo",
+      name: "Alex Demo",
+      email: "alex.demo@linkup.chat",
+      accountStatus: "active",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      tagline: "Exploring LinkUp in preview mode",
+      bio: "Welcome to LinkUp!",
+      friends: [],
+      sentFriendRequests: [],
+      receivedFriendRequests: [],
+      blockedUsers: [],
+      lastSeen: new Date(),
+    };
+  }
   return User.findById(userId).lean();
 };
 
@@ -129,6 +146,25 @@ const mapUserProfile = (user, currentUserId = null, currentUserMeta = null) => {
 
 const findOrCreateUser = async ({ email, name, avatar }) => {
   const normalizedEmail = email.trim().toLowerCase();
+
+  if (require("mongoose").connection.readyState !== 1) {
+    return {
+      _id: "demo_user_id_1234567890ab",
+      username: "alexdemo",
+      name: name.trim() || "Alex Demo",
+      email: normalizedEmail,
+      avatar: avatar || null,
+      tagline: "Exploring LinkUp in preview mode",
+      bio: "Welcome to LinkUp!",
+      friends: [],
+      sentFriendRequests: [],
+      receivedFriendRequests: [],
+      blockedUsers: [],
+      accountStatus: "active",
+      lastSeen: new Date(),
+    };
+  }
+
   const existingUser = await User.findOne({ email: normalizedEmail }).lean();
 
   let user;

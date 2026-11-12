@@ -149,8 +149,8 @@ export const NavHeader = ({
   };
 
   return (
-    <header className="z-50 shrink-0 border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
-      <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4">
+    <header className="z-50 shrink-0 border-b border-slate-200/70 bg-white/85 px-4 py-2.5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
         {/* Left */}
         <div className="flex min-w-0 items-center gap-3">
           {showBackButton ? (

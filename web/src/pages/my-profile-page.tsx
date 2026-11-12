@@ -87,7 +87,7 @@ export const MyProfilePage = () => {
     <main className="flex min-h-dvh w-full flex-col bg-slate-50 dark:bg-slate-950">
       <NavHeader title="Profile" showBackButton backTo="/" showNav />
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto px-4 py-6 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-lg">
           {error && (
             <div className="mb-6 flex items-center justify-between rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">

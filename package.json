@@ -1,4 +1,18 @@
 {
+  "name": "linkup",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "web",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run build:web && node server/src/server.js",
+    "build": "npm run build:web",
+    "build:web": "npm run build --workspace=web",
+    "lint": "npm run lint --workspace=web",
+    "start": "node server/src/server.js"
+  },
   "devDependencies": {
     "docx": "^9.6.1",
     "html-docx-js": "^0.3.1",

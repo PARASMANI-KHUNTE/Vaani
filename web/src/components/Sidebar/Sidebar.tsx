@@ -13,6 +13,8 @@ import {
   Archive,
   Copy,
   Palette,
+  Video,
+  Mic,
 } from "lucide-react";
 import { useState } from "react";
 import { Chat } from "@/lib/types";
@@ -45,8 +47,8 @@ type SidebarProps = {
 const MessageTypeIcon = ({ type }: { type: string }) => {
   switch (type) {
     case "image": return <ImageIcon className="h-3.5 w-3.5" />;
-    case "video": return <Check className="h-3.5 w-3.5" />; 
-    case "voice": return <Check className="h-3.5 w-3.5" />; 
+    case "video": return <Video className="h-3.5 w-3.5" />; 
+    case "voice": return <Mic className="h-3.5 w-3.5" />; 
     default: return <Paperclip className="h-3.5 w-3.5" />;
   }
 };
@@ -179,7 +181,7 @@ export const Sidebar = ({
   }
 
   return (
-    <aside className="flex h-full w-full md:w-[300px] shrink-0 flex-col border-r border-slate-200/70 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <aside className="flex h-full w-full shrink-0 flex-col border-r border-slate-200/70 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
