@@ -98,7 +98,7 @@ describe("Monitoring routes", () => {
       expect(status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.message).toBe("OK");
-      expect(body.data.service).toBe("canvas-chat");
+      expect(body.data.service).toBe("linkup-chat");
     } finally {
       await stopServer(server);
     }

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, Stack } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +30,8 @@ import { mobileConfig } from "@/lib/config";
 import { useMobileSocial } from "@/hooks/use-mobile-social";
 import { useSessionStore } from "@/store/session-store";
 import { MobileChat, ChatParticipant } from "@/lib/types";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 
 type MemberWithAction = ChatParticipant & { isOwner: boolean; isAdmin: boolean; actionMenuOpen: boolean };
 
@@ -38,6 +40,8 @@ export default function GroupInfoScreen() {
   const session = useSessionStore((state) => state.session);
   const token = session?.accessToken;
   const currentUserId = session?.user?.userId;
+  const { colors, contentWidth } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [chat, setChat] = useState<MobileChat | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +55,6 @@ export default function GroupInfoScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ChatParticipant[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isAddingMembers, setIsAddingMembers] = useState(false);
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -65,7 +68,7 @@ export default function GroupInfoScreen() {
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const { directoryUsers, isLoadingDirectory } = useMobileSocial({ token });
+  const { directoryUsers } = useMobileSocial({ token });
 
   const isOwner = chat?.createdBy === currentUserId;
   const isAdmin = chat?.adminIds?.includes(currentUserId || "") || isOwner;
@@ -79,7 +82,7 @@ export default function GroupInfoScreen() {
       if (found) {
         setChat(found);
       }
-    } catch (err) {
+    } catch {
       setError("Failed to load group info");
     } finally {
       setIsLoading(false);
@@ -130,7 +133,7 @@ export default function GroupInfoScreen() {
       setShowAddMembers(false);
       setSelectedUserIds([]);
       setSearchQuery("");
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to add members");
     } finally {
       setIsAddingMembers(false);
@@ -147,7 +150,7 @@ export default function GroupInfoScreen() {
       });
       await loadChat();
       setShowEditGroup(false);
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to update group");
     } finally {
       setIsSaving(false);
@@ -178,9 +181,9 @@ export default function GroupInfoScreen() {
 
     try {
       await Share.share({
-        message: `Join "${chat?.groupName || "Canvas Chat group"}":\n${webLink}\n\nApp link: ${deepLink}`,
+        message: `Join "${chat?.groupName || "LinkUp group"}":\n${webLink}\n\nApp link: ${deepLink}`,
       });
-    } catch (err) {
+    } catch {
       // ignore share dismissal
     }
   };
@@ -191,7 +194,7 @@ export default function GroupInfoScreen() {
       setActionLoading(memberId);
       await removeMobileGroupMember(token, chatId!, memberId);
       await loadChat();
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to remove member");
     } finally {
       setActionLoading(null);
@@ -214,7 +217,7 @@ export default function GroupInfoScreen() {
       setActionLoading(memberId);
       await promoteMobileGroupAdmin(token, chatId, memberId);
       await loadChat();
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to promote admin");
     } finally {
       setActionLoading(null);
@@ -227,7 +230,7 @@ export default function GroupInfoScreen() {
       setActionLoading(memberId);
       await demoteMobileGroupAdmin(token, chatId, memberId);
       await loadChat();
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to demote admin");
     } finally {
       setActionLoading(null);
@@ -251,7 +254,7 @@ export default function GroupInfoScreen() {
               await transferMobileGroupOwnership(token, chatId, memberId);
               await loadChat();
               closeMemberActions();
-            } catch (err) {
+            } catch {
               Alert.alert("Error", "Failed to transfer ownership");
             } finally {
               setActionLoading(null);
@@ -267,16 +270,16 @@ export default function GroupInfoScreen() {
     try {
       await leaveMobileGroup(token, chatId!);
       router.back();
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to leave group");
     }
   };
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#155e75" />
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
       </SafeAreaView>
     );
@@ -284,11 +287,11 @@ export default function GroupInfoScreen() {
 
   if (!chat || !chat.isGroup) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.centerState}>
-          <Text style={styles.errorText}>Group not found</Text>
+          <Text style={styles.errorText}>{error || "Group not found"}</Text>
           <Pressable style={styles.button} onPress={() => router.back()}>
-            <Text style={styles.buttonText}>Go Back</Text>
+            <Text style={styles.buttonText}>Go back</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -300,36 +303,42 @@ export default function GroupInfoScreen() {
   const members = membersWithActions.filter((p) => !p.isAdmin);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#0f172a" />
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.fg} />
         </Pressable>
-        <Text style={styles.headerTitle}>Group Info</Text>
+        <Text style={styles.headerTitle}>Group info</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { maxWidth: contentWidth }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            {chat.groupAvatar ? (
-              <View style={styles.avatarImage}>
-                <Text style={styles.avatarText}>{chat.groupName?.charAt(0) || "G"}</Text>
-              </View>
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="people" size={40} color="#fff" />
-              </View>
-            )}
-          </View>
-          <Text style={styles.groupName}>{chat.groupName || "Unnamed Group"}</Text>
+          {chat.groupAvatar ? (
+            <View style={styles.avatarImage}>
+              <Text style={styles.avatarText}>{chat.groupName?.charAt(0) || "G"}</Text>
+            </View>
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="people" size={36} color={colors.onBrand} />
+            </View>
+          )}
+          <Text style={styles.groupName}>{chat.groupName || "Unnamed group"}</Text>
           <Text style={styles.memberCount}>{chat.participants.length} members</Text>
 
           {isAdmin && (
             <Pressable style={styles.editButton} onPress={() => setShowEditGroup(true)}>
-              <Ionicons name="pencil" size={16} color="#155e75" />
-              <Text style={styles.editButtonText}>Edit Group</Text>
+              <Ionicons name="pencil" size={16} color={colors.brand} />
+              <Text style={styles.editButtonText}>Edit group</Text>
             </Pressable>
           )}
         </View>
@@ -337,7 +346,7 @@ export default function GroupInfoScreen() {
         {isAdmin && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="link" size={16} color="#155e75" />
+              <Ionicons name="link" size={16} color={colors.brand} />
               <Text style={styles.sectionTitle}>Invite link</Text>
             </View>
             <View style={styles.inviteCard}>
@@ -363,13 +372,13 @@ export default function GroupInfoScreen() {
                       onPress={handleGenerateInvite}
                     >
                       {isGeneratingInvite ? (
-                        <ActivityIndicator size="small" color="#155e75" />
+                        <ActivityIndicator size="small" color={colors.brand} />
                       ) : (
                         <Text style={styles.inviteSecondaryText}>Refresh</Text>
                       )}
                     </Pressable>
                     <Pressable style={styles.invitePrimaryButton} onPress={() => void handleShareInvite()}>
-                      <Ionicons name="share-outline" size={18} color="#ffffff" />
+                      <Ionicons name="share-outline" size={18} color={colors.onBrand} />
                       <Text style={styles.invitePrimaryText}>Share</Text>
                     </Pressable>
                   </View>
@@ -381,10 +390,10 @@ export default function GroupInfoScreen() {
                   onPress={handleGenerateInvite}
                 >
                   {isGeneratingInvite ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
+                    <ActivityIndicator size="small" color={colors.onBrand} />
                   ) : (
                     <>
-                      <Ionicons name="sparkles" size={18} color="#ffffff" />
+                      <Ionicons name="sparkles" size={18} color={colors.onBrand} />
                       <Text style={styles.invitePrimaryText}>Generate invite</Text>
                     </>
                   )}
@@ -396,7 +405,7 @@ export default function GroupInfoScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="key" size={16} color="#f59e0b" />
+            <Ionicons name="key" size={16} color={colors.warning} />
             <Text style={styles.sectionTitle}>Owner</Text>
           </View>
           <View style={styles.ownerCard}>
@@ -407,14 +416,14 @@ export default function GroupInfoScreen() {
               <Text style={styles.memberName}>{owner?.name || "Unknown"}</Text>
               <Text style={styles.memberUsername}>@{owner?.username || "user"}</Text>
             </View>
-            <Ionicons name="key" size={18} color="#f59e0b" />
+            <Ionicons name="key" size={18} color={colors.warning} />
           </View>
         </View>
 
         {admins.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="shield-checkmark" size={16} color="#155e75" />
+              <Ionicons name="shield-checkmark" size={16} color={colors.brand} />
               <Text style={styles.sectionTitle}>Administrators</Text>
             </View>
             {admins.map((admin) => (
@@ -431,7 +440,7 @@ export default function GroupInfoScreen() {
                     style={styles.menuButton}
                     onPress={() => openMemberActions(admin)}
                   >
-                    <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
+                    <Ionicons name="ellipsis-vertical" size={20} color={colors.muted} />
                   </Pressable>
                 )}
               </View>
@@ -441,7 +450,7 @@ export default function GroupInfoScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="people" size={16} color="#64748b" />
+            <Ionicons name="people" size={16} color={colors.muted} />
             <Text style={styles.sectionTitle}>Members</Text>
           </View>
           {members.map((member) => (
@@ -458,7 +467,7 @@ export default function GroupInfoScreen() {
                   style={styles.menuButton}
                   onPress={() => openMemberActions(member)}
                 >
-                  <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
+                  <Ionicons name="ellipsis-vertical" size={20} color={colors.muted} />
                 </Pressable>
               )}
             </View>
@@ -467,15 +476,15 @@ export default function GroupInfoScreen() {
 
         {isAdmin && (
           <Pressable style={styles.actionButton} onPress={() => setShowAddMembers(true)}>
-            <Ionicons name="person-add" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Add Members</Text>
+            <Ionicons name="person-add" size={20} color={colors.onBrand} />
+            <Text style={styles.actionButtonText}>Add members</Text>
           </Pressable>
         )}
 
         {isMember && !isOwner && (
           <Pressable style={styles.leaveButton} onPress={() => setShowLeaveConfirm(true)}>
-            <Ionicons name="exit-outline" size={20} color="#dc2626" />
-            <Text style={styles.leaveButtonText}>Leave Group</Text>
+            <Ionicons name="exit-outline" size={20} color={colors.danger} />
+            <Text style={styles.leaveButtonText}>Leave group</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -509,9 +518,9 @@ export default function GroupInfoScreen() {
                   void handleRemoveMember(memberActionTarget._id);
                 }}
               >
-                <Ionicons name="person-remove-outline" size={20} color="#dc2626" />
+                <Ionicons name="person-remove-outline" size={20} color={colors.danger} />
                 <Text style={styles.actionRowDangerText}>Remove from group</Text>
-                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#dc2626" /> : null}
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color={colors.danger} /> : null}
               </Pressable>
             ) : null}
 
@@ -527,9 +536,9 @@ export default function GroupInfoScreen() {
                   void handlePromoteAdmin(memberActionTarget._id);
                 }}
               >
-                <Ionicons name="shield-checkmark-outline" size={20} color="#155e75" />
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.brand} />
                 <Text style={styles.actionRowText}>Promote to admin</Text>
-                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#155e75" /> : null}
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color={colors.brand} /> : null}
               </Pressable>
             ) : null}
 
@@ -545,9 +554,9 @@ export default function GroupInfoScreen() {
                   void handleDemoteAdmin(memberActionTarget._id);
                 }}
               >
-                <Ionicons name="shield-outline" size={20} color="#155e75" />
+                <Ionicons name="shield-outline" size={20} color={colors.brand} />
                 <Text style={styles.actionRowText}>Demote admin</Text>
-                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#155e75" /> : null}
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color={colors.brand} /> : null}
               </Pressable>
             ) : null}
 
@@ -560,9 +569,9 @@ export default function GroupInfoScreen() {
                 disabled={actionLoading === memberActionTarget._id}
                 onPress={() => void handleTransferOwnership(memberActionTarget._id)}
               >
-                <Ionicons name="key-outline" size={20} color="#f59e0b" />
+                <Ionicons name="key-outline" size={20} color={colors.warning} />
                 <Text style={styles.actionRowText}>Transfer ownership</Text>
-                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color="#f59e0b" /> : null}
+                {actionLoading === memberActionTarget._id ? <ActivityIndicator size="small" color={colors.warning} /> : null}
               </Pressable>
             ) : null}
 
@@ -577,21 +586,23 @@ export default function GroupInfoScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Members</Text>
+              <Text style={styles.modalTitle}>Add members</Text>
               <Pressable onPress={() => { setShowAddMembers(false); setSearchQuery(""); setSelectedUserIds([]); }}>
-                <Ionicons name="close" size={24} color="#0f172a" />
+                <Ionicons name="close" size={24} color={colors.fg} />
               </Pressable>
             </View>
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search users..."
+              placeholderTextColor={colors.faint}
               style={styles.searchInput}
             />
             <FlatList
               data={searchResults}
               keyExtractor={(item) => item._id}
               style={styles.searchList}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <Pressable
                   style={[styles.userOption, selectedUserIds.includes(item._id) && styles.userOptionSelected]}
@@ -609,7 +620,7 @@ export default function GroupInfoScreen() {
                     <Text style={styles.userOptionUsername}>@{item.username || "user"}</Text>
                   </View>
                   {selectedUserIds.includes(item._id) && (
-                    <Ionicons name="checkmark-circle" size={24} color="#155e75" />
+                    <Ionicons name="checkmark-circle" size={24} color={colors.brand} />
                   )}
                 </Pressable>
               )}
@@ -634,7 +645,7 @@ export default function GroupInfoScreen() {
                 onPress={handleAddMembers}
               >
                 {isAddingMembers ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.onBrand} />
                 ) : (
                   <Text style={styles.addButtonText}>Add {selectedUserIds.length}</Text>
                 )}
@@ -647,8 +658,10 @@ export default function GroupInfoScreen() {
       <Modal visible={showLeaveConfirm} transparent animationType="fade" onRequestClose={() => setShowLeaveConfirm(false)}>
         <Pressable style={styles.confirmOverlay} onPress={() => setShowLeaveConfirm(false)}>
           <View style={styles.confirmContent} onStartShouldSetResponder={() => true}>
-            <Text style={styles.confirmTitle}>Leave Group?</Text>
-            <Text style={styles.confirmBody}>Are you sure you want to leave "{chat.groupName}"?</Text>
+            <Text style={styles.confirmTitle}>Leave group?</Text>
+            <Text style={styles.confirmBody}>
+              {`Are you sure you want to leave "${chat.groupName}"?`}
+            </Text>
             <View style={styles.confirmActions}>
               <Pressable style={styles.confirmCancel} onPress={() => setShowLeaveConfirm(false)}>
                 <Text style={styles.confirmCancelText}>Cancel</Text>
@@ -665,23 +678,25 @@ export default function GroupInfoScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Group</Text>
+              <Text style={styles.modalTitle}>Edit group</Text>
               <Pressable onPress={() => setShowEditGroup(false)}>
-                <Ionicons name="close" size={24} color="#0f172a" />
+                <Ionicons name="close" size={24} color={colors.fg} />
               </Pressable>
             </View>
-            <Text style={styles.inputLabel}>Group Name</Text>
+            <Text style={styles.inputLabel}>Group name</Text>
             <TextInput
               value={editGroupName}
               onChangeText={setEditGroupName}
               placeholder="Enter group name"
+              placeholderTextColor={colors.faint}
               style={styles.textInput}
             />
-            <Text style={styles.inputLabel}>Avatar URL (Optional)</Text>
+            <Text style={styles.inputLabel}>Avatar URL (optional)</Text>
             <TextInput
               value={editGroupAvatar}
               onChangeText={setEditGroupAvatar}
               placeholder="https://example.com/image.jpg"
+              placeholderTextColor={colors.faint}
               style={styles.textInput}
             />
             <View style={styles.modalActions}>
@@ -694,7 +709,7 @@ export default function GroupInfoScreen() {
                 onPress={handleUpdateGroup}
               >
                 {isSaving ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.onBrand} />
                 ) : (
                   <Text style={styles.addButtonText}>Save</Text>
                 )}
@@ -707,108 +722,320 @@ export default function GroupInfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f2e8" },
-  centerState: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { fontSize: 16, color: "#dc2626", marginBottom: 16 },
-  button: { backgroundColor: "#155e75", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
-  buttonText: { color: "#fff", fontWeight: "700" },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 12, backgroundColor: "#fffdf8", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
-  backButton: { padding: 4 },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: "#0f172a", textAlign: "center" },
-  headerSpacer: { width: 32 },
-  content: { padding: 16, gap: 20 },
-  profileSection: { alignItems: "center", gap: 8 },
-  avatarContainer: { width: 80, height: 80, borderRadius: 24, overflow: "hidden" },
-  avatarImage: { width: 80, height: 80, backgroundColor: "#155e75", alignItems: "center", justifyContent: "center" },
-  avatarPlaceholder: { width: 80, height: 80, backgroundColor: "#0f172a", alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 32, fontWeight: "800", color: "#fff" },
-  groupName: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
-  memberCount: { fontSize: 14, color: "#64748b" },
-  editButton: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: "#e0f2fe", borderRadius: 20 },
-  editButtonText: { fontSize: 13, fontWeight: "700", color: "#155e75" },
-  section: { gap: 8 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  sectionTitle: { fontSize: 12, fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: 1 },
-  inviteCard: { borderRadius: 18, backgroundColor: "#fffdf8", padding: 14, borderWidth: 1, borderColor: "#e2e8f0", gap: 10 },
-  inviteBody: { fontSize: 13, lineHeight: 18, color: "#64748b" },
-  inviteError: { fontSize: 12, fontWeight: "700", color: "#dc2626" },
-  inviteDetails: { gap: 6 },
-  inviteLink: { fontSize: 13, fontWeight: "700", color: "#0f172a" },
-  inviteMeta: { fontSize: 11, color: "#94a3b8" },
-  inviteActions: { flexDirection: "row", gap: 10, marginTop: 6 },
-  invitePrimaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#155e75", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, flex: 1 },
-  invitePrimaryText: { fontSize: 13, fontWeight: "800", color: "#fff" },
-  inviteSecondaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#e0f2fe", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, width: 110 },
-  inviteSecondaryText: { fontSize: 13, fontWeight: "800", color: "#155e75" },
-  inviteButtonDisabled: { opacity: 0.6 },
-  ownerCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fffbeb", padding: 12, borderRadius: 16, borderWidth: 1, borderColor: "#fcd34d" },
-  memberCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fffdf8", padding: 12, borderRadius: 16 },
-  memberAvatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#cffafe", alignItems: "center", justifyContent: "center" },
-  memberAvatarText: { fontSize: 18, fontWeight: "800", color: "#155e75" },
-  memberInfo: { flex: 1 },
-  memberName: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
-  memberUsername: { fontSize: 12, color: "#64748b" },
-  menuButton: { padding: 8 },
-  actionButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#155e75", paddingVertical: 14, borderRadius: 16 },
-  actionButtonText: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  leaveButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fef2f2", paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: "#fecaca" },
-  leaveButtonText: { fontSize: 15, fontWeight: "700", color: "#dc2626" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  actionSheet: {
-    backgroundColor: "#fffdf8",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 18,
-    gap: 8,
-  },
-  actionSheetHeader: { gap: 2, paddingBottom: 8 },
-  actionSheetTitle: { fontSize: 18, fontWeight: "900", color: "#0f172a" },
-  actionSheetSubtitle: { fontSize: 12, color: "#64748b", fontWeight: "600" },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  actionRowDisabled: { opacity: 0.6 },
-  actionRowText: { flex: 1, fontSize: 14, fontWeight: "800", color: "#0f172a" },
-  actionRowDangerText: { flex: 1, fontSize: 14, fontWeight: "800", color: "#dc2626" },
-  actionCancelRow: { paddingVertical: 14, alignItems: "center" },
-  actionCancelText: { fontSize: 14, fontWeight: "800", color: "#475569" },
-  confirmOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 },
-  confirmContent: { backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "100%", maxWidth: 320 },
-  confirmTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a", textAlign: "center" },
-  confirmBody: { fontSize: 14, color: "#64748b", textAlign: "center", marginTop: 8, marginBottom: 20 },
-  confirmActions: { flexDirection: "row", gap: 12 },
-  confirmCancel: { flex: 1, paddingVertical: 12, alignItems: "center", backgroundColor: "#f1f5f9", borderRadius: 12 },
-  confirmCancelText: { fontSize: 15, fontWeight: "700", color: "#475569" },
-  confirmLeave: { flex: 1, paddingVertical: 12, alignItems: "center", backgroundColor: "#dc2626", borderRadius: 12 },
-  confirmLeaveText: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  modalContent: { backgroundColor: "#fffdf8", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "80%" },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
-  searchInput: { borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, backgroundColor: "#fff", marginBottom: 12 },
-  searchList: { maxHeight: 300 },
-  userOption: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#fff", borderRadius: 12, marginBottom: 8 },
-  userOptionSelected: { backgroundColor: "#e0f2fe" },
-  userOptionAvatar: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#cffafe", alignItems: "center", justifyContent: "center" },
-  userOptionAvatarText: { fontSize: 16, fontWeight: "800", color: "#155e75" },
-  userOptionInfo: { flex: 1 },
-  userOptionName: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
-  userOptionUsername: { fontSize: 12, color: "#64748b" },
-  emptyText: { textAlign: "center", color: "#64748b", paddingVertical: 20 },
-  modalActions: { flexDirection: "row", gap: 12, marginTop: 16 },
-  cancelButton: { flex: 1, paddingVertical: 14, alignItems: "center", backgroundColor: "#f1f5f9", borderRadius: 12 },
-  cancelButtonText: { fontSize: 15, fontWeight: "700", color: "#475569" },
-  addButton: { flex: 1, paddingVertical: 14, alignItems: "center", backgroundColor: "#155e75", borderRadius: 12 },
-  addButtonDisabled: { opacity: 0.5 },
-  addButtonText: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  inputLabel: { fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6, marginTop: 12 },
-  textInput: { borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, backgroundColor: "#fff" },
-});
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.canvas },
+    centerState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
+    errorText: { ...typography.body, color: c.danger, marginBottom: 16, textAlign: "center" },
+    button: {
+      backgroundColor: c.brand,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: radii.pill,
+    },
+    buttonText: { color: c.onBrand, fontWeight: "700" },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      backgroundColor: c.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+    },
+    backButton: { padding: 4 },
+    headerTitle: { flex: 1, ...typography.h3, color: c.fg, textAlign: "center" },
+    headerSpacer: { width: 32 },
+    content: {
+      width: "100%",
+      alignSelf: "center",
+      padding: spacing.md,
+      paddingBottom: spacing.xxl,
+      gap: spacing.lg,
+    },
+    profileSection: { alignItems: "center", gap: 8, paddingTop: spacing.xs },
+    avatarImage: {
+      width: 80,
+      height: 80,
+      borderRadius: radii.xl,
+      backgroundColor: c.brand,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarPlaceholder: {
+      width: 80,
+      height: 80,
+      borderRadius: radii.xl,
+      backgroundColor: c.fg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: { fontSize: 32, fontWeight: "800", color: c.onBrand },
+    groupName: { ...typography.h2, color: c.fg, textAlign: "center" },
+    memberCount: { fontSize: 14, color: c.muted },
+    editButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      backgroundColor: c.brandSoft,
+      borderRadius: radii.pill,
+    },
+    editButtonText: { fontSize: 13, fontWeight: "700", color: c.brand },
+    section: { gap: 8 },
+    sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+    sectionTitle: {
+      ...typography.caption,
+      color: c.muted,
+    },
+    inviteCard: {
+      borderRadius: radii.lg,
+      backgroundColor: c.surface,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: c.line,
+      gap: 10,
+    },
+    inviteBody: { fontSize: 13, lineHeight: 18, color: c.muted },
+    inviteError: { fontSize: 12, fontWeight: "700", color: c.danger },
+    inviteDetails: { gap: 6 },
+    inviteLink: { fontSize: 13, fontWeight: "700", color: c.fg },
+    inviteMeta: { fontSize: 11, color: c.faint },
+    inviteActions: { flexDirection: "row", gap: 10, marginTop: 6 },
+    invitePrimaryButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: c.brand,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: radii.md,
+      flex: 1,
+    },
+    invitePrimaryText: { fontSize: 13, fontWeight: "800", color: c.onBrand },
+    inviteSecondaryButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.brandSoft,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: radii.md,
+      width: 110,
+    },
+    inviteSecondaryText: { fontSize: 13, fontWeight: "800", color: c.brand },
+    inviteButtonDisabled: { opacity: 0.6 },
+    ownerCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: c.warningSoft,
+      padding: 12,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: c.warning,
+    },
+    memberCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 12,
+      borderRadius: radii.md,
+      marginBottom: 8,
+    },
+    memberAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.md,
+      backgroundColor: c.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    memberAvatarText: { fontSize: 18, fontWeight: "800", color: c.brand },
+    memberInfo: { flex: 1, minWidth: 0 },
+    memberName: { fontSize: 15, fontWeight: "700", color: c.fg },
+    memberUsername: { fontSize: 12, color: c.muted },
+    menuButton: { padding: 8 },
+    actionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: c.brand,
+      paddingVertical: 14,
+      borderRadius: radii.md,
+    },
+    actionButtonText: { fontSize: 15, fontWeight: "700", color: c.onBrand },
+    leaveButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: c.dangerSoft,
+      paddingVertical: 14,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: c.danger,
+    },
+    leaveButtonText: { fontSize: 15, fontWeight: "700", color: c.danger },
+    modalOverlay: { flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" },
+    actionSheet: {
+      width: "100%",
+      maxWidth: 640,
+      alignSelf: "center",
+      backgroundColor: c.surface,
+      borderTopLeftRadius: radii.xxl,
+      borderTopRightRadius: radii.xxl,
+      padding: 18,
+      gap: 8,
+    },
+    actionSheetHeader: { gap: 2, paddingBottom: 8 },
+    actionSheetTitle: { fontSize: 18, fontWeight: "900", color: c.fg },
+    actionSheetSubtitle: { fontSize: 12, color: c.muted, fontWeight: "600" },
+    actionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: radii.md,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    actionRowDisabled: { opacity: 0.6 },
+    actionRowText: { flex: 1, fontSize: 14, fontWeight: "800", color: c.fg },
+    actionRowDangerText: { flex: 1, fontSize: 14, fontWeight: "800", color: c.danger },
+    actionCancelRow: { paddingVertical: 14, alignItems: "center" },
+    actionCancelText: { fontSize: 14, fontWeight: "800", color: c.muted },
+    confirmOverlay: {
+      flex: 1,
+      backgroundColor: c.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    confirmContent: {
+      backgroundColor: c.surface,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 20,
+      width: "100%",
+      maxWidth: 340,
+    },
+    confirmTitle: { fontSize: 18, fontWeight: "800", color: c.fg, textAlign: "center" },
+    confirmBody: {
+      fontSize: 14,
+      color: c.muted,
+      textAlign: "center",
+      marginTop: 8,
+      marginBottom: 20,
+    },
+    confirmActions: { flexDirection: "row", gap: 12 },
+    confirmCancel: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      backgroundColor: c.subtle,
+      borderRadius: radii.md,
+    },
+    confirmCancelText: { fontSize: 15, fontWeight: "700", color: c.muted },
+    confirmLeave: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      backgroundColor: c.danger,
+      borderRadius: radii.md,
+    },
+    confirmLeaveText: { fontSize: 15, fontWeight: "700", color: c.onBrand },
+    modalContent: {
+      width: "100%",
+      maxWidth: 640,
+      alignSelf: "center",
+      backgroundColor: c.surface,
+      borderTopLeftRadius: radii.xxl,
+      borderTopRightRadius: radii.xxl,
+      padding: 20,
+      maxHeight: "80%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    modalTitle: { fontSize: 20, fontWeight: "800", color: c.fg },
+    searchInput: {
+      borderWidth: 1,
+      borderColor: c.line,
+      borderRadius: radii.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: c.fg,
+      backgroundColor: c.elevated,
+      marginBottom: 12,
+    },
+    searchList: { maxHeight: 300 },
+    userOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 12,
+      backgroundColor: c.elevated,
+      borderWidth: 1,
+      borderColor: c.line,
+      borderRadius: radii.md,
+      marginBottom: 8,
+    },
+    userOptionSelected: { backgroundColor: c.brandSoft, borderColor: c.brand },
+    userOptionAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.sm,
+      backgroundColor: c.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    userOptionAvatarText: { fontSize: 16, fontWeight: "800", color: c.brand },
+    userOptionInfo: { flex: 1, minWidth: 0 },
+    userOptionName: { fontSize: 15, fontWeight: "700", color: c.fg },
+    userOptionUsername: { fontSize: 12, color: c.muted },
+    emptyText: { textAlign: "center", color: c.muted, paddingVertical: 20 },
+    modalActions: { flexDirection: "row", gap: 12, marginTop: 16 },
+    cancelButton: {
+      flex: 1,
+      paddingVertical: 14,
+      alignItems: "center",
+      backgroundColor: c.subtle,
+      borderRadius: radii.md,
+    },
+    cancelButtonText: { fontSize: 15, fontWeight: "700", color: c.muted },
+    addButton: {
+      flex: 1,
+      paddingVertical: 14,
+      alignItems: "center",
+      backgroundColor: c.brand,
+      borderRadius: radii.md,
+    },
+    addButtonDisabled: { opacity: 0.5 },
+    addButtonText: { fontSize: 15, fontWeight: "700", color: c.onBrand },
+    inputLabel: { fontSize: 13, fontWeight: "700", color: c.muted, marginBottom: 6, marginTop: 12 },
+    textInput: {
+      borderWidth: 1,
+      borderColor: c.line,
+      borderRadius: radii.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: c.fg,
+      backgroundColor: c.elevated,
+    },
+  });

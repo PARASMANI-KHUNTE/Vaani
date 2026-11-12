@@ -8,11 +8,15 @@ import { mobileConfig } from "@/lib/config";
 import type { MobileGroupInvitePreview } from "@/lib/types";
 import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 
 export default function GroupInviteJoinScreen() {
   const { token: inviteToken = "" } = useLocalSearchParams<{ token?: string }>();
   const session = useSessionStore((state) => state.session);
   const upsertChat = useChatStore((state) => state.upsertChat);
+  const { colors, contentWidth } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [preview, setPreview] = useState<MobileGroupInvitePreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,8 +95,13 @@ export default function GroupInviteJoinScreen() {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconButton}>
-            <Ionicons name="chevron-back" size={22} color="#0f172a" />
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="chevron-back" size={22} color={colors.fg} />
           </Pressable>
           <Text style={styles.headerTitle}>Join group</Text>
           <View style={styles.headerSpacer} />
@@ -100,10 +109,12 @@ export default function GroupInviteJoinScreen() {
 
         <View style={styles.centerState}>
           <View style={styles.bigIcon}>
-            <Ionicons name="people-outline" size={44} color="#94a3b8" />
+            <Ionicons name="people-outline" size={38} color={colors.faint} />
           </View>
           <Text style={styles.title}>Sign in required</Text>
-          <Text style={styles.subtitle}>You need to sign in to preview and join this group invite.</Text>
+          <Text style={styles.subtitle}>
+            You need to sign in to preview and join this group invite.
+          </Text>
           <Pressable
             style={styles.primaryButton}
             onPress={() => {
@@ -121,31 +132,38 @@ export default function GroupInviteJoinScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconButton}>
-          <Ionicons name="chevron-back" size={22} color="#0f172a" />
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.fg} />
         </Pressable>
         <Text style={styles.headerTitle}>Group invite</Text>
         <Pressable
           onPress={() => {
             if (!inviteLinks) return;
             void Share.share({
-              message: `Join my Canvas Chat group:\n${inviteLinks.web}\n\nApp link: ${inviteLinks.deep}`,
+              message: `Join my LinkUp group:\n${inviteLinks.web}\n\nApp link: ${inviteLinks.deep}`,
             });
           }}
           style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Share invite"
         >
-          <Ionicons name="share-outline" size={20} color="#155e75" />
+          <Ionicons name="share-outline" size={20} color={colors.brand} />
         </Pressable>
       </View>
 
       {isLoading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#155e75" />
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
       ) : error ? (
         <View style={styles.centerState}>
           <View style={styles.bigIcon}>
-            <Ionicons name="alert-circle-outline" size={44} color="#94a3b8" />
+            <Ionicons name="alert-circle-outline" size={38} color={colors.faint} />
           </View>
           <Text style={styles.title}>Invite unavailable</Text>
           <Text style={styles.subtitle}>{error}</Text>
@@ -154,13 +172,16 @@ export default function GroupInviteJoinScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={styles.content}>
+        <View style={[styles.content, { maxWidth: contentWidth }]}>
           <View style={styles.card}>
             <View style={styles.groupIcon}>
-              <Ionicons name="people" size={32} color="#ffffff" />
+              <Ionicons name="people" size={32} color={colors.onBrand} />
             </View>
             <Text style={styles.groupName}>{preview?.groupName || "Group"}</Text>
-            <Text style={styles.groupMeta}>{preview?.memberCount ?? 0} members</Text>
+            <View style={styles.memberPill}>
+              <Ionicons name="person" size={12} color={colors.brand} />
+              <Text style={styles.groupMeta}>{preview?.memberCount ?? 0} members</Text>
+            </View>
             <Text style={styles.helperText}>
               {preview?.isAlreadyMember
                 ? "You're already a member of this group."
@@ -173,7 +194,7 @@ export default function GroupInviteJoinScreen() {
               onPress={handleJoin}
             >
               {isJoining ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={colors.onBrand} />
               ) : (
                 <Text style={styles.primaryButtonText}>
                   {preview?.isAlreadyMember ? "Open group chat" : "Join group"}
@@ -187,34 +208,111 @@ export default function GroupInviteJoinScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f2e8" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#fffdf8",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  iconButton: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: "800", color: "#0f172a", textAlign: "center" },
-  headerSpacer: { width: 40 },
-  centerState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, gap: 12 },
-  bigIcon: { width: 84, height: 84, borderRadius: 26, backgroundColor: "#fffdf8", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#e2e8f0" },
-  title: { fontSize: 20, fontWeight: "900", color: "#0f172a", textAlign: "center" },
-  subtitle: { fontSize: 14, lineHeight: 20, color: "#64748b", textAlign: "center" },
-  content: { flex: 1, padding: 20 },
-  card: { borderRadius: 28, backgroundColor: "#fffdf8", padding: 20, alignItems: "center", gap: 10 },
-  groupIcon: { width: 72, height: 72, borderRadius: 22, backgroundColor: "#155e75", alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  groupName: { fontSize: 24, fontWeight: "900", color: "#0f172a", textAlign: "center" },
-  groupMeta: { fontSize: 13, fontWeight: "700", color: "#0f766e" },
-  helperText: { fontSize: 14, lineHeight: 20, color: "#64748b", textAlign: "center", marginTop: 2 },
-  primaryButton: { marginTop: 14, borderRadius: 999, backgroundColor: "#155e75", paddingVertical: 14, paddingHorizontal: 18, minWidth: "70%", alignItems: "center" },
-  primaryButtonDisabled: { opacity: 0.75 },
-  primaryButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
-  secondaryButton: { borderRadius: 999, backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#dbe4ef", paddingVertical: 12, paddingHorizontal: 18 },
-  secondaryButtonText: { color: "#0f172a", fontSize: 14, fontWeight: "800" },
-});
-
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.canvas },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      backgroundColor: c.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+    },
+    iconButton: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.sm,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerTitle: {
+      flex: 1,
+      ...typography.h3,
+      color: c.fg,
+      textAlign: "center",
+    },
+    headerSpacer: { width: 40 },
+    centerState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 24,
+      gap: spacing.sm,
+    },
+    bigIcon: {
+      width: 80,
+      height: 80,
+      borderRadius: radii.xl,
+      backgroundColor: c.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    title: { ...typography.h2, color: c.fg, textAlign: "center" },
+    subtitle: { ...typography.small, color: c.muted, textAlign: "center", maxWidth: 320 },
+    content: {
+      flex: 1,
+      width: "100%",
+      alignSelf: "center",
+      padding: spacing.lg,
+      justifyContent: "center",
+    },
+    card: {
+      borderRadius: radii.xxl,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: spacing.xl,
+      alignItems: "center",
+      gap: 10,
+    },
+    groupIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: radii.xl,
+      backgroundColor: c.brand,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4,
+    },
+    groupName: { ...typography.h1, color: c.fg, textAlign: "center" },
+    memberPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: radii.pill,
+      backgroundColor: c.brandSoft,
+    },
+    groupMeta: { fontSize: 12, fontWeight: "700", color: c.brand },
+    helperText: {
+      ...typography.small,
+      color: c.muted,
+      textAlign: "center",
+      marginTop: 2,
+    },
+    primaryButton: {
+      marginTop: 14,
+      borderRadius: radii.pill,
+      backgroundColor: c.brand,
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      minWidth: "70%",
+      alignItems: "center",
+    },
+    primaryButtonDisabled: { opacity: 0.75 },
+    primaryButtonText: { color: c.onBrand, fontSize: 15, fontWeight: "800" },
+    secondaryButton: {
+      borderRadius: radii.pill,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      paddingVertical: 12,
+      paddingHorizontal: 18,
+    },
+    secondaryButtonText: { color: c.fg, fontSize: 14, fontWeight: "800" },
+  });

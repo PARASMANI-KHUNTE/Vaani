@@ -12,8 +12,22 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "canvas-theme";
 
+const THEME_COLORS: Record<Theme, string> = {
+  light: "#F6F7FB",
+  dark: "#090B12",
+};
+
 const applyTheme = (theme: Theme) => {
   document.documentElement.classList.toggle("dark", theme === "dark");
+
+  // Keep the mobile browser chrome in sync with the in-app theme.
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "theme-color";
+    document.head.appendChild(meta);
+  }
+  meta.content = THEME_COLORS[theme];
 };
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {

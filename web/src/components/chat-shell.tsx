@@ -51,6 +51,12 @@ export const ChatShell = () => {
     messages,
     isLoadingChats,
     isLoadingMessages,
+    isLoadingOlder,
+    hasMoreMessages,
+    loadOlderMessages,
+    isLoadingMoreChats,
+    hasMoreChats,
+    loadMoreChats,
     error,
     clearError,
     sendChatMessage,
@@ -168,12 +174,14 @@ export const ChatShell = () => {
 
   if (status === "loading") {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-base-50 dark:bg-base-950">
+      <div className="flex h-full w-full items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent flex items-center justify-center">
-            <div className="h-4 w-4 rounded-full bg-blue-600/20" />
+          <div className="relative flex h-12 w-12 items-center justify-center">
+            <span className="absolute inset-0 rounded-2xl bg-brand/10" />
+            <span className="absolute inset-0 animate-spin rounded-2xl border-2 border-brand/25 border-t-brand" />
+            <MessageSquare className="relative h-5 w-5 text-brand" />
           </div>
-          <p className="text-sm font-medium text-slate-500">Loading workspace...</p>
+          <p className="text-sm font-medium text-muted">Loading your workspace...</p>
         </div>
       </div>
     );
@@ -181,14 +189,19 @@ export const ChatShell = () => {
 
   if (!session?.backendAccessToken) {
     return (
-      <section className="flex h-full w-full items-center justify-center bg-base-50 p-6 dark:bg-base-950">
-        <div className="w-full max-w-md surface-elevated rounded-xl p-8 shadow-flat dark:shadow-flat-dark border border-border-light dark:border-border-dark text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+      <section className="relative flex h-full w-full items-center justify-center overflow-hidden bg-canvas p-6">
+        <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand/15 blur-[100px]" />
+        <div className="pointer-events-none absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-accent/10 blur-[110px]" />
+
+        <div className="surface-elevated relative w-full max-w-md rounded-3xl border-line/80 p-8 text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/10 text-brand ring-1 ring-brand/15">
             <Sparkles className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome to LinkUp</h1>
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">A secure workspace for professional real-time collaboration. Sign in to access your groups and directory.</p>
-          <div className="mt-8">
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Welcome to LinkUp</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            A secure workspace for professional real-time collaboration. Sign in to access your groups and directory.
+          </p>
+          <div className="mt-8 flex justify-center">
             <GoogleLogin
               theme={document.documentElement.classList.contains("dark") ? "filled_black" : "outline"}
               shape="rectangular"
@@ -200,14 +213,14 @@ export const ChatShell = () => {
               onError={handleGoogleLoginError}
             />
           </div>
-          <p className="mt-6 text-xs text-slate-400 dark:text-slate-500">Enterprise-grade end-to-end security.</p>
+          <p className="mt-6 text-xs font-medium text-faint">Enterprise-grade end-to-end security.</p>
         </div>
       </section>
     );
   }
 
   return (
-    <div className="flex h-dvh w-full flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden relative">
+    <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-canvas text-fg">
       {error ? (
         <Toast
           message={error}
@@ -228,12 +241,12 @@ export const ChatShell = () => {
       <NavHeader title="Messages" showNav={true} />
 
       {isSelectionMode && selectedChatIds.length > 0 && (
-        <div className="z-40 flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50/50 px-6 py-2 dark:border-blue-900/30 dark:bg-blue-950/20">
-          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{selectedChatIds.length} <span className="hidden xs:inline">selected</span></span>
+        <div className="z-40 flex shrink-0 items-center justify-between border-b border-brand/15 bg-brand/[0.06] px-4 py-2 sm:px-6">
+          <span className="text-xs font-bold text-brand">{selectedChatIds.length} <span className="hidden xs:inline">selected</span></span>
           <div className="flex items-center gap-1.5">
-            <button type="button" onClick={() => void handleBulkMarkRead()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold" title="Read"><MailCheck className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline ml-1.5">Read</span></button>
-            <button type="button" onClick={() => void handleBulkMarkUnread()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold" title="Unread"><MailMinus className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline ml-1.5">Unread</span></button>
-            <button type="button" onClick={() => void handleBulkDelete()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-200 hover:bg-rose-50 dark:bg-slate-800 dark:border-slate-700 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold text-rose-600" title="Delete"><Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline ml-1.5">Delete</span></button>
+            <button type="button" onClick={() => void handleBulkMarkRead()} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-2 text-xs font-semibold text-muted shadow-sm transition-colors hover:bg-subtle hover:text-fg sm:px-3" title="Mark as read"><MailCheck className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline">Read</span></button>
+            <button type="button" onClick={() => void handleBulkMarkUnread()} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-2 text-xs font-semibold text-muted shadow-sm transition-colors hover:bg-subtle hover:text-fg sm:px-3" title="Mark as unread"><MailMinus className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline">Unread</span></button>
+            <button type="button" onClick={() => void handleBulkDelete()} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/5 px-2 text-xs font-semibold text-rose-600 shadow-sm transition-colors hover:bg-rose-500/10 dark:text-rose-400 sm:px-3" title="Delete"><Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" /><span className="hidden sm:inline">Delete</span></button>
           </div>
         </div>
       )}
@@ -241,9 +254,9 @@ export const ChatShell = () => {
       <main className="flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar */}
         <div className={cn(
-          "h-full shrink-0 border-r border-slate-200 dark:border-slate-800 transition-all duration-200",
+          "h-full shrink-0 border-r border-line transition-all duration-200",
           selectedChatId ? "hidden md:flex" : "flex",
-          isSidebarCollapsed ? "w-16" : "w-full md:w-80 lg:w-96"
+          isSidebarCollapsed ? "w-[68px]" : "w-full md:w-80 lg:w-96"
         )}>
           <Sidebar
             chats={filteredChats}
@@ -256,6 +269,9 @@ export const ChatShell = () => {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             isLoading={isLoadingChats}
+            hasMoreChats={hasMoreChats}
+            isLoadingMoreChats={isLoadingMoreChats}
+            onLoadMoreChats={() => void loadMoreChats()}
             onlineUserIds={onlineUserIds}
             selectedChatIds={selectedChatIds}
             onSelectChats={setSelectedChatIds}
@@ -274,10 +290,10 @@ export const ChatShell = () => {
         {/* Chat Area */}
         <div className={cn("h-full min-w-0 flex-1", !selectedChatId ? "hidden md:block" : "block")}>
           {selectedChatId && !activeChat && isLoadingChats ? (
-            <div className="flex h-full w-full items-center justify-center bg-[#f8f9fb] dark:bg-slate-950">
+            <div className="flex h-full w-full items-center justify-center bg-canvas">
               <div className="flex flex-col items-center gap-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-                <p className="text-xs font-medium text-slate-500">Opening conversation...</p>
+                <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-brand/25 border-t-brand" />
+                <p className="text-xs font-medium text-muted">Opening conversation...</p>
               </div>
             </div>
           ) : (
@@ -286,6 +302,9 @@ export const ChatShell = () => {
               messages={messages}
               currentUserId={session.backendUser?._id}
               isLoading={isLoadingMessages}
+              isLoadingOlder={isLoadingOlder}
+              hasMoreMessages={hasMoreMessages}
+              onLoadOlderMessages={loadOlderMessages}
               onSendMessage={sendChatMessage}
               onSendMedia={sendMediaMessage}
               onTyping={notifyTyping}
@@ -319,41 +338,42 @@ export const ChatShell = () => {
 
       {/* Bottom Navigation for Mobile */}
       {!selectedChatId && (
-        <nav className="z-50 flex shrink-0 items-center justify-around border-t border-slate-200 bg-white/80 pb-safe pt-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 sm:hidden">
-          <button 
-            type="button" 
-            className="flex flex-col items-center gap-1 px-4 py-2 text-blue-600 transition-all dark:text-blue-400"
+        <nav className="z-50 flex shrink-0 items-center justify-around border-t border-line bg-surface/85 pb-safe pt-1.5 backdrop-blur-xl supports-[backdrop-filter]:bg-surface/70 sm:hidden">
+          <button
+            type="button"
+            className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 text-brand transition-all"
+            aria-current="page"
           >
             <div className="relative">
               <MessageSquare className="h-6 w-6" />
               {totalUnread > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white leading-none">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold leading-none text-white ring-2 ring-surface">
                   {totalUnread > 99 ? "99+" : totalUnread}
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-tight">Chats</span>
+            <span className="text-[10px] font-bold tracking-tight">Chats</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate("/explore")}
-            className="flex flex-col items-center gap-1 px-4 py-2 text-slate-400 transition-all hover:text-slate-900 dark:hover:text-slate-100"
+            className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 text-faint transition-all hover:text-fg active:scale-95"
           >
             <Compass className="h-6 w-6" />
-            <span className="text-[10px] font-bold uppercase tracking-tight">Explore</span>
+            <span className="text-[10px] font-bold tracking-tight">Explore</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate("/me/profile")}
-            className="flex flex-col items-center gap-1 px-4 py-2 text-slate-400 transition-all hover:text-slate-900 dark:hover:text-slate-100"
+            className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 text-faint transition-all hover:text-fg active:scale-95"
           >
             <UserRound className="h-6 w-6" />
-            <span className="text-[10px] font-bold uppercase tracking-tight">Profile</span>
+            <span className="text-[10px] font-bold tracking-tight">Profile</span>
           </button>
-          <button 
+          <button
             onClick={() => navigate("/settings")}
-            className="flex flex-col items-center gap-1 px-4 py-2 text-slate-400 transition-all hover:text-slate-900 dark:hover:text-slate-100"
+            className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 text-faint transition-all hover:text-fg active:scale-95"
           >
             <Settings className="h-6 w-6" />
-            <span className="text-[10px] font-bold uppercase tracking-tight">Settings</span>
+            <span className="text-[10px] font-bold tracking-tight">Settings</span>
           </button>
         </nav>
       )}

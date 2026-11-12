@@ -18,6 +18,7 @@ import {
   Cpu,
   Users,
   Palette,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -44,51 +45,57 @@ const sections: { id: SectionId; label: string; icon: typeof BookOpen }[] = [
 ];
 
 const CodeBlock = ({ children }: { children: React.ReactNode }) => (
-  <pre className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+  <pre className="mb-4 overflow-x-auto rounded-2xl border border-line bg-subtle/60 p-4 font-mono text-[13px] leading-relaxed text-fg/85">
     <code>{children}</code>
   </pre>
 );
 
+const InlineCode = ({ children }: { children: React.ReactNode }) => (
+  <code className="rounded-md border border-line bg-subtle px-1.5 py-0.5 font-mono text-xs text-fg/85">
+    {children}
+  </code>
+);
+
 const Endpoint = ({ method, path, desc }: { method: string; path: string; desc?: string }) => (
-  <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800">
+  <div className="flex items-start gap-3 rounded-xl border border-line bg-surface px-4 py-3 transition-colors hover:bg-subtle/60">
     <span
       className={cn(
         "shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider",
-        method === "GET" && "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
-        method === "POST" && "bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
-        method === "PATCH" && "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
-        method === "DELETE" && "bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-400",
-        method === "SOCKET" && "bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400"
+        method === "GET" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+        method === "POST" && "bg-brand/15 text-brand",
+        method === "PATCH" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+        method === "DELETE" && "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+        method === "SOCKET" && "bg-violet-500/15 text-violet-600 dark:text-violet-400"
       )}
     >
       {method}
     </span>
     <div className="min-w-0 flex-1">
-      <p className="font-mono text-sm text-slate-800 dark:text-slate-200">{path}</p>
-      {desc && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{desc}</p>}
+      <p className="break-words font-mono text-sm text-fg">{path}</p>
+      {desc && <p className="mt-0.5 text-xs text-muted">{desc}</p>}
     </div>
   </div>
 );
 
 const SectionHeading = ({ icon: Icon, children }: { icon: typeof BookOpen; children: React.ReactNode }) => (
   <div className="mb-6 flex items-center gap-3">
-    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-500/20">
-      <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 ring-1 ring-inset ring-brand/15">
+      <Icon className="h-5 w-5 text-brand" />
     </div>
-    <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{children}</h2>
+    <h2 className="text-2xl font-bold tracking-tight text-fg">{children}</h2>
   </div>
 );
 
 const SubHeading = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="mb-3 mt-8 text-lg font-semibold text-slate-800 dark:text-slate-200">{children}</h3>
+  <h3 className="mb-3 mt-8 text-lg font-semibold tracking-tight text-fg">{children}</h3>
 );
 
 const Body = ({ children }: { children: React.ReactNode }) => (
-  <p className="mb-4 text-sm leading-7 text-slate-600 dark:text-slate-400">{children}</p>
+  <p className="mb-4 text-sm leading-7 text-muted">{children}</p>
 );
 
 const Badge = ({ children }: { children: React.ReactNode }) => (
-  <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-600 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-400">
+  <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
     {children}
   </span>
 );
@@ -125,9 +132,9 @@ const OverviewSection = () => (
         "Chat customization (wallpaper, theme)",
         "Account disable and delete",
       ].map((cap) => (
-        <div key={cap} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-          <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-          <span className="text-sm text-slate-700 dark:text-slate-300">{cap}</span>
+        <div key={cap} className="flex items-start gap-2 rounded-xl border border-line bg-surface px-3 py-2">
+          <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+          <span className="text-sm text-fg/85">{cap}</span>
         </div>
       ))}
     </div>
@@ -162,13 +169,13 @@ const ArchitectureSection = () => (
         { icon: Globe, label: "React + Vite Web App", desc: "REST API + Socket.IO for realtime events and signaling" },
         { icon: Server, label: "Express Server", desc: "REST controllers, Socket.IO handlers, MongoDB, and Cloudinary" },
       ].map(({ icon: Icon, label, desc }) => (
-        <div key={label} className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 dark:bg-blue-500/20">
-            <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        <div key={label} className="flex items-start gap-4 rounded-2xl border border-line bg-surface p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10">
+            <Icon className="h-5 w-5 text-brand" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{desc}</p>
+            <p className="text-sm font-semibold text-fg">{label}</p>
+            <p className="mt-0.5 text-xs text-muted">{desc}</p>
           </div>
         </div>
       ))}
@@ -195,8 +202,8 @@ const ArchitectureSection = () => (
 
     <SubHeading>Realtime Model</SubHeading>
     <Body>
-      Per-user room <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs dark:bg-slate-800">user:{'{userId}'}</code> and
-      per-chat room <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs dark:bg-slate-800">chat:{'{chatId}'}</code> handle
+      Per-user room <InlineCode>user:{'{userId}'}</InlineCode> and
+      per-chat room <InlineCode>chat:{'{chatId}'}</InlineCode> handle
       message delivery, typing, read/delivered updates, presence, and notifications.
     </Body>
 
@@ -209,10 +216,10 @@ const ArchitectureSection = () => (
         "JWT authenticates REST + Socket.IO",
       ].map((step, i) => (
         <div key={i} className="flex items-center gap-3">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/15 text-xs font-bold text-brand">
             {i + 1}
           </span>
-          <span className="text-sm text-slate-700 dark:text-slate-300">{step}</span>
+          <span className="text-sm text-fg/85">{step}</span>
         </div>
       ))}
     </div>
@@ -229,8 +236,8 @@ const ApiSection = () => (
   <div>
     <SectionHeading icon={Code2}>API Reference</SectionHeading>
     <Body>
-      Base URL is configured in <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs dark:bg-slate-800">web/.env</code> as{" "}
-      <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs dark:bg-slate-800">VITE_API_URL</code>.
+      Base URL is configured in <InlineCode>web/.env</InlineCode> as{" "}
+      <InlineCode>VITE_API_URL</InlineCode>.
     </Body>
 
     <SubHeading>Auth</SubHeading>
@@ -392,47 +399,47 @@ const FeaturesSection = () => (
 
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {[
-        { 
-          title: "Authentication", 
+        {
+          title: "Authentication",
           icon: Shield,
-          items: ["Google sign-in", "JWT session management", "Mobile auth code flow", "Account disable/delete"] 
+          items: ["Google sign-in", "JWT session management", "Mobile auth code flow", "Account disable/delete"]
         },
-        { 
-          title: "Messaging", 
+        {
+          title: "Messaging",
           icon: MessageSquare,
-          items: ["Realtime send/receive", "Message replies", "Emoji reactions", "Delete for me/everyone", "Read/delivered status", "Voice recording", "Date separators"] 
+          items: ["Realtime send/receive", "Message replies", "Emoji reactions", "Delete for me/everyone", "Read/delivered status", "Voice recording", "Date separators"]
         },
-        { 
-          title: "Media", 
+        {
+          title: "Media",
           icon: Palette,
-          items: ["Image upload", "Video upload", "File attachment", "Drag-and-drop support", "Upload progress + cancel", "Gallery selection"] 
+          items: ["Image upload", "Video upload", "File attachment", "Drag-and-drop support", "Upload progress + cancel", "Gallery selection"]
         },
-        { 
-          title: "Groups", 
+        {
+          title: "Groups",
           icon: Users,
-          items: ["Create groups", "Group profile (name, avatar)", "Chat customization (wallpaper, theme)", "Invite links with expiry", "Leave group"] 
+          items: ["Create groups", "Group profile (name, avatar)", "Chat customization (wallpaper, theme)", "Invite links with expiry", "Leave group"]
         },
-        { 
-          title: "Social", 
+        {
+          title: "Social",
           icon: Users,
-          items: ["Friend requests", "Accept/reject", "Block/unblock", "Unfriend", "User directory / explore", "Blocked users management"] 
+          items: ["Friend requests", "Accept/reject", "Block/unblock", "Unfriend", "User directory / explore", "Blocked users management"]
         },
-        { 
-          title: "UI/UX", 
+        {
+          title: "UI/UX",
           icon: Palette,
-          items: ["Dark theme", "Consistent NavHeader", "Collapsible sidebar", "Responsive layout", "Typing indicators", "Presence dots", "Notification toasts", "Message bubble UI improvements", "Settings page"] 
+          items: ["Dark theme", "Consistent NavHeader", "Collapsible sidebar", "Responsive layout", "Typing indicators", "Presence dots", "Notification toasts", "Message bubble UI improvements", "Settings page"]
         },
       ].map(({ title, icon: Icon, items }) => (
-        <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-900">
+        <div key={title} className="rounded-2xl border border-line bg-surface p-5 transition-all hover:border-brand/25 hover:shadow-soft">
           <div className="mb-3 flex items-center gap-2">
-            <Icon className="h-4 w-4 text-blue-500" />
-            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</h4>
+            <Icon className="h-4 w-4 text-brand" />
+            <h4 className="text-sm font-semibold text-fg">{title}</h4>
           </div>
           <div className="space-y-1.5">
             {items.map((item) => (
               <div key={item} className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                <span className="text-xs text-slate-600 dark:text-slate-400">{item}</span>
+                <div className="h-1.5 w-1.5 rounded-full bg-brand/70" />
+                <span className="text-xs text-muted">{item}</span>
               </div>
             ))}
           </div>
@@ -452,9 +459,9 @@ const LimitsSection = () => (
         "Push notifications are not finalized for production scale",
         "Large-file behavior depends on Cloudinary and client network",
       ].map((item) => (
-        <div key={item} className="flex items-start gap-2 rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/10">
+        <div key={item} className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-2.5">
           <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-          <span className="text-sm text-slate-700 dark:text-slate-300">{item}</span>
+          <span className="text-sm text-fg/85">{item}</span>
         </div>
       ))}
     </div>
@@ -496,7 +503,7 @@ const StatusSection = () => (
       ].map((item) => (
         <div key={item} className="flex items-center gap-2">
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          <span className="text-sm text-slate-600 dark:text-slate-400">{item}</span>
+          <span className="text-sm text-muted">{item}</span>
         </div>
       ))}
     </div>
@@ -510,7 +517,7 @@ const StatusSection = () => (
       ].map((item) => (
         <div key={item} className="flex items-center gap-2">
           <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-          <span className="text-sm text-slate-600 dark:text-slate-400">{item}</span>
+          <span className="text-sm text-muted">{item}</span>
         </div>
       ))}
     </div>
@@ -522,8 +529,8 @@ const StatusSection = () => (
         "Full e2e automation coverage",
       ].map((item) => (
         <div key={item} className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-          <span className="text-sm text-slate-600 dark:text-slate-400">{item}</span>
+          <div className="h-1.5 w-1.5 rounded-full bg-faint" />
+          <span className="text-sm text-muted">{item}</span>
         </div>
       ))}
     </div>
@@ -549,32 +556,33 @@ export default function DocsPage() {
   const ActiveContent = sectionComponents[activeSection];
 
   return (
-    <div className="relative min-h-dvh bg-slate-50 dark:bg-slate-950">
+    <div className="relative min-h-dvh bg-canvas">
       {/* Top bar */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
+      <header className="sticky top-0 z-50 border-b border-line bg-canvas/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
+              className="icon-btn lg:hidden"
+              aria-label="Toggle documentation sidebar"
             >
               <BookOpen className="h-4 w-4" />
             </button>
-            <button onClick={() => navigate("/")} className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+            <button onClick={() => navigate("/")} className="flex shrink-0 items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-surface shadow-sm ring-1 ring-line">
                 <img src="/linkup-logo.png" alt="LinkUp Logo" className="h-full w-full object-cover" />
               </div>
-              <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">LinkUp</span>
+              <span className="text-lg font-bold tracking-tight text-fg">LinkUp</span>
             </button>
-            <span className="text-slate-300 dark:text-slate-600">/</span>
-            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Docs</span>
+            <span className="text-line">/</span>
+            <span className="truncate text-sm font-medium text-muted">Docs</span>
           </div>
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-subtle hover:text-fg"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Back to app
+            <span className="hidden xs:inline">Back to app</span>
           </button>
         </div>
       </header>
@@ -587,7 +595,7 @@ export default function DocsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm lg:hidden"
               onClick={() => setSidebarOpen(false)}
             />
           )}
@@ -596,10 +604,16 @@ export default function DocsPage() {
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-40 mt-14 w-64 shrink-0 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 lg:sticky lg:top-14 lg:block lg:h-[calc(100dvh-3.5rem)] lg:bg-transparent dark:lg:bg-transparent",
+            "fixed inset-y-0 left-0 z-40 mt-14 w-64 shrink-0 border-r border-line bg-surface p-4 transition-transform duration-200 lg:sticky lg:top-14 lg:block lg:h-[calc(100dvh-3.5rem)] lg:translate-x-0 lg:bg-transparent",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
+          <div className="mb-3 flex items-center justify-between px-1 lg:hidden">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-faint">Documentation</p>
+            <button onClick={() => setSidebarOpen(false)} className="icon-btn !h-7 !w-7" aria-label="Close sidebar">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <nav className="space-y-1">
             {sections.map(({ id, label, icon: Icon }) => (
               <button
@@ -611,8 +625,8 @@ export default function DocsPage() {
                 className={cn(
                   "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                   activeSection === id
-                    ? "bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                    ? "bg-brand/10 font-semibold text-brand"
+                    : "text-muted hover:bg-subtle hover:text-fg"
                 )}
               >
                 <Icon className="h-4 w-4" />

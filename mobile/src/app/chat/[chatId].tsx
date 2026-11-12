@@ -11,9 +11,7 @@ import {
   KeyboardAvoidingView,
   Linking,
   Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,13 +20,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMobileChatDetail } from "@/hooks/use-mobile-chat-detail";
 import { useMobileChats } from "@/hooks/use-mobile-chats";
-import { useMobileRealtime } from "@/hooks/use-mobile-realtime";
 import { markMobileChatRead, uploadMobileMedia } from "@/lib/api/client";
 import { getMobileSocket } from "@/lib/socket/client";
 import { mobileSocketEvents } from "@/lib/socket/events";
 import { MobileMessage, MobileMessageReaction } from "@/lib/types";
 import { useChatStore } from "@/store/chat-store";
 import { useSessionStore } from "@/store/session-store";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
@@ -39,6 +38,7 @@ const formatTime = (value: string) =>
   }).format(new Date(value));
 
 const StatusIcon = ({ status, isOwn }: { status: string; isOwn: boolean }) => {
+  const { colors } = useAppTheme();
   if (!isOwn) return null;
 
   const color = "rgba(255,255,255,0.72)";
@@ -46,7 +46,7 @@ const StatusIcon = ({ status, isOwn }: { status: string; isOwn: boolean }) => {
 
   switch (status) {
     case "seen":
-      return <Ionicons name="checkmark-done" size={size} color="#34d399" />;
+      return <Ionicons name="checkmark-done" size={size} color={colors.success} />;
     case "delivered":
       return <Ionicons name="checkmark-done" size={size} color={color} />;
     case "sent":
@@ -74,7 +74,10 @@ export default function ChatDetailScreen() {
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { colors, isTablet, threadWidth } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
 
   const chat = useMemo(
     () => chats.find((entry) => entry._id === chatId) || null,
@@ -93,7 +96,7 @@ export default function ChatDetailScreen() {
       .catch(() => undefined);
   }, [chatId, session?.accessToken, upsertChat]);
 
-  const { messages, isLoading, isSending, error, sendMessage, toggleReaction, deleteMessage, editMessage } = useMobileChatDetail({
+  const { messages, isLoading, isSending, isLoadingOlder, hasOlderMessages, error, sendMessage, toggleReaction, deleteMessage, editMessage, loadOlderMessages } = useMobileChatDetail({
     token: session?.accessToken,
     userId: session?.user?.userId,
     chat,
@@ -379,8 +382,6 @@ export default function ChatDetailScreen() {
     setSelectedMedia(null);
   }, []);
 
-
-
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -390,8 +391,13 @@ export default function ChatDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#0f172a" />
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.fg} />
         </Pressable>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName} numberOfLines={1}>
@@ -406,12 +412,12 @@ export default function ChatDetailScreen() {
           ) : null}
         </View>
         {chat?.isGroup ? (
-          <Pressable 
+          <Pressable
             style={styles.infoButton}
             // @ts-expect-error - group-info is a modal route
             onPress={() => router.push("/group-info?chatId=" + chatId)}
           >
-            <Ionicons name="information-circle-outline" size={24} color="#0f172a" />
+            <Ionicons name="information-circle-outline" size={24} color={colors.fg} />
           </Pressable>
         ) : (
           <View style={styles.headerSpacer} />
@@ -425,7 +431,7 @@ export default function ChatDetailScreen() {
       >
         {isLoading && messages.length === 0 ? (
           <View style={styles.centerState}>
-            <ActivityIndicator size="large" color="#155e75" />
+            <ActivityIndicator size="large" color={colors.brand} />
           </View>
         ) : error ? (
           <View style={styles.centerState}>
@@ -436,20 +442,40 @@ export default function ChatDetailScreen() {
             ref={flatListRef}
             data={messages}
             keyExtractor={(item) => item._id}
-            contentContainerStyle={styles.messageList}
+            contentContainerStyle={[
+              styles.messageList,
+              { maxWidth: threadWidth },
+            ]}
+            style={styles.messageListView}
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            onContentSizeChange={() => {
+              const lastMessageId = messages[messages.length - 1]?._id ?? null;
+              if (lastMessageId !== lastMessageIdRef.current) {
+                lastMessageIdRef.current = lastMessageId;
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
+            ListHeaderComponent={
+              hasOlderMessages ? (
+                <Pressable
+                  onPress={() => void loadOlderMessages()}
+                  disabled={isLoadingOlder}
+                  style={styles.loadOlderButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Load older messages"
+                >
+                  {isLoadingOlder ? (
+                    <ActivityIndicator size="small" color={colors.brand} />
+                  ) : (
+                    <Text style={styles.loadOlderText}>Load older messages</Text>
+                  )}
+                </Pressable>
+              ) : null
+            }
             renderItem={({ item }) => {
               const senderId = typeof item.senderId === "string" ? item.senderId : item.senderId._id;
               const isOwn = senderId === session?.user?.userId;
-
-              const handleMessagePress = () => {
-                if (selectedMessageId) {
-                  setReplyToMessage(item);
-                  setSelectedMessageId(null);
-                  setShowReactionPicker(false);
-                }
-              };
 
               const renderMessageContent = () => {
                 if (item.type === "image" && item.media?.url) {
@@ -470,7 +496,11 @@ export default function ChatDetailScreen() {
                       style={styles.fileContainer}
                       onPress={() => void Linking.openURL(item.media!.url)}
                     >
-                      <Ionicons name="document-text" size={24} color={isOwn ? "#ffffff" : "#155e75"} />
+                      <Ionicons
+                        name="document-text"
+                        size={24}
+                        color={isOwn ? colors.bubbleOwnText : colors.brand}
+                      />
                       <Text style={[styles.fileName, isOwn ? styles.ownText : styles.otherText]} numberOfLines={1}>
                         {item.media.originalName || item.media.publicId || "File"}
                       </Text>
@@ -483,7 +513,11 @@ export default function ChatDetailScreen() {
                       style={styles.fileContainer}
                       onPress={() => void Linking.openURL(item.media!.url)}
                     >
-                      <Ionicons name="videocam" size={24} color={isOwn ? "#ffffff" : "#155e75"} />
+                      <Ionicons
+                        name="videocam"
+                        size={24}
+                        color={isOwn ? colors.bubbleOwnText : colors.brand}
+                      />
                       <Text style={[styles.fileName, isOwn ? styles.ownText : styles.otherText]} numberOfLines={1}>
                         {item.media.originalName || "Video message"}
                       </Text>
@@ -496,7 +530,11 @@ export default function ChatDetailScreen() {
                       style={styles.fileContainer}
                       onPress={() => void Linking.openURL(item.media!.url)}
                     >
-                      <Ionicons name="mic" size={24} color={isOwn ? "#ffffff" : "#155e75"} />
+                      <Ionicons
+                        name="mic"
+                        size={24}
+                        color={isOwn ? colors.bubbleOwnText : colors.brand}
+                      />
                       <Text style={[styles.fileName, isOwn ? styles.ownText : styles.otherText]} numberOfLines={1}>
                         {item.media.originalName || "Voice message"}
                       </Text>
@@ -513,7 +551,11 @@ export default function ChatDetailScreen() {
               return (
                 <View style={[styles.messageRow, isOwn ? styles.ownRow : styles.otherRow]}>
                   <Pressable
-                    style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.otherBubble]}
+                    style={[
+                      styles.messageBubble,
+                      isTablet && styles.messageBubbleWide,
+                      isOwn ? styles.ownBubble : styles.otherBubble,
+                    ]}
                     onLongPress={() => {
                       setSelectedMessageId(item._id);
                       setShowReactionPicker(true);
@@ -528,7 +570,11 @@ export default function ChatDetailScreen() {
                   >
                     {item.replyTo && (
                       <View style={[styles.replyIndicator, isOwn ? styles.ownReplyIndicator : styles.otherReplyIndicator]}>
-                        <Ionicons name="return-up-back" size={14} color={isOwn ? "rgba(255,255,255,0.6)" : "#155e75"} />
+                        <Ionicons
+                          name="return-up-back"
+                          size={14}
+                          color={isOwn ? "rgba(255,255,255,0.6)" : colors.brand}
+                        />
                         <Text style={[styles.replyIndicatorText, isOwn ? styles.ownReplyText : styles.otherReplyText]} numberOfLines={1}>
                           {typeof item.replyTo.senderId === "string" ? "User" : item.replyTo.senderId.name}
                         </Text>
@@ -557,7 +603,9 @@ export default function ChatDetailScreen() {
             }}
             ListEmptyComponent={
               <View style={styles.emptyCard}>
-                <Ionicons name="chatbubble-outline" size={40} color="#94a3b8" />
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="chatbubble-outline" size={30} color={colors.faint} />
+                </View>
                 <Text style={styles.emptyTitle}>No messages yet</Text>
                 <Text style={styles.emptyBody}>Send a message to start the conversation.</Text>
               </View>
@@ -565,7 +613,7 @@ export default function ChatDetailScreen() {
           />
         )}
 
-        <View style={styles.composer}>
+        <View style={[styles.composer, { maxWidth: threadWidth }]}>
           {selectedMedia ? (
             <View style={styles.mediaPreviewContainer}>
               {selectedMedia.type === "image" ? (
@@ -581,7 +629,7 @@ export default function ChatDetailScreen() {
                         : "document-text"
                     }
                     size={22}
-                    color="#155e75"
+                    color={colors.brand}
                   />
                   <View style={styles.filePreviewText}>
                     <Text style={styles.filePreviewTitle} numberOfLines={1}>
@@ -594,7 +642,7 @@ export default function ChatDetailScreen() {
                 </View>
               )}
               <Pressable style={styles.cancelMediaButton} onPress={handleCancelMedia}>
-                <Ionicons name="close" size={16} color="#ffffff" />
+                <Ionicons name="close" size={16} color={colors.onBrand} />
               </Pressable>
               <Pressable
                 style={[styles.sendButton, styles.sendMediaButton, isSendingMedia && styles.sendButtonDisabled]}
@@ -602,9 +650,9 @@ export default function ChatDetailScreen() {
                 onPress={handleSendMedia}
               >
                 {isSendingMedia ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator size="small" color={colors.onBrand} />
                 ) : (
-                  <Ionicons name="send" size={18} color="#ffffff" />
+                  <Ionicons name="send" size={18} color={colors.onBrand} />
                 )}
               </Pressable>
             </View>
@@ -620,18 +668,18 @@ export default function ChatDetailScreen() {
                     </Text>
                   </View>
                   <Pressable onPress={() => setReplyToMessage(null)} style={styles.cancelReplyButton}>
-                    <Ionicons name="close" size={20} color="#64748b" />
+                    <Ionicons name="close" size={20} color={colors.muted} />
                   </Pressable>
                 </View>
               )}
               <Pressable style={styles.attachButton} onPress={handleMediaSelection}>
-                <Ionicons name="add-circle-outline" size={24} color="#64748b" />
+                <Ionicons name="add-circle-outline" size={24} color={colors.muted} />
               </Pressable>
               <TextInput
                 value={draft}
                 onChangeText={handleTextChange}
                 placeholder="Type a message"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.faint}
                 multiline
                 maxLength={2000}
                 style={styles.input}
@@ -646,9 +694,9 @@ export default function ChatDetailScreen() {
                     onPress={handleSend}
                   >
                     {isSending ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
+                      <ActivityIndicator size="small" color={colors.onBrand} />
                     ) : (
-                      <Ionicons name="send" size={18} color="#ffffff" />
+                      <Ionicons name="send" size={18} color={colors.onBrand} />
                     )}
                   </Pressable>
                 ) : null}
@@ -699,7 +747,7 @@ export default function ChatDetailScreen() {
                     setShowEditModal(true);
                   }}
                 >
-                  <Ionicons name="pencil-outline" size={20} color="#155e75" />
+                  <Ionicons name="pencil-outline" size={20} color={colors.brand} />
                   <Text style={styles.editButtonText}>Edit</Text>
                 </Pressable>
               ) : null}
@@ -710,7 +758,7 @@ export default function ChatDetailScreen() {
                   setShowDeleteModal(true);
                 }}
               >
-              <Ionicons name="trash-outline" size={20} color="#dc2626" />
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </Pressable>
           </View>
@@ -748,7 +796,7 @@ export default function ChatDetailScreen() {
                 setSelectedMessageId(null);
               }}
             >
-              <Text style={[styles.deleteOptionText, { color: "#dc2626" }]}>Delete for everyone</Text>
+              <Text style={[styles.deleteOptionText, styles.deleteDangerText]}>Delete for everyone</Text>
             </Pressable>
             <Pressable
               style={styles.cancelOption}
@@ -776,7 +824,7 @@ export default function ChatDetailScreen() {
               multiline
               autoFocus
               placeholder="Update your message..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.faint}
             />
             <View style={styles.editActions}>
               <Pressable style={styles.editCancel} onPress={() => setShowEditModal(false)}>
@@ -804,442 +852,505 @@ export default function ChatDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f2e8",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#fffdf8",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  backButton: {
-    padding: 4,
-    marginRight: 8,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  typingText: {
-    fontSize: 12,
-    color: "#155e75",
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  groupMembersText: {
-    fontSize: 12,
-    color: "#64748b",
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  headerSpacer: {
-    width: 36,
-  },
-  infoButton: {
-    padding: 4,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  centerState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  errorText: {
-    color: "#dc2626",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  messageList: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 6,
-  },
-  messageRow: {
-    flexDirection: "row",
-    marginBottom: 4,
-  },
-  ownRow: {
-    justifyContent: "flex-end",
-  },
-  otherRow: {
-    justifyContent: "flex-start",
-  },
-  messageBubble: {
-    maxWidth: "82%",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  ownBubble: {
-    backgroundColor: "#155e75",
-    borderBottomRightRadius: 6,
-  },
-  otherBubble: {
-    backgroundColor: "#fffdf8",
-    borderBottomLeftRadius: 6,
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  ownText: {
-    color: "#ffffff",
-  },
-  otherText: {
-    color: "#0f172a",
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 4,
-    marginTop: 4,
-  },
-  messageMeta: {
-    fontSize: 11,
-  },
-  ownMeta: {
-    color: "rgba(255,255,255,0.72)",
-  },
-  otherMeta: {
-    color: "#94a3b8",
-  },
-  emptyCard: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    gap: 10,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  emptyBody: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#64748b",
-    textAlign: "center",
-  },
-  composer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#fffdf8",
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: "#0f172a",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 20,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#155e75",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendButtonDisabled: {
-    opacity: 0.4,
-  },
-  reactionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 2,
-    marginTop: 4,
-  },
-  reactionEmoji: {
-    fontSize: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  reactionPickerContainer: {
-    position: "absolute",
-    bottom: 100,
-  },
-  reactionPicker: {
-    flexDirection: "row",
-    backgroundColor: "#ffffff",
-    borderRadius: 30,
-    padding: 8,
-    gap: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  reactionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#f1f5f9",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  reactionEmojiButton: {
-    fontSize: 24,
-  },
-  messageOptionsContainer: {
-    position: "absolute",
-    bottom: 100,
-    alignItems: "center",
-    gap: 12,
-  },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  editButtonText: {
-    color: "#155e75",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  deleteButtonText: {
-    color: "#dc2626",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  deleteModalContent: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 20,
-    width: "80%",
-    maxWidth: 300,
-  },
-  deleteModalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0f172a",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  deleteOption: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  deleteOptionText: {
-    fontSize: 16,
-    color: "#0f172a",
-    textAlign: "center",
-  },
-  cancelOption: {
-    paddingVertical: 14,
-    marginTop: 8,
-  },
-  cancelOptionText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#64748b",
-    textAlign: "center",
-  },
-  editModalContent: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 20,
-    width: "88%",
-    maxWidth: 340,
-    gap: 12,
-  },
-  editModalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0f172a",
-    textAlign: "center",
-  },
-  editInput: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: "#0f172a",
-    minHeight: 90,
-    textAlignVertical: "top",
-  },
-  editActions: { flexDirection: "row", gap: 12 },
-  editCancel: { flex: 1, paddingVertical: 12, alignItems: "center", backgroundColor: "#f1f5f9", borderRadius: 12 },
-  editCancelText: { fontSize: 15, fontWeight: "800", color: "#475569" },
-  editSave: { flex: 1, paddingVertical: 12, alignItems: "center", backgroundColor: "#155e75", borderRadius: 12 },
-  editSaveText: { fontSize: 15, fontWeight: "800", color: "#ffffff" },
-  attachButton: {
-    padding: 8,
-  },
-  mediaPreviewContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  mediaPreview: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  filePreview: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  filePreviewText: { flex: 1, gap: 2 },
-  filePreviewTitle: { fontSize: 13, fontWeight: "800", color: "#0f172a" },
-  filePreviewMeta: { fontSize: 11, color: "#64748b" },
-  cancelMediaButton: {
-    position: "absolute",
-    left: 44,
-    top: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#dc2626",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendMediaButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  messageImage: {
-    width: 200,
-    height: 150,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  fileContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  fileName: {
-    fontSize: 14,
-    maxWidth: 150,
-  },
-  replyPreviewContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginBottom: 4,
-    gap: 8,
-  },
-  replyLine: {
-    width: 3,
-    height: 30,
-    backgroundColor: "#155e75",
-    borderRadius: 2,
-  },
-  replyContent: {
-    flex: 1,
-  },
-  replyLabel: {
-    fontSize: 11,
-    color: "#155e75",
-    fontWeight: "600",
-  },
-  replyText: {
-    fontSize: 13,
-    color: "#475569",
-  },
-  cancelReplyButton: {
-    padding: 4,
-  },
-  replyIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginBottom: 4,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-  },
-  ownReplyIndicator: {
-    borderBottomColor: "rgba(255,255,255,0.2)",
-  },
-  otherReplyIndicator: {
-    borderBottomColor: "#e2e8f0",
-  },
-  replyIndicatorText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  ownReplyText: {
-    color: "rgba(255,255,255,0.6)",
-  },
-  otherReplyText: {
-    color: "#155e75",
-  },
-  replyIndicatorContent: {
-    fontSize: 11,
-    flex: 1,
-  },
-});
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      backgroundColor: c.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+    },
+    backButton: {
+      padding: 4,
+      marginRight: 4,
+    },
+    headerInfo: {
+      flex: 1,
+    },
+    headerName: {
+      ...typography.h3,
+      color: c.fg,
+    },
+    typingText: {
+      fontSize: 12,
+      color: c.brand,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+    groupMembersText: {
+      fontSize: 12,
+      color: c.muted,
+      fontWeight: "500",
+      marginTop: 2,
+    },
+    headerSpacer: {
+      width: 36,
+    },
+    infoButton: {
+      padding: 4,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    centerState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 24,
+    },
+    errorText: {
+      color: c.danger,
+      fontSize: 14,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+    messageListView: {
+      flex: 1,
+    },
+    loadOlderButton: {
+      alignSelf: "center",
+      marginVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+    },
+    loadOlderText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: c.muted,
+    },
+    messageList: {
+      width: "100%",
+      alignSelf: "center",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      gap: 6,
+    },
+    messageRow: {
+      flexDirection: "row",
+      marginBottom: 4,
+    },
+    ownRow: {
+      justifyContent: "flex-end",
+    },
+    otherRow: {
+      justifyContent: "flex-start",
+    },
+    messageBubble: {
+      maxWidth: "82%",
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    messageBubbleWide: {
+      maxWidth: "68%",
+    },
+    ownBubble: {
+      backgroundColor: c.bubbleOwn,
+      borderBottomRightRadius: 6,
+    },
+    otherBubble: {
+      backgroundColor: c.bubbleOther,
+      borderBottomLeftRadius: 6,
+      borderWidth: 1,
+      borderColor: c.line,
+      shadowColor: "#0A0C18",
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    },
+    messageText: {
+      fontSize: 15,
+      lineHeight: 21,
+    },
+    ownText: {
+      color: c.bubbleOwnText,
+    },
+    otherText: {
+      color: c.bubbleOtherText,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 4,
+      marginTop: 4,
+    },
+    messageMeta: {
+      fontSize: 11,
+    },
+    ownMeta: {
+      color: "rgba(255,255,255,0.72)",
+    },
+    otherMeta: {
+      color: c.faint,
+    },
+    emptyCard: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 60,
+      gap: 10,
+    },
+    emptyIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: radii.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    emptyTitle: {
+      ...typography.h3,
+      color: c.fg,
+    },
+    emptyBody: {
+      ...typography.small,
+      color: c.muted,
+      textAlign: "center",
+    },
+    composer: {
+      width: "100%",
+      alignSelf: "center",
+      flexDirection: "row",
+      alignItems: "flex-end",
+      flexWrap: "wrap",
+      gap: 10,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 10,
+      backgroundColor: c.surface,
+      borderTopWidth: 1,
+      borderTopColor: c.line,
+    },
+    input: {
+      flex: 1,
+      minHeight: 40,
+      maxHeight: 120,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: c.fg,
+      backgroundColor: c.subtle,
+      borderRadius: 20,
+    },
+    sendButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: c.brand,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    sendButtonDisabled: {
+      opacity: 0.4,
+    },
+    reactionsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 2,
+      marginTop: 4,
+    },
+    reactionEmoji: {
+      fontSize: 12,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    reactionPickerContainer: {
+      position: "absolute",
+      bottom: 100,
+    },
+    reactionPicker: {
+      flexDirection: "row",
+      backgroundColor: c.surface,
+      borderRadius: 30,
+      padding: 8,
+      gap: 4,
+      borderWidth: 1,
+      borderColor: c.line,
+      shadowColor: "#0A0C18",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    reactionButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: c.subtle,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    reactionEmojiButton: {
+      fontSize: 24,
+    },
+    messageOptionsContainer: {
+      position: "absolute",
+      bottom: 100,
+      alignItems: "center",
+      gap: 12,
+    },
+    editButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: radii.sm,
+      shadowColor: "#0A0C18",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    editButtonText: {
+      color: c.brand,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    deleteButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: radii.sm,
+      shadowColor: "#0A0C18",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    deleteButtonText: {
+      color: c.danger,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    deleteModalContent: {
+      backgroundColor: c.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 20,
+      width: "80%",
+      maxWidth: 320,
+    },
+    deleteModalTitle: {
+      ...typography.h3,
+      color: c.fg,
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    deleteOption: {
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+    },
+    deleteOptionText: {
+      fontSize: 16,
+      color: c.fg,
+      textAlign: "center",
+    },
+    deleteDangerText: {
+      color: c.danger,
+    },
+    cancelOption: {
+      paddingVertical: 14,
+      marginTop: 8,
+    },
+    cancelOptionText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: c.muted,
+      textAlign: "center",
+    },
+    editModalContent: {
+      backgroundColor: c.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 20,
+      width: "88%",
+      maxWidth: 380,
+      gap: 12,
+    },
+    editModalTitle: {
+      ...typography.h3,
+      color: c.fg,
+      textAlign: "center",
+    },
+    editInput: {
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.subtle,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: c.fg,
+      minHeight: 90,
+      textAlignVertical: "top",
+    },
+    editActions: { flexDirection: "row", gap: 12 },
+    editCancel: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      backgroundColor: c.subtle,
+      borderRadius: radii.md,
+    },
+    editCancelText: { fontSize: 15, fontWeight: "800", color: c.muted },
+    editSave: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      backgroundColor: c.brand,
+      borderRadius: radii.md,
+    },
+    editSaveText: { fontSize: 15, fontWeight: "800", color: c.onBrand },
+    attachButton: {
+      padding: 8,
+    },
+    mediaPreviewContainer: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    mediaPreview: {
+      width: 60,
+      height: 60,
+      borderRadius: radii.sm,
+    },
+    filePreview: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      borderRadius: radii.md,
+      backgroundColor: c.subtle,
+      borderWidth: 1,
+      borderColor: c.line,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    filePreviewText: { flex: 1, gap: 2 },
+    filePreviewTitle: { fontSize: 13, fontWeight: "800", color: c.fg },
+    filePreviewMeta: { fontSize: 11, color: c.muted },
+    cancelMediaButton: {
+      position: "absolute",
+      left: 44,
+      top: -4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: c.danger,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendMediaButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+    },
+    messageImage: {
+      width: 200,
+      height: 150,
+      borderRadius: radii.md,
+      marginBottom: 4,
+    },
+    fileContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 4,
+    },
+    fileName: {
+      fontSize: 14,
+      maxWidth: 150,
+    },
+    replyPreviewContainer: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: c.subtle,
+      borderRadius: radii.sm,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      marginBottom: 4,
+      gap: 8,
+    },
+    replyLine: {
+      width: 3,
+      height: 30,
+      backgroundColor: c.brand,
+      borderRadius: 2,
+    },
+    replyContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    replyLabel: {
+      fontSize: 11,
+      color: c.brand,
+      fontWeight: "600",
+    },
+    replyText: {
+      fontSize: 13,
+      color: c.muted,
+    },
+    cancelReplyButton: {
+      padding: 4,
+    },
+    replyIndicator: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginBottom: 4,
+      paddingBottom: 4,
+      borderBottomWidth: 1,
+    },
+    ownReplyIndicator: {
+      borderBottomColor: "rgba(255,255,255,0.2)",
+    },
+    otherReplyIndicator: {
+      borderBottomColor: c.line,
+    },
+    replyIndicatorText: {
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    ownReplyText: {
+      color: "rgba(255,255,255,0.6)",
+    },
+    otherReplyText: {
+      color: c.brand,
+    },
+    replyIndicatorContent: {
+      fontSize: 11,
+      flex: 1,
+    },
+  });

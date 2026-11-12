@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Trash2, X } from "lucide-react";
 
@@ -17,8 +17,6 @@ export const DeleteConfirmDialog = ({
   onConfirm,
   onCancel,
 }: DeleteConfirmDialogProps) => {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -51,37 +49,39 @@ export const DeleteConfirmDialog = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm dark:bg-black/60"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
           onClick={handleBackdropClick}
         >
           <motion.div
-            ref={dialogRef}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, type: "spring", stiffness: 300, damping: 25 }}
-            className="w-full max-w-sm overflow-hidden rounded-3xl border border-ink/10 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900"
+            role="alertdialog"
+            aria-modal="true"
+            className="w-full max-w-sm overflow-hidden rounded-3xl border border-line bg-elevated shadow-float"
           >
             <div className="relative p-6">
               <button
                 type="button"
                 onClick={onCancel}
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-ink/40 transition-colors hover:bg-ink/5 hover:text-ink dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-200"
+                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-faint transition-colors hover:bg-subtle hover:text-fg"
+                aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
 
-              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-500/10">
-                <AlertTriangle className="h-7 w-7 text-red-500" />
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 ring-1 ring-rose-500/20 dark:text-rose-400">
+                <AlertTriangle className="h-7 w-7" />
               </div>
 
-              <h3 className="mb-2 text-lg font-semibold text-ink dark:text-white">
+              <h3 className="mb-2 text-lg font-bold tracking-tight text-fg">
                 Delete conversation?
               </h3>
-              
-              <p className="mb-6 text-sm leading-relaxed text-ink/60 dark:text-slate-400">
+
+              <p className="mb-6 text-sm leading-relaxed text-muted">
                 Are you sure you want to delete your conversation with{" "}
-                <span className="font-medium text-ink dark:text-white">{chatName}</span>? 
+                <span className="font-semibold text-fg">{chatName}</span>?
                 This action cannot be undone.
               </p>
 
@@ -89,14 +89,14 @@ export const DeleteConfirmDialog = ({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="flex-1 rounded-xl border border-ink/10 bg-white px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-shell dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-muted shadow-sm transition-colors hover:bg-subtle hover:text-fg active:scale-[0.98]"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={onConfirm}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-600"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-rose-700 active:scale-[0.98]"
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete

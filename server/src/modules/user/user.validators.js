@@ -8,21 +8,33 @@ const searchUsersValidator = [
 ];
 
 const registerPushTokenValidator = [
-  body("token")
-    .trim()
-    .matches(/^ExponentPushToken\[[A-Za-z0-9+\-_=]+\]$/)
-    .withMessage("token must be a valid Expo push token"),
+  body().custom((value) => {
+    const token = value.token ?? value.pushToken;
+    if (!token) {
+      throw new Error("push token is required");
+    }
+    return true;
+  }),
+  body(["token", "pushToken"]).custom((value) => {
+    if (value === undefined) return true;
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error("token must be a non-empty string");
+    }
+    return true;
+  }),
   body("platform")
     .optional()
-    .isIn(["android", "ios"])
-    .withMessage("platform must be android or ios"),
+    .isIn(["android", "ios", "web"])
+    .withMessage("platform must be android, ios, or web"),
 ];
 
 const unregisterPushTokenValidator = [
-  body("token")
-    .trim()
-    .notEmpty()
-    .withMessage("token is required"),
+  body().custom((value) => {
+    if (!value.token && !value.pushToken) {
+      throw new Error("token is required");
+    }
+    return true;
+  }),
 ];
 
 module.exports = {

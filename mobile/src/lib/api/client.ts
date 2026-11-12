@@ -31,11 +31,21 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}) 
   return payload?.data as T;
 };
 
-export const getMobileChats = (token: string) =>
-  apiRequest<{ chats: MobileChat[] }>("/chats", {
+export const getMobileChats = (token: string, options: { limit?: number; offset?: number } = {}) => {
+  const params = new URLSearchParams();
+  params.set("limit", String(options.limit ?? 50));
+  if (options.offset) {
+    params.set("offset", String(options.offset));
+  }
+
+  return apiRequest<{
+    chats: MobileChat[];
+    pagination: { total: number; limit: number; offset: number; hasMore: boolean };
+  }>(`/chats?${params.toString()}`, {
     method: "GET",
     token,
   });
+};
 
 export const getMobileAuthMe = (token: string) =>
   apiRequest<{
@@ -90,20 +100,33 @@ export const loginMobileWithGoogle = (idToken: string) =>
     }),
   });
 
-export const getMobileMessages = (token: string, chatId: string, page = 1, limit = 30) =>
-  apiRequest<{
+export const getMobileMessages = (
+  token: string,
+  chatId: string,
+  options: { page?: number; limit?: number; cursor?: string | null } = {}
+) => {
+  const params = new URLSearchParams();
+  params.set("page", String(options.page ?? 1));
+  params.set("limit", String(options.limit ?? 30));
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  return apiRequest<{
     messages: MobileMessage[];
     pagination: {
-      page: number;
+      page?: number;
       limit: number;
       total: number;
-      totalPages: number;
+      totalPages?: number;
       hasNextPage: boolean;
+      cursor?: string | null;
     };
-  }>(`/messages/${chatId}?page=${page}&limit=${limit}`, {
+  }>(`/messages/${chatId}?${params.toString()}`, {
     method: "GET",
     token,
   });
+};
 
 export const postMobileMessage = (token: string, input: { chatId: string; content: string; replyToId?: string | null }) =>
   apiRequest<{ message: MobileMessage }>("/messages", {

@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Info, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 type ConfirmDialogProps = {
   isOpen: boolean;
@@ -21,19 +22,16 @@ type ConfirmDialogProps = {
 
 const variantStyles = {
   danger: {
-    icon: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-    confirm: "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20",
-    cancel: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700",
+    icon: "bg-rose-500/10 text-rose-600 ring-rose-500/20 dark:text-rose-400",
+    confirm: "bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-500/40",
   },
   warning: {
-    icon: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-    confirm: "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20",
-    cancel: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700",
+    icon: "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400",
+    confirm: "bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-500/40",
   },
   info: {
-    icon: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-    confirm: "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20",
-    cancel: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700",
+    icon: "bg-brand/10 text-brand ring-brand/20",
+    confirm: "bg-brand text-white hover:bg-brand-hover focus-visible:ring-brand/40",
   },
 };
 
@@ -59,7 +57,7 @@ export const ConfirmDialog = ({
   destructive,
 }: ConfirmDialogProps) => {
   const Icon = variantIcons[variant];
-  
+
   // Handle alternate props
   const finalLoading = loading ?? isLoading;
   const finalConfirmText = confirmText ?? confirmLabel;
@@ -75,7 +73,7 @@ export const ConfirmDialog = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-950/45 backdrop-blur-sm"
             onClick={finalOnCancel}
           />
           <motion.div
@@ -83,20 +81,24 @@ export const ConfirmDialog = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800 ring-1 ring-black/5"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
+            className="relative w-full max-w-sm rounded-3xl border border-line bg-elevated p-6 shadow-float"
           >
             <div className="flex items-start gap-4">
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${variantStyles[finalVariant].icon}`}>
+              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1", variantStyles[finalVariant].icon)}>
                 <Icon className="h-6 w-6" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+              <div className="flex-1 pt-0.5">
+                <h3 id="confirm-dialog-title" className="text-lg font-bold tracking-tight text-fg">{title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{message}</p>
               </div>
               <button
                 onClick={finalOnCancel}
                 disabled={finalLoading}
-                className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                className="shrink-0 rounded-lg p-1.5 text-faint transition-colors hover:bg-subtle hover:text-fg disabled:opacity-50"
+                aria-label="Close dialog"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -106,14 +108,17 @@ export const ConfirmDialog = ({
               <button
                 onClick={finalOnCancel}
                 disabled={finalLoading}
-                className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${variantStyles[finalVariant].cancel}`}
+                className="flex-1 rounded-xl border border-line bg-surface py-3 text-sm font-bold text-muted shadow-sm transition-all hover:bg-subtle hover:text-fg active:scale-[0.98] disabled:opacity-50"
               >
                 {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}
                 disabled={finalLoading}
-                className={`flex-1 rounded-xl py-3 text-sm font-bold shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 ${variantStyles[finalVariant].confirm}`}
+                className={cn(
+                  "flex-1 rounded-xl py-3 text-sm font-bold shadow-sm transition-all active:scale-[0.98] disabled:opacity-50",
+                  variantStyles[finalVariant].confirm
+                )}
               >
                 {finalLoading ? "Processing..." : finalConfirmText}
               </button>
@@ -143,7 +148,7 @@ export const AlertDialog = ({ isOpen, title, message, onDismiss, onClose }: Aler
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-950/45 backdrop-blur-sm"
             onClick={finalOnDismiss}
           />
           <motion.div
@@ -151,21 +156,23 @@ export const AlertDialog = ({ isOpen, title, message, onDismiss, onClose }: Aler
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800 ring-1 ring-black/5"
+            role="alertdialog"
+            aria-modal="true"
+            className="relative w-full max-w-sm rounded-3xl border border-line bg-elevated p-6 shadow-float"
           >
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand ring-1 ring-brand/20">
                 <Info className="h-6 w-6" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+              <div className="flex-1 pt-0.5">
+                <h3 className="text-lg font-bold tracking-tight text-fg">{title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{message}</p>
               </div>
             </div>
             <div className="mt-6">
               <button
                 onClick={finalOnDismiss}
-                className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98]"
+                className="w-full rounded-xl bg-brand py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-brand-hover active:scale-[0.98]"
               >
                 OK
               </button>

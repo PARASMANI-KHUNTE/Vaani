@@ -87,7 +87,8 @@ export type Message = {
       | "admin_demoted"
       | "ownership_transferred"
       | "group_wallpaper_updated"
-      | "group_theme_updated";
+      | "group_theme_updated"
+      | "group_updated";
     metadata?: Record<string, unknown> | null;
   } | null;
   optimistic?: boolean;
@@ -154,10 +155,11 @@ export type MessageListResponse = {
   messages: Message[];
   deliveredCount: number;
   pagination: {
-    page: number;
+    page?: number;
     limit: number;
     total: number;
-    totalPages: number;
+    totalPages?: number;
     hasNextPage: boolean;
+    cursor?: string | null;
   };
 };

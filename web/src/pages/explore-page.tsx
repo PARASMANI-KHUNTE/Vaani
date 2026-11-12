@@ -40,7 +40,7 @@ export const ExplorePage = () => {
   });
 
   return (
-    <main className="flex h-dvh flex-col bg-slate-50 dark:bg-slate-950">
+    <main className="flex h-dvh flex-col bg-canvas">
       <NavHeader title="Explore" showNav />
       {chatError || socialError ? (
         <Toast

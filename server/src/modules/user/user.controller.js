@@ -77,7 +77,7 @@ const updateMe = asyncHandler(async (req, res) => {
 const registerDevicePushToken = asyncHandler(async (req, res) => {
   const token = await registerPushToken({
     userId: req.user._id.toString(),
-    token: req.body.token,
+    token: req.body.token ?? req.body.pushToken,
     platform: req.body.platform,
   });
 
@@ -89,7 +89,7 @@ const registerDevicePushToken = asyncHandler(async (req, res) => {
 const unregisterDevicePushToken = asyncHandler(async (req, res) => {
   const token = await unregisterPushToken({
     userId: req.user._id.toString(),
-    token: req.body.token,
+    token: req.body.token ?? req.body.pushToken,
   });
 
   return sendSuccess(res, 200, "Push token removed successfully", {

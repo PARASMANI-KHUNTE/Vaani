@@ -1,20 +1,23 @@
 import * as Google from "expo-auth-session/providers/google";
-import { router } from "expo-router";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { getMobileAuthMe, loginMobileWithGoogle, redeemMobileWebAuthCode } from "@/lib/api/client";
 import { mobileConfig } from "@/lib/config";
 import { useSessionStore } from "@/store/session-store";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -25,12 +28,20 @@ const getSafeRedirect = (value: unknown) => {
   return value;
 };
 
+const HIGHLIGHTS = [
+  { icon: "flash-outline", label: "Realtime" },
+  { icon: "people-outline", label: "Groups" },
+  { icon: "images-outline", label: "Media" },
+] as const;
+
 export default function AuthScreen() {
   const { redirect, code } = useLocalSearchParams<{ redirect?: string; code?: string }>();
   const [error, setError] = useState<string | null>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isCodeLoading, setIsCodeLoading] = useState(false);
   const setSession = useSessionStore((state) => state.setSession);
+  const { colors, gutter, isDark, isTablet } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
     {
@@ -143,7 +154,7 @@ export default function AuthScreen() {
     };
 
     void finalizeLogin();
-  }, [response, setSession]);
+  }, [redirect, response, setSession]);
 
   const handleGoogleSignIn = async () => {
     if (!mobileConfig.googleWebClientId) {
@@ -161,222 +172,305 @@ export default function AuthScreen() {
     }
   };
 
+  const busy = isGoogleLoading || isCodeLoading || !!code || !request;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.screen}>
-        <View style={styles.heroGlow} />
-        <View style={styles.heroGlowSecondary} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} animated />
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingHorizontal: gutter }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.layout, isTablet && styles.layoutWide]}>
+          <View style={[styles.hero, isTablet && styles.heroWide]}>
+            <View style={styles.glowPrimary} />
+            <View style={styles.glowSecondary} />
 
-        <View style={styles.brandWrap}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoEmoji}>C</Text>
-          </View>
-          <Text style={styles.kicker}>Canvas Chat</Text>
-          <Text style={styles.title}>Warm conversations, beautifully connected.</Text>
-          <Text style={styles.subtitle}>
-            Sign in with Google to connect with friends across web and mobile.
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Welcome back</Text>
-            <Text style={styles.cardBody}>
-              Continue securely with your Google account. You&apos;ll return directly into the app after sign-in.
-            </Text>
-          </View>
-
-          <Pressable
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.googleButton,
-              pressed && styles.googleButtonPressed,
-              (isGoogleLoading || isCodeLoading || !!code || !request) && styles.googleButtonDisabled,
-            ]}
-            disabled={isGoogleLoading || isCodeLoading || !!code || !request}
-            onPress={() => void handleGoogleSignIn()}
-          >
-            <View style={styles.googleIconWrap}>
-              <Text style={styles.googleGlyph}>G</Text>
+            <View style={[styles.brandRow, isTablet && styles.brandRowWide]}>
+              <View style={styles.logoBadge}>
+                <Text style={styles.logoLetter}>L</Text>
+              </View>
+              <Text style={styles.brandName}>LinkUp</Text>
             </View>
-            <Text style={styles.googleButtonText}>
-              {isCodeLoading
-                ? "Finishing sign-in..."
-                : isGoogleLoading
-                ? "Finishing sign-in..."
-                : "Continue with Google"}
+
+            <Text style={[styles.title, isTablet && styles.titleWide]}>
+              Conversations that feel instant.
             </Text>
-            {isGoogleLoading || isCodeLoading ? (
-              <ActivityIndicator size="small" color="#155e75" />
-            ) : (
-              <Text style={styles.arrow}>{"->"}</Text>
-            )}
-          </Pressable>
+            <Text style={[styles.subtitle, isTablet && styles.subtitleWide]}>
+              Realtime chat, groups, and media — the same workspace you know on the web,
+              now in your pocket.
+            </Text>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.highlights}>
+              {HIGHLIGHTS.map((item) => (
+                <View key={item.label} style={styles.highlight}>
+                  <Ionicons name={item.icon} size={14} color={colors.brand} />
+                  <Text style={styles.highlightText}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
-          <Text style={styles.footnote}>
-            This flow uses secure OAuth and deep-links back to the app.
-          </Text>
+          <View style={[styles.card, isTablet && styles.cardWide]}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Welcome back</Text>
+              <Text style={styles.cardBody}>
+                Continue securely with your Google account. You&apos;ll return directly
+                to LinkUp after sign-in.
+              </Text>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              style={({ pressed }) => [
+                styles.googleButton,
+                pressed && styles.googleButtonPressed,
+                busy && styles.googleButtonDisabled,
+              ]}
+              disabled={busy}
+              onPress={() => void handleGoogleSignIn()}
+            >
+              <View style={styles.googleIconWrap}>
+                <Text style={styles.googleGlyph}>G</Text>
+              </View>
+              <Text style={styles.googleButtonText}>
+                {isCodeLoading || isGoogleLoading
+                  ? "Finishing sign-in..."
+                  : "Continue with Google"}
+              </Text>
+              {isGoogleLoading || isCodeLoading ? (
+                <ActivityIndicator size="small" color={colors.brand} />
+              ) : (
+                <Ionicons name="arrow-forward" size={18} color={colors.brand} />
+              )}
+            </Pressable>
+
+            {error ? (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={16} color={colors.danger} />
+                <Text style={styles.error}>{error}</Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.footnote}>
+              Secure OAuth · Deep-links back to the app · Works with your web session
+            </Text>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f5efe3",
-  },
-  screen: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 24,
-    backgroundColor: "#f5efe3",
-    justifyContent: "space-between",
-    overflow: "hidden",
-  },
-  heroGlow: {
-    position: "absolute",
-    top: -90,
-    right: -40,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "rgba(21, 94, 117, 0.14)",
-  },
-  heroGlowSecondary: {
-    position: "absolute",
-    bottom: 120,
-    left: -80,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(217, 119, 6, 0.08)",
-  },
-  brandWrap: {
-    marginTop: 24,
-    gap: 12,
-  },
-  logoBadge: {
-    width: 58,
-    height: 58,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#155e75",
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.15,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-  },
-  logoEmoji: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#fffdf8",
-  },
-  kicker: {
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 2.2,
-    textTransform: "uppercase",
-    color: "#0f766e",
-  },
-  title: {
-    maxWidth: 300,
-    fontSize: 38,
-    lineHeight: 42,
-    fontWeight: "900",
-    color: "#111827",
-  },
-  subtitle: {
-    maxWidth: 340,
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#475569",
-  },
-  card: {
-    borderRadius: 30,
-    padding: 22,
-    gap: 18,
-    backgroundColor: "rgba(255, 253, 248, 0.96)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.7)",
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
-  },
-  cardHeader: {
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  cardBody: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#64748b",
-  },
-  googleButton: {
-    minHeight: 58,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#dbe4ef",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  googleButtonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.99 }],
-  },
-  googleButtonDisabled: {
-    opacity: 0.75,
-  },
-  googleIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f8fafc",
-  },
-  googleGlyph: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#ea4335",
-  },
-  googleButtonText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  arrow: {
-    fontSize: 18,
-    color: "#155e75",
-  },
-  error: {
-    fontSize: 13,
-    color: "#dc2626",
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  footnote: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: "#64748b",
-    textAlign: "center",
-  },
-});
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    scroll: {
+      flexGrow: 1,
+      justifyContent: "center",
+      paddingVertical: spacing.xxl,
+    },
+    layout: {
+      width: "100%",
+      maxWidth: 980,
+      alignSelf: "center",
+      gap: spacing.xxl,
+    },
+    layoutWide: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 56,
+    },
+    hero: {
+      gap: spacing.sm,
+      overflow: "hidden",
+    },
+    heroWide: {
+      flex: 1,
+      paddingVertical: spacing.xl,
+    },
+    glowPrimary: {
+      position: "absolute",
+      top: -120,
+      right: -80,
+      width: 260,
+      height: 260,
+      borderRadius: 130,
+      backgroundColor: c.brand,
+      opacity: 0.12,
+    },
+    glowSecondary: {
+      position: "absolute",
+      bottom: -140,
+      left: -100,
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: c.accent,
+      opacity: 0.1,
+    },
+    brandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: spacing.xs,
+    },
+    brandRowWide: {
+      marginBottom: spacing.md,
+    },
+    logoBadge: {
+      width: 46,
+      height: 46,
+      borderRadius: radii.md,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.brand,
+    },
+    logoLetter: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: c.onBrand,
+    },
+    brandName: {
+      ...typography.h2,
+      color: c.fg,
+      letterSpacing: -0.4,
+    },
+    title: {
+      ...typography.display,
+      color: c.fg,
+      maxWidth: 460,
+    },
+    titleWide: {
+      fontSize: 42,
+      lineHeight: 48,
+      maxWidth: 480,
+    },
+    subtitle: {
+      ...typography.body,
+      color: c.muted,
+      maxWidth: 460,
+    },
+    subtitleWide: {
+      maxWidth: 440,
+    },
+    highlights: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    highlight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+    },
+    highlightText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: c.muted,
+    },
+    card: {
+      borderRadius: radii.xxl,
+      padding: spacing.lg,
+      gap: spacing.md,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      shadowColor: "#0A0C18",
+      shadowOpacity: 0.1,
+      shadowRadius: 30,
+      shadowOffset: { width: 0, height: 16 },
+      elevation: 8,
+    },
+    cardWide: {
+      width: 400,
+      padding: spacing.xl,
+    },
+    cardHeader: {
+      gap: 6,
+    },
+    cardTitle: {
+      ...typography.h2,
+      color: c.fg,
+    },
+    cardBody: {
+      ...typography.small,
+      color: c.muted,
+    },
+    googleButton: {
+      minHeight: 56,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.md,
+      backgroundColor: c.elevated,
+      borderWidth: 1,
+      borderColor: c.line,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.sm,
+    },
+    googleButtonPressed: {
+      opacity: 0.92,
+      transform: [{ scale: 0.99 }],
+    },
+    googleButtonDisabled: {
+      opacity: 0.7,
+    },
+    googleIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.subtle,
+    },
+    googleGlyph: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: "#EA4335",
+    },
+    googleButtonText: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: "700",
+      color: c.fg,
+    },
+    errorBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: radii.md,
+      backgroundColor: c.dangerSoft,
+    },
+    error: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 17,
+      color: c.danger,
+      fontWeight: "600",
+    },
+    footnote: {
+      ...typography.caption,
+      fontSize: 10,
+      lineHeight: 14,
+      color: c.faint,
+      textAlign: "center",
+      letterSpacing: 0.6,
+      textTransform: "none",
+    },
+  });

@@ -43,7 +43,8 @@ const allowedClientOrigins = Array.from(
 
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
-  port: 3000,
+  port: Number(process.env.PORT) || 3000,
+  logLevel: process.env.LOG_LEVEL || "info",
   clientUrl: fallbackClientOrigin,
   clientUrls: allowedClientOrigins,
   mobileOrigins: parseOriginList(process.env.MOBILE_ORIGINS),
@@ -64,7 +65,7 @@ const env = {
     upstashToken: process.env.UPSTASH_REDIS_REST_TOKEN || null,
     enabled: process.env.REDIS_ENABLED === "true",
     cacheTtlSeconds: Number(process.env.REDIS_CACHE_TTL_SECONDS || 300),
-    useLocal: process.env.NODE_ENV !== "production" && !process.env.UPSTASH_REDIS_REST_URL,
+    useLocal: !process.env.UPSTASH_REDIS_REST_URL,
   },
   retention: {
     messageDays: Number(process.env.MESSAGE_RETENTION_DAYS || 90),

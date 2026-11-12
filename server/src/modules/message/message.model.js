@@ -107,6 +107,19 @@ const messageSchema = new mongoose.Schema(
       type: mediaSchema,
       default: null,
     },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "seen"],
+      default: "sent",
+    },
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
+    seenAt: {
+      type: Date,
+      default: null,
+    },
     receipts: {
       type: [receiptSchema],
       default: [],
@@ -167,6 +180,9 @@ const messageSchema = new mongoose.Schema(
             "group_created",
             "group_renamed",
             "group_avatar_updated",
+            "group_wallpaper_updated",
+            "group_theme_updated",
+            "group_updated",
             "member_added",
             "member_removed",
             "member_left",
@@ -191,6 +207,7 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ chatId: 1, senderId: 1 });
+messageSchema.index({ chatId: 1, status: 1 });
 messageSchema.index({ chatId: 1, deletedForEveryone: 1, deletedFor: 1 });
 messageSchema.index({ "reactions.userId": 1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });

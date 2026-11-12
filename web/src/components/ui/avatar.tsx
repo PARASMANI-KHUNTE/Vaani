@@ -43,11 +43,6 @@ export const Avatar = ({
   const shouldAttemptImage = isUsableImageSrc(normalizedSrc);
   const [hasImageError, setHasImageError] = useState(false);
 
-  // Debug logging
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('[Avatar]', { src: normalizedSrc, name, shouldAttemptImage, hasImageError });
-  }
-
   useEffect(() => {
     setHasImageError(false);
   }, [normalizedSrc]);
@@ -69,7 +64,7 @@ export const Avatar = ({
       ) : (
         <div
           className={cn(
-            "flex h-full w-full items-center justify-center bg-gradient-to-br text-white",
+            "flex h-full w-full items-center justify-center bg-gradient-to-br text-white ring-1 ring-inset ring-white/15",
             getAvatarColor(name),
             fallbackClassName
           )}

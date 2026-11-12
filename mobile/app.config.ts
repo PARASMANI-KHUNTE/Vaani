@@ -6,11 +6,11 @@ const expoOwner = process.env.EXPO_PUBLIC_EXPO_OWNER || "parasmani";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Canvas Chat Mobile",
+  name: "LinkUp",
   slug: "canvas-chat-mobile",
   owner: expoOwner,
   version: "1.0.0",
-  orientation: "portrait",
+  orientation: "default",
   scheme: process.env.EXPO_PUBLIC_APP_SCHEME || "canvaschat",
   userInterfaceStyle: "automatic",
   icon: "./assets/images/icon.png",
@@ -29,7 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.canvaschat.mobile",
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#EEEDFF",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -47,7 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-splash-screen",
       {
-        backgroundColor: "#0f172a",
+        backgroundColor: "#0B0D17",
         image: "./assets/images/splash-icon.png",
         imageWidth: 84,
       },

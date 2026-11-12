@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@chat-app/shared/*": ["packages/shared/src/*"],
+      "@chat-app/server/*": ["packages/server/src/*"],
+      "@chat-app/web/*": ["packages/web/src/*"],
+      "@chat-app/mobile/*": ["packages/mobile/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".turbo"]
+}

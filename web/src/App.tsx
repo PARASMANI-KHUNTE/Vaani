@@ -20,9 +20,10 @@ export default function App() {
   
   if (status === "loading") {
     return (
-      <div className="flex h-dvh items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent flex items-center justify-center">
-          <div className="h-4 w-4 rounded-full bg-blue-600/20" />
+      <div className="flex h-dvh items-center justify-center bg-canvas">
+        <div className="flex flex-col items-center gap-4">
+          <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-brand/20 border-t-brand" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-faint">Loading</span>
         </div>
       </div>
     );

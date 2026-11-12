@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { ScreenShell } from "@/components/screen-shell";
 import { useMobileSocial } from "@/hooks/use-mobile-social";
 import { useNotificationStore } from "@/store/notification-store";
 import { useSessionStore } from "@/store/session-store";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 
 const getNotificationIcon = (kind: string) => {
   switch (kind) {
@@ -19,15 +21,15 @@ const getNotificationIcon = (kind: string) => {
   }
 };
 
-const getNotificationColor = (kind: string) => {
+const getNotificationColor = (kind: string, colors: AppColors) => {
   switch (kind) {
     case "friend_request":
-      return "#155e75";
+      return colors.brand;
     case "reaction":
-      return "#dc2626";
+      return colors.danger;
     case "message":
     default:
-      return "#155e75";
+      return colors.accent;
   }
 };
 
@@ -41,6 +43,13 @@ export default function NotificationsScreen() {
   const removeFriendRequest = useNotificationStore((state) => state.removeFriendRequest);
   const { acceptRequest, rejectRequest } = useMobileSocial({ token });
   const pendingRequestsRef = useRef<Set<string>>(new Set());
+  const { colors, isTablet } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const columns = isTablet ? 2 : 1;
+  const unreadCount = useMemo(
+    () => notifications.filter((item) => !item.read).length,
+    [notifications]
+  );
 
   const handleAccept = (userId: string, notificationId: string) => {
     const requestKey = `accept:${userId}:${notificationId}`;
@@ -61,7 +70,7 @@ export default function NotificationsScreen() {
     markRead(notificationId);
     
     acceptRequest(userId).catch((err) => {
-      if (previousAction) {
+      if (previousAction && previousAction !== "received") {
         updateNotificationAction(notificationId, previousAction);
       }
       if (previousStatus) {
@@ -93,7 +102,7 @@ export default function NotificationsScreen() {
     markRead(notificationId);
 
     rejectRequest(userId).catch((err) => {
-      if (previousAction) {
+      if (previousAction && previousAction !== "received") {
         updateNotificationAction(notificationId, previousAction);
       }
       if (previousStatus) {
@@ -112,16 +121,28 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <ScreenShell eyebrow="Alerts" title="Notifications" subtitle="Realtime messages and relationship updates from the existing socket system.">
+    <ScreenShell
+      eyebrow="Alerts"
+      title="Notifications"
+      subtitle="Realtime messages and relationship updates from the existing socket system."
+    >
       <View style={styles.headerRow}>
-        <Text style={styles.count}>{notifications.filter((item) => !item.read).length} unread</Text>
-        <Pressable onPress={markAllRead} style={styles.markAllButton}>
+        <Text style={styles.count}>{unreadCount} unread</Text>
+        <Pressable
+          onPress={markAllRead}
+          style={styles.markAllButton}
+          accessibilityRole="button"
+          accessibilityLabel="Mark all notifications as read"
+        >
           <Text style={styles.markAllText}>Mark all read</Text>
         </Pressable>
       </View>
 
       <FlatList
+        key={`notifications-${columns}`}
         data={notifications}
+        numColumns={columns}
+        columnWrapperStyle={columns > 1 ? styles.column : undefined}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
@@ -135,14 +156,30 @@ export default function NotificationsScreen() {
                 }
               }}
             >
-              <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.kind) }]}>
-                <Ionicons name={getNotificationIcon(item.kind) as any} size={18} color="#ffffff" />
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: getNotificationColor(item.kind, colors) },
+                ]}
+              >
+                <Ionicons
+                  name={getNotificationIcon(item.kind) as any}
+                  size={18}
+                  color={colors.onBrand}
+                />
               </View>
               <View style={styles.textContainer}>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.body}>{item.body}</Text>
+                <Text style={styles.title} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.body} numberOfLines={2}>
+                  {item.body}
+                </Text>
                 <Text style={styles.time}>
-                  {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {new Date(item.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </Text>
               </View>
             </Pressable>
@@ -167,12 +204,14 @@ export default function NotificationsScreen() {
                 <Ionicons
                   name={item.action === "accepted" ? "checkmark-circle" : "close-circle"}
                   size={14}
-                  color={item.action === "accepted" ? "#059669" : "#64748b"}
+                  color={item.action === "accepted" ? colors.success : colors.muted}
                 />
-                <Text style={[
-                  styles.actionText,
-                  { color: item.action === "accepted" ? "#059669" : "#64748b" }
-                ]}>
+                <Text
+                  style={[
+                    styles.actionText,
+                    { color: item.action === "accepted" ? colors.success : colors.muted },
+                  ]}
+                >
                   You {item.action === "accepted" ? "accepted" : "declined"}
                 </Text>
               </View>
@@ -181,9 +220,13 @@ export default function NotificationsScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
-            <Ionicons name="notifications-outline" size={48} color="#94a3b8" />
+            <View style={styles.emptyIcon}>
+              <Ionicons name="notifications-outline" size={30} color={colors.faint} />
+            </View>
             <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptyBody}>Messages, friend requests, and reactions will land here.</Text>
+            <Text style={styles.emptyBody}>
+              Messages, friend requests, and reactions will land here.
+            </Text>
           </View>
         }
       />
@@ -191,28 +234,85 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  count: { fontSize: 13, fontWeight: "700", color: "#0f766e" },
-  markAllButton: { borderRadius: 999, backgroundColor: "#fffdf8", paddingHorizontal: 12, paddingVertical: 8 },
-  markAllText: { color: "#155e75", fontWeight: "700", fontSize: 12 },
-  listContent: { paddingBottom: 24, gap: 12 },
-  card: { borderRadius: 24, backgroundColor: "#fffdf8", padding: 16, marginBottom: 12 },
-  cardUnread: { borderWidth: 1, borderColor: "#99f6e4" },
-  cardContent: { flexDirection: "row", gap: 12 },
-  iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
-  textContainer: { flex: 1 },
-  title: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
-  body: { marginTop: 2, fontSize: 13, lineHeight: 19, color: "#475569" },
-  time: { marginTop: 4, fontSize: 11, color: "#94a3b8" },
-  inlineActions: { flexDirection: "row", gap: 8, marginTop: 12, marginLeft: 52 },
-  acceptButton: { borderRadius: 999, backgroundColor: "#155e75", paddingHorizontal: 12, paddingVertical: 10 },
-  acceptText: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  rejectButton: { borderRadius: 999, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", paddingHorizontal: 12, paddingVertical: 10 },
-  rejectText: { color: "#0f172a", fontWeight: "700", fontSize: 12 },
-  actionStatus: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 12, marginLeft: 52 },
-  actionText: { fontSize: 12, fontWeight: "600" },
-  emptyCard: { borderRadius: 24, backgroundColor: "#fffdf8", padding: 32, gap: 12, alignItems: "center" },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a" },
-  emptyBody: { fontSize: 14, lineHeight: 20, color: "#64748b", textAlign: "center" },
-});
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 14,
+      gap: spacing.sm,
+    },
+    count: { fontSize: 13, fontWeight: "700", color: c.brand },
+    markAllButton: {
+      borderRadius: radii.pill,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    markAllText: { color: c.brand, fontWeight: "700", fontSize: 12 },
+    listContent: { paddingBottom: 24 },
+    column: { gap: spacing.sm },
+    card: {
+      flex: 1,
+      borderRadius: radii.xl,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 16,
+      marginBottom: spacing.sm,
+    },
+    cardUnread: { borderColor: c.brand },
+    cardContent: { flexDirection: "row", gap: 12 },
+    iconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    textContainer: { flex: 1, minWidth: 0 },
+    title: { fontSize: 15, fontWeight: "700", color: c.fg },
+    body: { marginTop: 2, fontSize: 13, lineHeight: 19, color: c.muted },
+    time: { marginTop: 4, fontSize: 11, color: c.faint },
+    inlineActions: { flexDirection: "row", gap: 8, marginTop: 12, marginLeft: 52 },
+    acceptButton: {
+      borderRadius: radii.pill,
+      backgroundColor: c.brand,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    acceptText: { color: c.onBrand, fontWeight: "700", fontSize: 12 },
+    rejectButton: {
+      borderRadius: radii.pill,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    rejectText: { color: c.fg, fontWeight: "700", fontSize: 12 },
+    actionStatus: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 12, marginLeft: 52 },
+    actionText: { fontSize: 12, fontWeight: "600" },
+    emptyCard: {
+      borderRadius: radii.xxl,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 32,
+      gap: 12,
+      alignItems: "center",
+    },
+    emptyIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: radii.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.subtle,
+    },
+    emptyTitle: { ...typography.h3, color: c.fg },
+    emptyBody: { ...typography.small, color: c.muted, textAlign: "center" },
+  });

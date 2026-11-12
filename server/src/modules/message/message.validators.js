@@ -10,6 +10,10 @@ const getMessagesValidator = [
     .optional()
     .isInt({ min: 1, max: 50 })
     .withMessage("limit must be between 1 and 50"),
+  query("cursor")
+    .optional({ values: "falsy" })
+    .isMongoId()
+    .withMessage("cursor must be a valid message id"),
 ];
 
 const createMessageValidator = [

@@ -11,6 +11,7 @@ const {
   demoteGroupAdmin,
   deleteChatForUser,
   getChatSummary,
+  getChatSummariesForParticipants,
   getGroupInvitePreview,
   joinGroupByInvite,
   leaveGroup,
@@ -77,9 +78,31 @@ const createChat = asyncHandler(async (req, res) => {
 });
 
 const readChat = asyncHandler(async (req, res) => {
+  const currentUserId = req.user._id.toString();
   const chat = await markChatRead({
     chatId: req.params.chatId,
-    currentUserId: req.user._id.toString(),
+    currentUserId,
+  });
+
+  const participantIds = (chat.participants || [])
+    .map((participant) => (participant._id ? participant._id.toString() : participant.toString()))
+    .filter(Boolean);
+  const summaries = await getChatSummariesForParticipants(req.params.chatId, participantIds);
+  const seenAt = new Date().toISOString();
+
+  participantIds.forEach((participantId) => {
+    if (participantId !== currentUserId) {
+      emitToUser(participantId, SOCKET_EVENTS.MESSAGE_SEEN, {
+        chatId: req.params.chatId,
+        seenByUserId: currentUserId,
+        seenAt,
+      });
+    }
+    if (summaries[participantId]) {
+      emitToUser(participantId, SOCKET_EVENTS.CHAT_UPDATED, {
+        chat: summaries[participantId],
+      });
+    }
   });
 
   return sendSuccess(res, 200, "Chat marked as read", {
@@ -102,6 +125,10 @@ const removeChat = asyncHandler(async (req, res) => {
   const result = await deleteChatForUser({
     chatId: req.params.chatId,
     currentUserId: req.user._id.toString(),
+  });
+
+  emitToUser(req.user._id.toString(), SOCKET_EVENTS.CHAT_REMOVED, {
+    chatId: req.params.chatId,
   });
 
   return sendSuccess(res, 200, "Chat removed from your list", result);
@@ -265,6 +292,10 @@ const leaveGroupChat = asyncHandler(async (req, res) => {
   const result = await leaveGroup({
     chatId: req.params.chatId,
     currentUserId,
+  });
+
+  emitToUser(currentUserId, SOCKET_EVENTS.CHAT_REMOVED, {
+    chatId: req.params.chatId,
   });
 
   if (result.wasDeleted) {

@@ -52,6 +52,9 @@ type ChatWindowProps = {
   messages: Message[];
   currentUserId?: string;
   isLoading: boolean;
+  isLoadingOlder?: boolean;
+  hasMoreMessages?: boolean;
+  onLoadOlderMessages?: () => void;
   onSendMessage: (content: string, replyToId?: string | null) => Promise<void>;
   onEditMessage?: (messageId: string, content: string) => Promise<void>;
   onForwardMessage?: (messageId: string, targetChatId: string) => Promise<void>;
@@ -95,6 +98,9 @@ export const ChatWindow = ({
   messages,
   currentUserId,
   isLoading,
+  isLoadingOlder,
+  hasMoreMessages,
+  onLoadOlderMessages,
   onSendMessage,
   onEditMessage,
   onForwardMessage,
@@ -179,7 +185,7 @@ export const ChatWindow = ({
   }, [chat?._id, isSpeechListening, stopSpeechListening]);
 
   const themeConfig: Record<string, string> = {
-    default: "bg-blue-600 hover:bg-blue-700",
+    default: "bg-brand hover:bg-brand-hover",
     emerald: "bg-emerald-600 hover:bg-emerald-700",
     rose: "bg-rose-600 hover:bg-rose-700",
     amber: "bg-amber-600 hover:bg-amber-700",
@@ -204,6 +210,18 @@ export const ChatWindow = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingPrependRef = useRef<{ scrollHeight: number } | null>(null);
+
+  const handleLoadOlderMessages = () => {
+    const container = scrollContainerRef.current;
+    if (!container || isLoadingOlder || !onLoadOlderMessages) {
+      return;
+    }
+    // Remember the height so the viewport stays anchored after older
+    // messages are prepended.
+    pendingPrependRef.current = { scrollHeight: container.scrollHeight };
+    onLoadOlderMessages();
+  };
 
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
@@ -224,9 +242,22 @@ export const ChatWindow = ({
   }, [showHeaderMenu]);
 
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
     }
+
+    const pendingPrepend = pendingPrependRef.current;
+    if (pendingPrepend) {
+      pendingPrependRef.current = null;
+      const addedHeight = container.scrollHeight - pendingPrepend.scrollHeight;
+      if (addedHeight > 0) {
+        container.scrollTop += addedHeight;
+      }
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
@@ -562,21 +593,22 @@ export const ChatWindow = ({
 
   if (!chat) {
     return (
-      <section className="flex h-full flex-col items-center justify-center bg-slate-50/50 p-6 text-center dark:bg-slate-950/40">
-        <div className="max-w-md w-full rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-8 shadow-sm backdrop-blur-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+      <section className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-canvas p-6 text-center">
+        <div className="pointer-events-none absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-brand/10 blur-[110px]" />
+        <div className="relative w-full max-w-md rounded-3xl border border-line bg-surface/80 p-8 shadow-soft backdrop-blur-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand ring-1 ring-brand/15">
             <MessageCircle className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Welcome to LinkUp</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-xl font-bold tracking-tight text-fg">Welcome to LinkUp</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
             Select a conversation from the sidebar or start a new message to begin chatting in real-time.
           </p>
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             {onOpenNewChat && (
               <button
                 type="button"
                 onClick={onOpenNewChat}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+                className="btn-primary w-full sm:w-auto"
               >
                 <MessageSquare className="h-4 w-4" />
                 New Message
@@ -586,7 +618,7 @@ export const ChatWindow = ({
               <button
                 type="button"
                 onClick={() => navigate("/explore")}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition-all"
+                className="btn-secondary w-full sm:w-auto"
               >
                 <Compass className="h-4 w-4" />
                 Explore People
@@ -600,24 +632,25 @@ export const ChatWindow = ({
 
   const chatTitle = chat.isGroup ? chat.groupName : chat.otherParticipant?.name;
   const chatAvatar = chat.isGroup ? chat.groupAvatar : chat.otherParticipant?.avatar;
-
-  // Debug logging - log every render to track changes
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('[ChatWindow render]', {
-      chatId: chat._id,
-      isGroup: chat.isGroup,
-      chatTitle,
-      chatAvatar,
-      otherParticipantName: chat.otherParticipant?.name,
-      otherParticipantAvatar: chat.otherParticipant?.avatar,
-      currentUserId,
-    });
-  }
+  const wallpaper = chat.wallpaper || null;
+  const wallpaperIsUrl = Boolean(wallpaper && /^https?:\/\//i.test(wallpaper));
+  const wallpaperClass = wallpaper && !wallpaperIsUrl ? `wallpaper-${wallpaper}` : "";
+  const wallpaperStyle = wallpaperIsUrl
+    ? {
+        backgroundImage: `url("${wallpaper}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : undefined;
 
   return (
-    <section className={cn("relative flex h-full flex-col overflow-hidden bg-slate-50 dark:bg-slate-950", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}>
+    <section
+      className={cn("relative flex h-full flex-col overflow-hidden bg-canvas", wallpaperClass)}
+      style={wallpaperStyle}
+    >
       {/* Compact Header - 56px mobile */}
-      <header className="z-30 shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800">
+      <header className="relative z-30 shrink-0 border-b border-line bg-surface/80 backdrop-blur-md">
+        <div className="relative mx-auto w-full max-w-3xl">
         {/* Mobile Header */}
         <div className="flex h-14 items-center px-2 sm:px-4">
           {/* Left: Back + Avatar */}
@@ -625,15 +658,16 @@ export const ChatWindow = ({
             {onBack && (
               <button
                 onClick={onBack}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:scale-95 sm:hidden"
+                className="icon-btn sm:hidden"
+                aria-label="Back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            
+
             <button
               type="button"
-              className="group/header relative flex items-center gap-2 sm:gap-2.5"
+              className="group/header relative flex items-center gap-2 rounded-xl px-1 py-1 transition-colors hover:bg-subtle/70 sm:gap-2.5"
               onClick={() => {
                 if (chat.isGroup) {
                   onOpenGroupInfo?.(chat._id);
@@ -646,17 +680,20 @@ export const ChatWindow = ({
                 <Avatar
                   src={chatAvatar}
                   name={chatTitle || "?"}
-                  className="h-9 w-9 rounded-full sm:h-10 sm:w-10"
+                  className="h-9 w-9 rounded-full shadow-sm sm:h-10 sm:w-10"
                 />
                 {!chat.isGroup && isOnline && (
-                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#f0f2f5] bg-emerald-500 dark:border-[#1f232b]" />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-emerald-500" />
                 )}
               </div>
-              <div className="hidden sm:block">
-                <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white leading-tight">
+              <div className="hidden min-w-0 text-left sm:block">
+                <h3 className="truncate text-[15px] font-semibold leading-tight text-fg">
                   {chatTitle}
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                <p className={cn(
+                  "truncate text-[11px] leading-tight",
+                  typingLabel ? "font-medium text-brand" : "text-muted"
+                )}>
                   {typingLabel
                     ? typingLabel
                     : chat.isGroup
@@ -674,23 +711,20 @@ export const ChatWindow = ({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-0.5 sm:gap-1">
-            {/* Mobile: Show typing/status */}
-            {typingLabel && (
-              <p className="hidden max-w-[80px] truncate text-xs text-slate-500 sm:block sm:max-w-[120px]">
-                {typingLabel}
-              </p>
-            )}
-            
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:scale-95 dark:text-slate-300"
+              className="icon-btn"
+              aria-label="Search messages"
+              aria-pressed={showSearch}
             >
               <Search className="h-5 w-5" />
             </button>
 
             <button
               onClick={() => setShowHeaderMenu(!showHeaderMenu)}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-600 active:scale-95 dark:text-slate-300"
+              className="icon-btn"
+              aria-label="Conversation options"
+              aria-expanded={showHeaderMenu}
             >
               <MoreHorizontal className="h-5 w-5" />
             </button>
@@ -704,28 +738,29 @@ export const ChatWindow = ({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-t border-slate-200/50 dark:border-slate-700/50 px-3 py-2 sm:px-4"
+              className="overflow-hidden border-t border-line px-3 py-2 sm:px-4"
             >
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                 <input
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search messages..."
-                  className="w-full rounded-full bg-white px-4 py-2 pl-10 text-sm text-slate-900 placeholder:text-slate-400 outline-none dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
+                  className="w-full rounded-full border border-line bg-subtle/60 px-4 py-2 pl-10 text-sm text-fg outline-none transition-all placeholder:text-faint focus:border-brand/40 focus:bg-surface focus:ring-2 focus:ring-brand/12"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-faint transition-colors hover:text-fg"
+                    aria-label="Clear search"
                   >
-                    <X className="h-4 w-4 text-slate-400" />
+                    <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
               {searchQuery ? (
-                <p className="mt-1.5 px-2 text-[11px] text-slate-500">{searchMatchCount} results</p>
+                <p className="mt-1.5 px-2 text-[11px] font-medium text-muted">{searchMatchCount} results</p>
               ) : null}
             </motion.div>
           )}
@@ -742,7 +777,7 @@ export const ChatWindow = ({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="fixed left-1/2 top-[96px] z-50 w-[280px] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800 ring-1 ring-black/5"
+                className="absolute right-2 top-[3.5rem] z-50 w-[280px] overflow-hidden rounded-2xl border border-line bg-elevated shadow-float"
               >
                 <div className="p-1">
                   <button
@@ -750,9 +785,9 @@ export const ChatWindow = ({
                       setIsSelectionMode(!isSelectionMode);
                       setShowHeaderMenu(false);
                     }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                   >
-                    <CheckSquare className="h-5 w-5 text-blue-500" />
+                    <CheckSquare className="h-5 w-5 text-brand" />
                     {isSelectionMode ? "Cancel Selection" : "Select Messages"}
                     {isSelectionMode && selectedMessages.size > 0 && ` (${selectedMessages.size})`}
                   </button>
@@ -762,7 +797,7 @@ export const ChatWindow = ({
                         onOpenGroupInfo?.(chat._id);
                         setShowHeaderMenu(false);
                       }}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                     >
                       <Users className="h-5 w-5 text-emerald-500" />
                       Group Info
@@ -773,20 +808,20 @@ export const ChatWindow = ({
                       setConfirmClearOpen(true);
                       setShowHeaderMenu(false);
                     }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                   >
                     <Trash2 className="h-5 w-5 text-amber-500" />
                     Clear Chat
                   </button>
                 </div>
                 {chat.isGroup && (
-                  <div className="border-t border-slate-100 p-1 dark:border-slate-700">
+                  <div className="border-t border-line p-1">
                     <button
                       onClick={() => {
                         setConfirmLeaveOpen(true);
                         setShowHeaderMenu(false);
                       }}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 active:bg-red-50 dark:active:bg-red-900/20"
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-rose-500 transition-colors hover:bg-rose-500/10 active:bg-rose-500/15"
                     >
                       <LogOut className="h-5 w-5" />
                       Leave Group
@@ -797,20 +832,40 @@ export const ChatWindow = ({
             </>
           )}
         </AnimatePresence>
+        </div>
       </header>
 
       {/* Messages Area */}
       <div 
         ref={scrollContainerRef} 
-        className={cn("flex-1 overflow-y-auto px-3 py-2 sm:px-4 sm:py-3 transition-colors", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}
+        className={cn("flex-1 overflow-y-auto px-3 py-2 sm:px-4 sm:py-3 transition-colors", wallpaperClass)}
       >
         {/* Loading */}
         {isLoading && messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-500" />
+            <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-line border-t-brand" />
           </div>
         ) : (
-          <div className="space-y-1 sm:space-y-0.5">
+          <div className="mx-auto w-full max-w-3xl space-y-1 sm:space-y-0.5">
+            {(hasMoreMessages || isLoadingOlder) && onLoadOlderMessages ? (
+              <div className="flex justify-center py-3">
+                <button
+                  type="button"
+                  onClick={handleLoadOlderMessages}
+                  disabled={isLoadingOlder}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3.5 py-1.5 text-[11px] font-semibold text-muted shadow-sm backdrop-blur-sm transition-colors hover:text-fg disabled:cursor-wait disabled:opacity-70"
+                >
+                  {isLoadingOlder ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-brand" />
+                      Loading older messages
+                    </>
+                  ) : (
+                    "Load older messages"
+                  )}
+                </button>
+              </div>
+            ) : null}
             {groupedMessages.map(({ message, isGroupStart, isGroupEnd, groupedMedia }, index) => {
               const prev = index > 0 ? groupedMessages[index - 1].message : null;
               const showDate = !prev || formatDateSeparator(message.createdAt) !== formatDateSeparator(prev.createdAt);
@@ -819,7 +874,7 @@ export const ChatWindow = ({
                 <div key={message._id}>
                   {showDate && (
                     <div className="flex items-center justify-center py-4 sm:py-6">
-                      <span className="rounded-full bg-slate-200/70 dark:bg-slate-800/80 px-4 py-1 text-[11px] font-medium text-slate-600 backdrop-blur-sm dark:text-slate-300">
+                      <span className="rounded-full border border-line bg-surface/70 px-4 py-1 text-[11px] font-semibold text-muted backdrop-blur-sm">
                         {formatDateSeparator(message.createdAt)}
                       </span>
                     </div>
@@ -856,7 +911,8 @@ export const ChatWindow = ({
       </div>
 
       {/* Input Bar - Sticky Bottom */}
-      <footer className="shrink-0 px-2.5 pb-2.5 pt-2 sm:px-4 sm:pb-4 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-t border-slate-200/70 dark:border-slate-800">
+      <footer className="shrink-0 border-t border-line bg-surface/85 px-2.5 pb-2.5 pt-2 backdrop-blur-md sm:px-4 sm:pb-4">
+        <div className="mx-auto w-full max-w-3xl">
         {/* Voice-to-Text Dictating Banner */}
         <AnimatePresence>
           {isSpeechListening && (
@@ -864,23 +920,23 @@ export const ChatWindow = ({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mb-2 flex items-center justify-between rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 px-3 py-2 text-xs text-blue-800 dark:text-blue-200 shadow-sm backdrop-blur-sm"
+              className="mb-2 flex items-center justify-between rounded-xl border border-brand/20 bg-brand/[0.07] px-3 py-2 text-xs text-brand shadow-sm backdrop-blur-sm"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand" />
                 </span>
                 <div className="truncate">
                   <span className="font-semibold">Voice Dictation Active:</span>
-                  <span className="ml-1 text-slate-600 dark:text-slate-300">Speak into your microphone to transcribe text</span>
+                  <span className="ml-1 text-muted">Speak into your microphone to transcribe text</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <div className="ml-2 flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={stopSpeechListening}
-                  className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-sm"
+                  className="rounded-lg bg-brand px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
                 >
                   Done
                 </button>
@@ -921,19 +977,19 @@ export const ChatWindow = ({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mb-2 flex items-center justify-between rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-2 text-xs shadow-sm"
+              className="mb-2 flex items-center justify-between rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm"
             >
-              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 min-w-0">
-                <Pencil className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="flex min-w-0 items-center gap-2 text-muted">
+                <Pencil className="h-4 w-4 shrink-0 text-brand" />
                 <div className="truncate">
-                  <span className="font-semibold">Editing message:</span>
-                  <span className="ml-1.5 opacity-80 truncate italic">"{editingMessage.content}"</span>
+                  <span className="font-semibold text-fg">Editing message:</span>
+                  <span className="ml-1.5 truncate italic opacity-80">"{editingMessage.content}"</span>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => { setEditingMessage(null); setDraft(""); }}
-                className="ml-2 rounded-lg p-1 text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40 transition-colors"
+                className="ml-2 rounded-lg p-1 text-muted transition-colors hover:bg-subtle hover:text-fg"
                 title="Cancel edit"
               >
                 <X className="h-3.5 w-3.5" />
@@ -949,15 +1005,16 @@ export const ChatWindow = ({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mb-2 flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800"
+              className="mb-2 flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm"
             >
-              <div className="h-6 w-1 rounded-full bg-blue-500" />
-              <p className="flex-1 truncate text-xs text-slate-500 dark:text-slate-400">
+              <div className="h-6 w-1 rounded-full bg-brand" />
+              <p className="flex-1 truncate text-xs text-muted">
                 Reply to: <span className="italic">{replyTarget.content}</span>
               </p>
-              <button 
-                onClick={() => setReplyTarget(null)} 
-                className="p-1 text-slate-400 active:scale-95"
+              <button
+                onClick={() => setReplyTarget(null)}
+                className="rounded-md p-1 text-faint transition-colors hover:bg-subtle hover:text-fg active:scale-95"
+                aria-label="Cancel reply"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -967,29 +1024,29 @@ export const ChatWindow = ({
 
         {/* Upload Progress */}
         {mediaTransfer?.isUploading && (
-          <div className="mb-2 flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
-            <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
-            <span className="flex-1 truncate text-xs font-medium text-slate-600 dark:text-slate-300">
+          <div className="mb-2 flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+            <RefreshCw className="h-4 w-4 animate-spin text-brand" />
+            <span className="flex-1 truncate text-xs font-medium text-muted">
               {mediaTransfer.fileName || "Uploading..."}
             </span>
-            <span className="text-xs font-bold text-blue-500">{mediaTransfer.progress}%</span>
+            <span className="text-xs font-bold text-brand">{mediaTransfer.progress}%</span>
           </div>
         )}
 
         {/* Error Banner */}
         {mediaTransfer?.error && (
-          <div className="mb-2 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 dark:bg-red-900/20">
-            <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
-            <span className="flex-1 truncate text-xs font-medium text-red-600 dark:text-red-300">
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-3 py-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+            <span className="flex-1 truncate text-xs font-medium text-rose-600 dark:text-rose-300">
               {mediaTransfer.error}
             </span>
             {mediaTransfer.canRetry && onRetryMedia && (
-              <button onClick={onRetryMedia} className="text-xs font-bold text-red-500">
+              <button onClick={onRetryMedia} className="text-xs font-bold text-rose-500 hover:underline">
                 Retry
               </button>
             )}
             {onDismissMedia && (
-              <button onClick={onDismissMedia} className="p-1 text-red-400">
+              <button onClick={onDismissMedia} className="p-1 text-rose-400 hover:text-rose-500" aria-label="Dismiss">
                 <X className="h-4 w-4" />
               </button>
             )}
@@ -998,8 +1055,8 @@ export const ChatWindow = ({
 
         {/* Pending Media Preview */}
         {pendingMedia && (
-          <div className="mb-2 flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
-            <div className="h-14 w-14 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <div className="mb-2 flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg bg-subtle">
               {pendingMedia.kind === "image" ? (
                 <img src={pendingMedia.url} alt="Preview" className="h-full w-full object-cover" />
               ) : pendingMedia.kind === "video" ? (
@@ -1011,13 +1068,13 @@ export const ChatWindow = ({
                   preload="metadata"
                 />
               ) : pendingMedia.kind === "audio" ? (
-                <Mic className="h-5 w-5 text-slate-500" />
+                <Mic className="h-5 w-5 text-muted" />
               ) : (
-                <Paperclip className="h-5 w-5 text-slate-500" />
+                <Paperclip className="h-5 w-5 text-muted" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <div className="truncate text-xs font-semibold text-fg">
                 {pendingMedia.file.name}
               </div>
               {pendingMedia.kind === "audio" && (
@@ -1028,14 +1085,14 @@ export const ChatWindow = ({
                   className="mt-2 h-8 w-full max-w-[260px]"
                 />
               )}
-              <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="mt-0.5 text-[11px] text-muted">
                 {pendingMedia.kind.toUpperCase()} • {formatBytes(pendingMedia.file.size)}
               </div>
             </div>
             <button
               type="button"
               onClick={clearPendingMedia}
-              className="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="rounded-lg px-2 py-1 text-xs font-bold text-muted transition-colors hover:bg-subtle hover:text-fg"
               disabled={isSendingMedia || mediaTransfer?.isUploading}
             >
               Cancel
@@ -1043,7 +1100,7 @@ export const ChatWindow = ({
             <button
               type="button"
               onClick={sendPendingMedia}
-              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
               disabled={isSendingMedia || mediaTransfer?.isUploading}
             >
               Send
@@ -1052,20 +1109,20 @@ export const ChatWindow = ({
         )}
 
         {pendingBatch && pendingBatch.length > 0 && (
-          <div className="mb-2 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
+          <div className="mb-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <div className="text-xs font-semibold text-fg">
                   {pendingBatch.length} files selected
                 </div>
-                <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <div className="mt-0.5 text-[11px] text-muted">
                   Click send to upload and share
                 </div>
               </div>
               <button
                 type="button"
                 onClick={clearPendingBatch}
-                className="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                className="rounded-lg px-2 py-1 text-xs font-bold text-muted transition-colors hover:bg-subtle hover:text-fg"
                 disabled={isSendingMedia || mediaTransfer?.isUploading}
               >
                 Cancel
@@ -1073,7 +1130,7 @@ export const ChatWindow = ({
               <button
                 type="button"
                 onClick={sendPendingBatch}
-                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
                 disabled={isSendingMedia || mediaTransfer?.isUploading}
               >
                 Send all
@@ -1084,15 +1141,15 @@ export const ChatWindow = ({
               {pendingBatch.slice(0, 6).map((item) => (
                 <div
                   key={`${item.file.name}-${item.file.size}-${item.url}`}
-                  className="aspect-square overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center"
+                  className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-subtle"
                   title={item.file.name}
                 >
                   {item.kind === "image" ? (
                     <img src={item.url} alt="" className="h-full w-full object-cover" />
                   ) : item.kind === "video" ? (
-                    <Video className="h-5 w-5 text-slate-500" />
+                    <Video className="h-5 w-5 text-muted" />
                   ) : (
-                    <Paperclip className="h-5 w-5 text-slate-500" />
+                    <Paperclip className="h-5 w-5 text-muted" />
                   )}
                 </div>
               ))}
@@ -1107,8 +1164,10 @@ export const ChatWindow = ({
             <button
               id="attach-btn"
               onClick={() => setShowAttachMenu(!showAttachMenu)}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors shadow-sm"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-sm transition-colors hover:bg-subtle hover:text-fg active:scale-95"
               title="Attach media or file"
+              aria-label="Attach media or file"
+              aria-expanded={showAttachMenu}
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -1120,34 +1179,34 @@ export const ChatWindow = ({
                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                  className="fixed left-4 bottom-20 z-50 w-[200px] overflow-hidden rounded-2xl bg-white p-2 shadow-xl dark:bg-slate-800 ring-1 ring-black/5"
+                  className="absolute bottom-full left-0 z-50 mb-2 w-[200px] overflow-hidden rounded-2xl border border-line bg-elevated p-2 shadow-float"
                 >
                   <button
                     onClick={() => { setShowAttachMenu(false); videoInputRef.current?.click(); }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                   >
                     <Video className="h-5 w-5 text-purple-500" />
                     Video
                   </button>
                   <button
                     onClick={() => { setShowAttachMenu(false); imageInputRef.current?.click(); }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                   >
-                    <ImagePlus className="h-5 w-5 text-blue-500" />
+                    <ImagePlus className="h-5 w-5 text-brand" />
                     Photo
                   </button>
                   <button
                     onClick={() => { setShowAttachMenu(false); galleryInputRef.current?.click(); }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                   >
-                    <Images className="h-5 w-5 text-green-500" />
+                    <Images className="h-5 w-5 text-emerald-500" />
                     Gallery
                   </button>
                   <button
                     onClick={() => { setShowAttachMenu(false); fileInputRef.current?.click(); }}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-700"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-fg/85 transition-colors hover:bg-subtle active:bg-subtle"
                   >
-                    <Paperclip className="h-5 w-5 text-slate-500" />
+                    <Paperclip className="h-5 w-5 text-muted" />
                     File
                   </button>
                 </motion.div>
@@ -1156,14 +1215,15 @@ export const ChatWindow = ({
           </div>
 
           {/* Text Input / Recording */}
-          <div className="flex flex-1 items-end gap-2 rounded-2xl sm:rounded-full bg-white px-2 py-2 sm:px-4 sm:py-2.5 shadow-sm dark:bg-slate-800">
+          <div className="flex flex-1 items-end gap-2 rounded-2xl border border-line bg-surface px-2 py-2 shadow-sm transition-all focus-within:border-brand/35 focus-within:ring-2 focus-within:ring-brand/10 sm:rounded-full sm:px-4 sm:py-2.5">
             {/* Emoji Button */}
             <div className="relative shrink-0">
               <button
                 ref={emojiButtonRef}
                 type="button"
                 onClick={() => setShowEmojiPicker((prev) => !prev)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 active:scale-95"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-faint transition-colors hover:bg-subtle hover:text-brand active:scale-95"
+                aria-label="Insert emoji"
               >
                 <Smile className="h-5 w-5" />
               </button>
@@ -1189,7 +1249,7 @@ export const ChatWindow = ({
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
                 </span>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                <span className="text-xs font-medium text-muted">
                   Recording {formatDuration(recordingDuration)}
                 </span>
               </div>
@@ -1211,7 +1271,7 @@ export const ChatWindow = ({
                 }}
                 placeholder={isSpeechListening ? "Listening... Speak now" : "Message"}
                 rows={1}
-                className="max-h-28 flex-1 bg-transparent py-0.5 text-[15px] text-slate-900 placeholder:text-slate-400 outline-none dark:text-white resize-none"
+                className="max-h-28 flex-1 resize-none bg-transparent py-0.5 text-[15px] text-fg outline-none placeholder:text-faint"
               />
             )}
 
@@ -1231,10 +1291,10 @@ export const ChatWindow = ({
                 className={cn(
                   "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200",
                   isSpeechListening
-                    ? "bg-red-500 text-white shadow-md ring-2 ring-red-300 dark:ring-red-900 animate-pulse"
+                    ? "animate-pulse bg-rose-500 text-white shadow-md ring-2 ring-rose-300 dark:ring-rose-900"
                     : isSpeechSupported
-                    ? "text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 active:scale-95"
-                    : "text-slate-300 dark:text-slate-600 opacity-60 cursor-not-allowed"
+                    ? "text-faint hover:bg-subtle hover:text-brand active:scale-95"
+                    : "cursor-not-allowed text-faint/60 opacity-60"
                 )}
               >
                 {isSpeechListening ? (
@@ -1258,7 +1318,7 @@ export const ChatWindow = ({
             <button
               onClick={stopRecording}
               title="Stop audio recording"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500 text-white active:scale-95 shadow-sm"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm transition-transform active:scale-95"
             >
               <Square className="h-4 w-4 fill-current" />
             </button>
@@ -1272,7 +1332,7 @@ export const ChatWindow = ({
               }
               title="Send message"
               className={cn(
-                "flex h-11 w-11 items-center justify-center rounded-full active:scale-95 shadow-sm transition-transform",
+                "flex h-11 w-11 items-center justify-center rounded-full shadow-sm transition-all duration-200 active:scale-95 disabled:opacity-50",
                 currentThemeClass,
                 "text-white"
               )}
@@ -1284,11 +1344,12 @@ export const ChatWindow = ({
               onClick={startRecording}
               disabled={isSendingMedia}
               title="Record voice message (Audio)"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-95 dark:bg-slate-800 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-sm transition-colors hover:bg-subtle hover:text-fg active:scale-95"
             >
               <Mic className="h-5 w-5" />
             </button>
           )}
+        </div>
         </div>
       </footer>
 

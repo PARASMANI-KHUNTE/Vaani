@@ -64,28 +64,36 @@ export const GroupInvitePage = () => {
   }
 
   return (
-    <main className="ambient-grid flex min-h-screen items-center justify-center px-4 py-8">
-      <div className="surface-panel w-full max-w-lg rounded-[30px] p-6 sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lagoon/70">Group Invite</p>
-        {isLoading ? <p className="mt-3 text-sm text-ink/60">Loading invite...</p> : null}
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-canvas px-4 py-8">
+      <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-brand/15 blur-[110px]" />
+      <div className="pointer-events-none absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-accent/10 blur-[110px]" />
+
+      <div className="surface-panel relative w-full max-w-lg rounded-[30px] p-6 sm:p-8">
+        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-brand">Group Invite</p>
+        {isLoading ? (
+          <div className="mt-4 flex items-center gap-2.5 text-sm text-muted">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
+            Loading invite...
+          </div>
+        ) : null}
         {!isLoading && error ? (
-          <div className="mt-4 rounded-2xl border border-red-300/40 bg-red-50/70 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/[0.07] px-4 py-3 text-sm font-medium text-rose-600 dark:text-rose-300">
             {error}
           </div>
         ) : null}
         {!isLoading && !error && preview ? (
           <div className="mt-4">
-            <div className="flex items-center gap-3">
-              <Avatar src={preview.groupAvatar} name={preview.groupName} className="h-14 w-14 rounded-2xl" />
-              <div>
-                <h1 className="text-xl font-semibold text-ink dark:text-slate-100">{preview.groupName}</h1>
-                <p className="text-sm text-ink/60 dark:text-slate-400">{preview.memberCount} members</p>
+            <div className="flex items-center gap-3.5">
+              <Avatar src={preview.groupAvatar} name={preview.groupName} className="h-14 w-14 rounded-2xl shadow-sm" />
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-bold tracking-tight text-fg">{preview.groupName}</h1>
+                <p className="text-sm text-muted">{preview.memberCount} members</p>
               </div>
             </div>
-            <p className="mt-3 text-xs text-ink/55 dark:text-slate-400">
+            <p className="mt-3 text-xs font-medium text-faint">
               Expires on {new Date(preview.expiresAt).toLocaleString()}
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-6 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={async () => {
@@ -107,7 +115,7 @@ export const GroupInvitePage = () => {
                     setIsJoining(false);
                   }
                 }}
-                className="rounded-full bg-[linear-gradient(135deg,#172033,#25304a)] px-4 py-2 text-sm font-semibold text-white"
+                className="btn-primary"
                 disabled={isJoining}
               >
                 {preview.isAlreadyMember ? "Open Group" : isJoining ? "Joining..." : "Join Group"}
@@ -115,7 +123,7 @@ export const GroupInvitePage = () => {
               <button
                 type="button"
                 onClick={() => navigate("/")}
-                className="rounded-full border border-ink/15 bg-white/70 px-4 py-2 text-sm font-semibold text-ink/70"
+                className="btn-secondary"
               >
                 Cancel
               </button>

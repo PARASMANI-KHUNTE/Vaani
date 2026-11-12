@@ -14,11 +14,14 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
   const [messages, setMessages] = useState<MobileMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token || !chat?._id) {
       setMessages([]);
+      setHasOlderMessages(false);
       return;
     }
 
@@ -31,6 +34,7 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
 
         if (active) {
           setMessages(response.messages);
+          setHasOlderMessages(Boolean(response.pagination?.hasNextPage));
           setError(null);
         }
       } catch (loadError) {
@@ -95,16 +99,40 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
 
     const handleMessageSeen = ({
       chatId: seenChatId,
+      seenAt,
     }: {
       chatId: string;
+      seenAt?: string;
     }) => {
       if (seenChatId !== chat._id) return;
 
+      // Only messages that existed when the other side opened the chat are
+      // seen; newer ones must keep their previous status.
+      const seenAtMs = seenAt ? new Date(seenAt).getTime() : Number.POSITIVE_INFINITY;
+
       setMessages((current) =>
-        current.map((msg) => ({
-          ...msg,
-          status: "seen" as const,
-        }))
+        current.map((msg) => {
+          const senderId = typeof msg.senderId === "string" ? msg.senderId : msg.senderId._id;
+          if (senderId !== userId || new Date(msg.createdAt).getTime() > seenAtMs) {
+            return msg;
+          }
+          return { ...msg, status: "seen" as const };
+        })
+      );
+    };
+
+    const handleMessageEdited = ({
+      chatId: editedChatId,
+      message,
+    }: {
+      chatId?: string;
+      message: MobileMessage;
+    }) => {
+      const targetChatId = editedChatId || message.chatId;
+      if (targetChatId !== chat._id) return;
+
+      setMessages((current) =>
+        current.map((msg) => (msg._id === message._id ? { ...msg, ...message } : msg))
       );
     };
 
@@ -166,6 +194,20 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     socket.on(mobileSocketEvents.reactionAdded, handleReactionAdded);
     socket.on(mobileSocketEvents.reactionRemoved, handleReactionRemoved);
     socket.on(mobileSocketEvents.messageDeleted, handleMessageDeleted);
+    socket.on(mobileSocketEvents.messageEdited, handleMessageEdited);
+
+    // Socket rooms are not preserved across reconnects and events sent while
+    // offline are not replayed, so re-join and reload the newest page.
+    const handleConnect = () => {
+      socket.emit(mobileSocketEvents.joinChat, { chatId: chat._id });
+      void getMobileMessages(token, chat._id)
+        .then((response) => {
+          setMessages(response.messages);
+          setHasOlderMessages(Boolean(response.pagination?.hasNextPage));
+        })
+        .catch(() => undefined);
+    };
+    socket.on("connect", handleConnect);
 
     return () => {
       socket.off(mobileSocketEvents.newMessage, handleNewMessage);
@@ -174,8 +216,10 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
       socket.off(mobileSocketEvents.reactionAdded, handleReactionAdded);
       socket.off(mobileSocketEvents.reactionRemoved, handleReactionRemoved);
       socket.off(mobileSocketEvents.messageDeleted, handleMessageDeleted);
+      socket.off(mobileSocketEvents.messageEdited, handleMessageEdited);
+      socket.off("connect", handleConnect);
     };
-  }, [chat?._id, token]);
+  }, [chat?._id, token, userId]);
 
   const sendMessage = async (content: string, replyToId?: string | null) => {
     if (!token || !chat?._id || !content.trim()) {
@@ -231,7 +275,7 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
 
     try {
       await socketAckPromise;
-    } catch (socketError) {
+    } catch {
       try {
         const response = await postMobileMessage(token, {
           chatId: chat._id,
@@ -258,6 +302,37 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     () => [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
     [messages]
   );
+
+  const loadOlderMessages = async () => {
+    if (!token || !chat?._id || isLoadingOlder || !hasOlderMessages) {
+      return;
+    }
+
+    const oldestMessage = sortedMessages[0];
+    if (!oldestMessage) {
+      return;
+    }
+
+    setIsLoadingOlder(true);
+    try {
+      const response = await getMobileMessages(token, chat._id, {
+        limit: 30,
+        cursor: oldestMessage._id,
+      });
+
+      setMessages((current) => {
+        const knownIds = new Set(current.map((entry) => entry._id));
+        const older = response.messages.filter((entry) => !knownIds.has(entry._id));
+        return [...older, ...current];
+      });
+      setHasOlderMessages(Boolean(response.pagination?.hasNextPage));
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load older messages");
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
 
   const toggleReaction = async (messageId: string, emoji: string, currentUserId: string) => {
     if (!token || !chat?._id) {
@@ -291,7 +366,7 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     }
 
     try {
-      const response = await deleteMobileMessage(token, messageId, scope);
+      await deleteMobileMessage(token, messageId, scope);
       
       if (scope === "everyone") {
         setMessages((current) =>
@@ -328,10 +403,13 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     messages: sortedMessages,
     isLoading,
     isSending,
+    isLoadingOlder,
+    hasOlderMessages,
     error,
     sendMessage,
     toggleReaction,
     deleteMessage,
     editMessage,
+    loadOlderMessages,
   };
 };

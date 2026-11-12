@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   acceptFriendRequest,
   blockUser,
@@ -32,6 +32,10 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
   const [error, setError] = useState<string | null>(null);
   const pendingRequestsRef = useRef(new Set<string>());
   const storeRef = useRef<ReturnType<typeof useChatStore.getState> | null>(null);
+  // Socket events and notification actions update the store immediately.
+  // Overlay those relationship changes so every useSocialData consumer
+  // (explore page, new-chat modal) sees them without a refetch.
+  const storeDirectoryUsers = useChatStore((state) => state.directoryUsers);
 
   useEffect(() => {
     storeRef.current = useChatStore.getState();
@@ -76,7 +80,6 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
       setDirectoryUsers([]);
       return;
     }
-
     let active = true;
 
     const loadDirectory = async () => {
@@ -355,8 +358,27 @@ export const useSocialData = ({ token, exploreQuery }: UseSocialDataParams) => {
     }
   };
 
+  const mergedDirectoryUsers = useMemo(
+    () =>
+      directoryUsers.map((entry) => {
+        const override = storeDirectoryUsers[entry._id];
+        if (!override) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          isFriend: override.isFriend,
+          requestSent: override.requestSent,
+          requestReceived: override.requestReceived,
+          friendsCount: override.friendsCount,
+        };
+      }),
+    [directoryUsers, storeDirectoryUsers]
+  );
+
   return {
-    directoryUsers,
+    directoryUsers: mergedDirectoryUsers,
     error,
     fetchSharedProfile,
     isLoadingDirectory,

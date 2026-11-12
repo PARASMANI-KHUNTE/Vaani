@@ -50,7 +50,9 @@ app.use(express.urlencoded({ extended: true }));
 const monitoringHtmlPath = path.join(__dirname, "public", "monitoring.html");
 const webDistPath = path.resolve(__dirname, "../../web/dist");
 
-app.use(express.static(webDistPath));
+// `index: false` keeps the SPA from swallowing `/` (and other API routes) so
+// JSON clients are not served index.html.
+app.use(express.static(webDistPath, { index: false }));
 
 app.get("/monitoring", (_req, res) => {
   return res
@@ -132,28 +134,48 @@ app.post("/monitoring/send", (req, res, next) => {
     return next(error);
   }
 });
-app.get("/readyz", (_req, res) => {
+const getReadiness = () => {
   const snapshot = getHealthSnapshot();
-  const ready = snapshot.mongo.connected && (!snapshot.redis.enabled || snapshot.redis.connected);
+  // Redis is optional: the app falls back to an in-memory store, so a missing
+  // Redis instance degrades the service but must not keep it out of rotation.
+  const ready = snapshot.mongo.connected;
+  const degraded = snapshot.redis.enabled && !snapshot.redis.connected;
   const status = ready ? 200 : 503;
+
+  return {
+    snapshot: { ...snapshot, degraded },
+    ready,
+    degraded,
+    status,
+  };
+};
+
+app.get("/readyz", (_req, res) => {
+  const { snapshot, ready, degraded, status } = getReadiness();
 
   return res.status(status).json({
     success: ready,
     status,
-    message: ready ? "Ready" : "Not ready",
+    message: ready
+      ? degraded
+        ? "Ready (degraded: Redis unavailable, using in-memory fallback)"
+        : "Ready"
+      : "Not ready",
     data: snapshot,
   });
 });
 
 app.get("/monitoring/ready", (_req, res) => {
-  const snapshot = getHealthSnapshot();
-  const ready = snapshot.mongo.connected && (!snapshot.redis.enabled || snapshot.redis.connected);
-  const status = ready ? 200 : 503;
+  const { snapshot, ready, degraded, status } = getReadiness();
 
   return res.status(status).json({
     success: ready,
     status,
-    message: ready ? "Ready" : "Not ready",
+    message: ready
+      ? degraded
+        ? "Ready (degraded: Redis unavailable, using in-memory fallback)"
+        : "Ready"
+      : "Not ready",
     data: snapshot,
   });
 });

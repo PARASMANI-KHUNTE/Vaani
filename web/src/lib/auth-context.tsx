@@ -1,10 +1,18 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CredentialResponse } from "@react-oauth/google";
-import { exchangeGoogleLogin, getAuthMe, unregisterPushToken } from "@/lib/api";
+import {
+  exchangeGoogleLogin,
+  getAuthMe,
+  refreshAccessToken,
+  revokeSession,
+  setAuthRefreshHandler,
+  unregisterPushToken,
+} from "@/lib/api";
 import { secureStorage } from "@/lib/secure-storage";
 
 type BackendSession = {
   backendAccessToken: string;
+  backendRefreshToken?: string;
   backendUser: {
     _id: string;
     name: string;
@@ -26,10 +34,73 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const normalizeSession = (
+  accessToken: string,
+  refreshToken: string | undefined,
+  user: BackendSession["backendUser"]
+): BackendSession => ({
+  backendAccessToken: accessToken,
+  backendRefreshToken: refreshToken,
+  backendUser: {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+    lastSeen: user.lastSeen || null,
+  },
+});
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
   const [session, setSession] = useState<BackendSession | null>(null);
   const [isSessionMode, setIsSessionMode] = useState(false);
+  const sessionRef = useRef<BackendSession | null>(null);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // Let the API client transparently refresh expired access tokens.
+  useEffect(() => {
+    setAuthRefreshHandler({
+      refresh: async () => {
+        const refreshToken = sessionRef.current?.backendRefreshToken;
+        if (!refreshToken) {
+          return null;
+        }
+
+        try {
+          const result = await refreshAccessToken(refreshToken);
+          const currentSession = sessionRef.current;
+          if (!currentSession) {
+            return null;
+          }
+
+          const nextSession: BackendSession = {
+            ...currentSession,
+            backendAccessToken: result.accessToken,
+          };
+
+          sessionRef.current = nextSession;
+          setSession(nextSession);
+          secureStorage.set(nextSession);
+          return result.accessToken;
+        } catch {
+          return null;
+        }
+      },
+      onRefreshFailed: () => {
+        sessionRef.current = null;
+        secureStorage.remove();
+        setSession(null);
+        setStatus("unauthenticated");
+      },
+    });
+
+    return () => {
+      setAuthRefreshHandler(null);
+    };
+  }, []);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -43,20 +114,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const me = await getAuthMe(storedSession.backendAccessToken);
-        const normalizedSession: BackendSession = {
-          backendAccessToken: storedSession.backendAccessToken,
-          backendUser: {
-            _id: me.user._id,
-            name: me.user.name,
-            email: me.user.email,
-            avatar: me.user.avatar,
-            lastSeen: me.user.lastSeen || null,
-          },
-        };
+        const normalizedSession = normalizeSession(
+          storedSession.backendAccessToken,
+          storedSession.backendRefreshToken,
+          me.user
+        );
+        sessionRef.current = normalizedSession;
         setSession(normalizedSession);
         secureStorage.set(normalizedSession);
         setStatus("authenticated");
       } catch {
+        sessionRef.current = null;
         secureStorage.remove();
         setSession(null);
         setStatus("unauthenticated");
@@ -77,28 +145,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const nextSession = await exchangeGoogleLogin(idToken);
-        const normalizedSession: BackendSession = {
-          backendAccessToken: nextSession.accessToken,
-          backendUser: {
-            _id: nextSession.user._id,
-            name: nextSession.user.name,
-            email: nextSession.user.email,
-            avatar: nextSession.user.avatar,
-            lastSeen: nextSession.user.lastSeen || null,
-          },
-        };
+        const normalizedSession = normalizeSession(
+          nextSession.accessToken,
+          nextSession.refreshToken,
+          nextSession.user
+        );
 
+        sessionRef.current = normalizedSession;
         setSession(normalizedSession);
         secureStorage.set(normalizedSession);
         setStatus("authenticated");
       },
       logout: () => {
-        const token = session?.backendAccessToken;
+        const currentSession = sessionRef.current;
+        const token = currentSession?.backendAccessToken;
+        const refreshToken = currentSession?.backendRefreshToken;
         const endpoint = token ? localStorage.getItem("webPushEndpoint") : null;
+
         if (token && endpoint) {
           void unregisterPushToken(token, endpoint).catch(console.error);
           localStorage.removeItem("webPushEndpoint");
         }
+        if (refreshToken) {
+          void revokeSession(refreshToken).catch(console.error);
+        }
+
+        sessionRef.current = null;
         secureStorage.remove();
         setSession(null);
         setStatus("unauthenticated");

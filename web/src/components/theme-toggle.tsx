@@ -3,6 +3,7 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme-context";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export const ThemeToggle = () => {
   const { theme, setTheme } = useTheme();
@@ -13,9 +14,7 @@ export const ThemeToggle = () => {
   }, []);
 
   if (!mounted) {
-    return (
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink/10 bg-white/60" />
-    );
+    return <div className="h-9 w-9 rounded-xl border border-line bg-subtle/60" aria-hidden="true" />;
   }
 
   const isDark = theme === "dark";
@@ -24,7 +23,10 @@ export const ThemeToggle = () => {
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink/10 bg-white/60 text-ink/60 transition-all hover:border-ink/20 hover:bg-white hover:text-ink dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/15 dark:hover:bg-white/10 dark:hover:text-slate-200"
+      className={cn(
+        "icon-btn border border-line bg-surface shadow-sm",
+        "hover:border-brand/25 hover:bg-brand/5 hover:text-brand"
+      )}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
@@ -32,4 +34,3 @@ export const ThemeToggle = () => {
     </button>
   );
 };
-
