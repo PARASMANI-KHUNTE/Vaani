@@ -229,7 +229,7 @@ export const MediaPreview = ({
                     disabled={zoom <= 1}
                     className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
                   >
-                    <ZoomOut className="h-4.5 w-4.5" />
+                    <ZoomOut className="h-5 w-5" />
                   </button>
                   {zoom > 1 && (
                     <button
@@ -245,7 +245,7 @@ export const MediaPreview = ({
                     disabled={zoom >= 5}
                     className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
                   >
-                    <ZoomIn className="h-4.5 w-4.5" />
+                    <ZoomIn className="h-5 w-5" />
                   </button>
                   <div className="mx-1 h-5 w-px bg-white/20" />
                 </>
@@ -260,7 +260,7 @@ export const MediaPreview = ({
                 className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                 title="Download"
               >
-                <Download className="h-4.5 w-4.5" />
+                <Download className="h-5 w-5" />
               </a>
             </div>
           </div>

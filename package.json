@@ -1,21 +1,34 @@
 {
-  "name": "linkup",
+  "name": "chat-app",
   "version": "1.0.0",
   "private": true,
+  "description": "Real-time chat application with React, React Native, and Node.js",
   "workspaces": [
-    "web",
-    "server"
+    "packages/*"
   ],
   "scripts": {
-    "dev": "npm run build:web && node server/src/server.js",
-    "build": "npm run build:web",
-    "build:web": "npm run build --workspace=web",
-    "lint": "npm run lint --workspace=web",
-    "start": "node server/src/server.js"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=web",
+    "build:server": "turbo run build --filter=server",
+    "build:mobile": "turbo run build --filter=mobile",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "db:push": "turbo run db:push --filter=server",
+    "db:studio": "turbo run db:studio --filter=server",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
   },
   "devDependencies": {
-    "docx": "^9.6.1",
-    "html-docx-js": "^0.3.1",
-    "puppeteer": "^24.42.0"
-  }
+    "turbo": "^2.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
 }

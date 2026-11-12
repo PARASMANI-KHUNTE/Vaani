@@ -7,6 +7,7 @@ import { getProfileByUserId, getProfileByUsername } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useChatData } from "@/hooks/use-chat-data";
 import { UserProfile } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export const SharedProfilePage = () => {
   const navigate = useNavigate();
@@ -73,10 +74,10 @@ export const SharedProfilePage = () => {
 
   if (status === "loading" || isLoading) {
     return (
-      <main className="flex min-h-dvh w-full items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest leading-none">Loading Profile</p>
+          <span className="h-10 w-10 animate-spin rounded-full border-[3px] border-brand/20 border-t-brand" />
+          <p className="text-[11px] font-bold uppercase leading-none tracking-[0.24em] text-faint">Loading Profile</p>
         </div>
       </main>
     );
@@ -84,17 +85,14 @@ export const SharedProfilePage = () => {
 
   if (!session?.backendAccessToken) {
     return (
-      <main className="flex min-h-dvh w-full items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full items-center justify-center bg-canvas px-4">
         <div className="flex max-w-sm flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-            <UserRound className="h-8 w-8 text-slate-400" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-line bg-surface text-faint">
+            <UserRound className="h-8 w-8" />
           </div>
-          <h1 className="mt-6 text-2xl font-bold text-slate-900 dark:text-white">Authentication Required</h1>
-          <p className="mt-2 text-sm font-medium text-slate-500">You must be signed in to view workspace profiles.</p>
-          <Link
-            to="/"
-            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-          >
+          <h1 className="mt-6 text-2xl font-bold tracking-tight text-fg">Authentication Required</h1>
+          <p className="mt-2 text-sm font-medium text-muted">You must be signed in to view workspace profiles.</p>
+          <Link to="/" className="btn-primary mt-8">
             <Home className="h-4 w-4" />
             Go to App
           </Link>
@@ -105,18 +103,15 @@ export const SharedProfilePage = () => {
 
   if (error || !profile) {
     return (
-      <main className="flex min-h-dvh w-full items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full items-center justify-center bg-canvas px-4">
         <div className="flex max-w-sm flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-900/30">
-            <UserRound className="h-8 w-8 text-rose-500" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/[0.07] text-rose-500">
+            <UserRound className="h-8 w-8" />
           </div>
-          <h1 className="mt-6 text-2xl font-bold text-slate-900 dark:text-white">Profile Unavailable</h1>
-          <p className="mt-2 text-sm font-medium text-slate-500">{error || "This profile could not be loaded."}</p>
-          <div className="mt-8 flex flex-col gap-3 w-full">
-            <Link
-              to="/"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-            >
+          <h1 className="mt-6 text-2xl font-bold tracking-tight text-fg">Profile Unavailable</h1>
+          <p className="mt-2 text-sm font-medium text-muted">{error || "This profile could not be loaded."}</p>
+          <div className="mt-8 flex w-full flex-col gap-3">
+            <Link to="/" className="btn-secondary">
               <ArrowLeft className="h-4 w-4" />
               Back to App
             </Link>
@@ -127,7 +122,7 @@ export const SharedProfilePage = () => {
   }
 
   return (
-    <main className="flex min-h-dvh w-full flex-col bg-white dark:bg-slate-950">
+    <main className="flex min-h-dvh w-full flex-col bg-canvas">
       <NavHeader
         title="User Profile"
         showBackButton
@@ -136,7 +131,7 @@ export const SharedProfilePage = () => {
         rightContent={
           <button
             onClick={() => navigate("/")}
-            className="rounded-lg px-4 py-2 text-sm font-bold text-slate-900 border border-slate-200 transition-all hover:bg-slate-50 dark:text-white dark:border-slate-800 dark:hover:bg-slate-800"
+            className="btn-secondary !px-4 !py-2 !text-xs"
           >
             Open App
           </button>
@@ -144,32 +139,35 @@ export const SharedProfilePage = () => {
       />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="grid border-b border-slate-200 dark:border-slate-800 lg:grid-cols-[400px_1fr]">
-          <section className="border-r border-slate-200 p-8 dark:border-slate-800">
+        <div className="grid border-b border-line lg:grid-cols-[400px_1fr]">
+          <section className="border-b border-line p-8 lg:border-b-0 lg:border-r">
             <div className="flex flex-col items-center text-center">
-              <div className="relative h-28 w-28 overflow-hidden rounded-2xl border-4 border-white bg-slate-100 shadow-xl ring-1 ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-700">
+              <div className="relative h-28 w-28 overflow-hidden rounded-[26px] bg-subtle shadow-float ring-4 ring-surface">
                 <Avatar
                   src={profile.avatar}
                   name={profile.name}
-                  className="h-full w-full rounded-xl"
+                  className="h-full w-full rounded-[22px]"
                   textClassName="text-3xl font-bold"
                 />
               </div>
-              <p className="mt-6 text-2xl font-bold text-slate-900 dark:text-white">{profile.name}</p>
-              <p className="text-sm font-medium text-slate-500">@{profile.username}</p>
-              <p className="mt-4 inline-flex rounded-lg bg-slate-100 px-3 py-1 text-sm font-bold tracking-widest text-slate-900 uppercase dark:bg-slate-800 dark:text-white">
+              <p className="mt-6 text-2xl font-bold tracking-tight text-fg">{profile.name}</p>
+              <p className="text-sm font-medium text-muted">@{profile.username}</p>
+              <p className="mt-4 inline-flex rounded-xl bg-brand/10 px-3 py-1 text-sm font-bold uppercase tracking-[0.2em] text-brand ring-1 ring-inset ring-brand/15">
                 {profile.tagline || "----"}
               </p>
-              <div className="mt-8 grid w-full grid-cols-2 gap-4 border-t border-slate-100 pt-8 dark:border-slate-800">
+              <div className="mt-8 grid w-full grid-cols-2 gap-4 border-t border-line pt-8">
                 <div>
-                  <p className="text-xl font-bold text-slate-900 dark:text-white">{profile.friendsCount || 0}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Friends</p>
+                  <p className="text-xl font-bold tabular-nums text-fg">{profile.friendsCount || 0}</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-faint">Friends</p>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                  <p className={cn(
+                    "text-sm font-bold",
+                    profile.isFriend ? "text-emerald-600 dark:text-emerald-400" : "text-brand"
+                  )}>
                     {profile.isFriend ? "Friends" : profile.requestSent ? "Sent" : profile.requestReceived ? "Received" : "Not Friends"}
                   </p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Relationship</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-faint">Relationship</p>
                 </div>
               </div>
             </div>
@@ -177,15 +175,17 @@ export const SharedProfilePage = () => {
 
           <section className="p-8">
             <div className="max-w-2xl">
-              <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-400">Biography</label>
-              <p className="text-lg font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-faint">Biography</label>
+              <p className="text-lg font-medium leading-relaxed text-fg/85">
                 {profile.bio || "This user hasn't shared a bio yet."}
               </p>
-              
+
               <div className="mt-12 space-y-4">
-                <div className="rounded-2xl bg-slate-50 p-6 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">Need to talk?</h4>
-                  <p className="mt-1 text-xs text-slate-500">Start a conversation with {profile.name.split(' ')[0]} to collaborate in realtime.</p>
+                <div className="rounded-2xl border border-line bg-subtle/40 p-6">
+                  <h4 className="text-sm font-bold text-fg">Need to talk?</h4>
+                  <p className="mt-1 text-xs text-muted">
+                    Start a conversation with {profile.name.split(" ")[0]} to collaborate in realtime.
+                  </p>
                   <button
                     onClick={async () => {
                       if (!profile._id || isStartingChat) return;
@@ -200,7 +200,7 @@ export const SharedProfilePage = () => {
                       }
                     }}
                     disabled={isStartingChat}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+                    className="btn-primary mt-4"
                   >
                     <MessageSquare className="h-4 w-4" />
                     {isStartingChat ? "Opening..." : "Send Message"}

@@ -71,34 +71,36 @@ export const NewChatModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 sm:p-6 backdrop-blur-md bg-slate-900/40 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-md animate-in fade-in duration-200 sm:p-6">
       <div 
-        className="w-full max-w-lg overflow-hidden rounded-[32px] border border-white/20 bg-white/95 dark:bg-slate-900/95 shadow-2xl shadow-blue-500/10 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+        className="flex max-h-[85vh] w-full max-w-lg animate-in zoom-in-95 flex-col overflow-hidden rounded-[28px] border border-line bg-elevated shadow-float duration-200"
         role="dialog"
+        aria-modal="true"
       >
         {/* Header */}
-        <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">New Conversation</h2>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Choose a friend to start chatting</p>
+        <div className="border-b border-line p-6 pb-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold tracking-tight text-fg">New Conversation</h2>
+              <p className="text-xs font-medium text-muted">Choose a friend to start chatting</p>
             </div>
-            <button 
+            <button
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="icon-btn"
+              aria-label="Close"
             >
-              <X className="h-5 w-5 text-slate-400" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="flex gap-2 mt-4">
+          <div className="mt-4 flex gap-1 rounded-2xl border border-line bg-subtle/60 p-1">
             <button
               onClick={() => setIsGroupMode(false)}
               className={cn(
-                "flex-1 py-2 text-xs font-bold rounded-xl transition-all",
-                !isGroupMode 
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                "flex-1 rounded-xl py-2 text-xs font-bold transition-all",
+                !isGroupMode
+                  ? "bg-surface text-brand shadow-sm ring-1 ring-brand/15"
+                  : "text-muted hover:text-fg"
               )}
             >
               Direct Message
@@ -106,10 +108,10 @@ export const NewChatModal = ({
             <button
               onClick={() => setIsGroupMode(true)}
               className={cn(
-                "flex-1 py-2 text-xs font-bold rounded-xl transition-all",
-                isGroupMode 
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                "flex-1 rounded-xl py-2 text-xs font-bold transition-all",
+                isGroupMode
+                  ? "bg-surface text-brand shadow-sm ring-1 ring-brand/15"
+                  : "text-muted hover:text-fg"
               )}
             >
               Group Chat
@@ -118,44 +120,53 @@ export const NewChatModal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
+        <div className="min-h-[300px] flex-1 space-y-4 overflow-y-auto p-4">
           {isGroupMode && (
-            <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100/50 dark:border-blue-900/30">
-              <label className="block text-[10px] font-bold uppercase tracking-widest text-blue-600/60 mb-2">Group Details</label>
+            <div className="rounded-2xl border border-brand/15 bg-brand/[0.05] p-4">
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-brand/70">Group Details</label>
               <input
                 type="text"
                 placeholder="Name your group..."
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                className="w-full bg-white dark:bg-slate-800 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-blue-500/50 outline-none placeholder:text-slate-400"
+                className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm font-medium text-fg outline-none transition-all placeholder:text-faint focus:border-brand/40 focus:ring-2 focus:ring-brand/12"
               />
-              <p className="mt-2 text-[10px] text-blue-500 font-medium">Select at least 2 friends ({selectedUserIds.length} selected)</p>
+              <p className="mt-2 text-[10px] font-semibold text-brand">Select at least 2 friends ({selectedUserIds.length} selected)</p>
             </div>
           )}
 
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
             <input
               type="text"
               placeholder="Search friends..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl pl-11 pr-4 py-3 text-sm font-medium outline-none"
+              className="w-full rounded-2xl border border-line bg-subtle/60 py-3 pl-11 pr-4 text-sm font-medium text-fg outline-none transition-all placeholder:text-faint focus:border-brand/40 focus:bg-surface focus:ring-2 focus:ring-brand/12"
             />
           </div>
 
           <div className="space-y-1">
             {isLoadingDirectory && friends.length === 0 ? (
-              <div className="py-10 text-center animate-pulse">
-                <div className="h-10 w-10 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-4" />
-                <div className="h-4 w-32 bg-slate-100 dark:bg-slate-800 rounded mx-auto" />
+              <div className="space-y-2 py-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-2xl px-3 py-2.5">
+                    <div className="skeleton h-11 w-11 rounded-xl" />
+                    <div className="space-y-2">
+                      <div className="skeleton h-3 w-28" />
+                      <div className="skeleton h-2.5 w-20" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : friends.length === 0 ? (
               <div className="py-10 text-center">
-                <Users className="h-10 w-10 text-slate-200 dark:text-slate-800 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-500">{query ? "No friends found" : "Your friends list is empty"}</p>
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-subtle text-faint">
+                  <Users className="h-7 w-7" />
+                </div>
+                <p className="text-sm font-semibold text-fg">{query ? "No friends found" : "Your friends list is empty"}</p>
                 {!query && (
-                  <p className="text-xs text-slate-400 mt-1">Go to explore to find new connections</p>
+                  <p className="mt-1 text-xs text-faint">Go to explore to find new connections</p>
                 )}
               </div>
             ) : (
@@ -164,24 +175,24 @@ export const NewChatModal = ({
                   key={user._id}
                   onClick={() => handleAction(user._id)}
                   className={cn(
-                    "flex items-center justify-between w-full p-3 rounded-2xl transition-all group",
+                    "group flex w-full items-center justify-between rounded-2xl border p-3 transition-all",
                     selectedUserIds.includes(user._id)
-                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40"
-                      : "hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent"
+                      ? "border-brand/25 bg-brand/[0.06]"
+                      : "border-transparent hover:bg-subtle"
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar src={user.avatar} name={user.name} className="h-11 w-11 rounded-xl" />
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">{user.name}</p>
-                      <p className="text-[10px] font-medium text-slate-500 line-clamp-1">@{user.username}</p>
+                    <Avatar src={user.avatar} name={user.name} className="h-11 w-11 rounded-xl shadow-sm" />
+                    <div className="min-w-0 text-left">
+                      <p className="line-clamp-1 text-sm font-bold text-fg">{user.name}</p>
+                      <p className="line-clamp-1 text-[11px] font-medium text-faint">@{user.username}</p>
                     </div>
                   </div>
                   <div className={cn(
-                    "h-6 w-6 rounded-lg flex items-center justify-center transition-all",
+                    "flex h-6 w-6 items-center justify-center rounded-lg transition-all",
                     selectedUserIds.includes(user._id)
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 dark:bg-slate-800 text-transparent group-hover:text-slate-300"
+                      ? "bg-brand text-white shadow-sm"
+                      : "bg-subtle text-faint group-hover:text-muted"
                   )}>
                     {isGroupMode ? (
                       selectedUserIds.includes(user._id) ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />
@@ -197,11 +208,11 @@ export const NewChatModal = ({
 
         {/* Footer */}
         {isGroupMode && (
-          <div className="p-6 border-t border-slate-100 dark:border-slate-800">
+          <div className="border-t border-line p-5">
             <button
               disabled={!groupName.trim() || selectedUserIds.length < 2 || isSubmitting}
               onClick={handleCreateGroup}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3 font-bold text-white shadow-sm transition-all hover:bg-brand-hover active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-subtle disabled:text-faint disabled:shadow-none"
             >
               {isSubmitting ? "Creating..." : "Start Group Conversation"}
             </button>

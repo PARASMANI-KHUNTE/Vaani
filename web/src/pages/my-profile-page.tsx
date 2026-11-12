@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Camera, Check, Pencil, Loader2 } from "lucide-react";
+import { Camera, Check, Pencil, Loader2, ShieldOff, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { useSocialData } from "@/hooks/use-social-data";
 import { Avatar } from "@/components/ui/avatar";
@@ -58,12 +59,12 @@ export const MyProfilePage = () => {
 
   if (status === "loading" || isLoadingProfile) {
     return (
-      <main className="flex min-h-dvh w-full flex-col bg-slate-50 dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full flex-col bg-canvas">
         <NavHeader title="Profile" showBackButton backTo="/" showNav />
         <div className="flex flex-1 items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Loading profile...</span>
+          <div className="flex items-center gap-3 text-sm font-medium text-muted">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
+            Loading profile...
           </div>
         </div>
       </main>
@@ -72,11 +73,11 @@ export const MyProfilePage = () => {
 
   if (!token || !profile) {
     return (
-      <main className="flex min-h-dvh w-full flex-col bg-slate-50 dark:bg-slate-950">
+      <main className="flex min-h-dvh w-full flex-col bg-canvas">
         <NavHeader title="Profile" showBackButton backTo="/" showNav />
-        <div className="flex flex-1 items-center justify-center">
-          <div className="rounded-2xl bg-white p-8 text-center shadow-sm dark:bg-slate-900">
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Sign in to view your profile</h1>
+        <div className="flex flex-1 items-center justify-center px-4">
+          <div className="surface-panel max-w-sm rounded-3xl p-8 text-center">
+            <h1 className="text-xl font-bold tracking-tight text-fg">Sign in to view your profile</h1>
           </div>
         </div>
       </main>
@@ -84,88 +85,107 @@ export const MyProfilePage = () => {
   }
 
   return (
-    <main className="flex min-h-dvh w-full flex-col bg-slate-50 dark:bg-slate-950">
+    <main className="flex min-h-dvh w-full flex-col bg-canvas">
       <NavHeader title="Profile" showBackButton backTo="/" showNav />
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-lg">
           {error && (
-            <div className="mb-6 flex items-center justify-between rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/[0.07] px-4 py-3 text-sm font-medium text-rose-600 dark:text-rose-300">
               <span>{error}</span>
-              <button onClick={clearError} className="font-medium underline">Dismiss</button>
+              <button onClick={clearError} className="shrink-0 font-semibold underline underline-offset-2">
+                Dismiss
+              </button>
             </div>
           )}
 
           <div className="space-y-6">
             {/* Profile Preview Card */}
             {!isEditing && (
-              <div className="card text-center">
-                <div className="flex flex-col items-center">
-                  {/* Avatar */}
-                  <div className="relative group">
-                    <div className="h-28 w-28 overflow-hidden rounded-2xl shadow-lg ring-4 ring-slate-100 dark:ring-slate-800">
-                      <Avatar
-                        src={profile.avatar}
-                        name={profile.name}
-                        className="h-full w-full"
-                        textClassName="text-3xl font-bold"
-                      />
+              <div className="surface-panel overflow-hidden rounded-[28px]">
+                <div className="relative h-28 bg-brand-gradient">
+                  <div className="absolute inset-0 bg-paper-grid opacity-40" />
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/20 blur-2xl" />
+                </div>
+
+                <div className="px-6 pb-8">
+                  <div className="-mt-14 flex flex-col items-center text-center">
+                    <div className="group relative">
+                      <div className="h-28 w-28 overflow-hidden rounded-[26px] shadow-float ring-4 ring-surface">
+                        <Avatar
+                          src={profile.avatar}
+                          name={profile.name}
+                          className="h-full w-full"
+                          textClassName="text-3xl font-bold"
+                        />
+                      </div>
+                      <div className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-[26px] bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Camera className="h-8 w-8 text-white" />
+                      </div>
                     </div>
-                    <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer">
-                      <Camera className="h-8 w-8 text-white" />
+
+                    <h2 className="mt-5 text-2xl font-bold tracking-tight text-fg">{profile.name}</h2>
+                    <p className="text-sm font-medium text-muted">@{profile.username}</p>
+
+                    {profile.tagline && (
+                      <span className="mt-3 inline-flex rounded-xl bg-brand/10 px-4 py-1.5 text-sm font-bold uppercase tracking-[0.2em] text-brand ring-1 ring-inset ring-brand/15">
+                        {profile.tagline}
+                      </span>
+                    )}
+
+                    {profile.bio && (
+                      <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
+                        {profile.bio}
+                      </p>
+                    )}
+
+                    <div className="mt-8 grid w-full grid-cols-2 gap-4 border-t border-line pt-6">
+                      <div>
+                        <p className="text-2xl font-bold tabular-nums text-fg">{profile.friendsCount}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-faint">Friends</p>
+                      </div>
+                      <div>
+                        <p className="flex items-center justify-center gap-1.5 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Active
+                        </p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-faint">Status</p>
+                      </div>
                     </div>
+
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="btn-primary mt-7 w-full sm:w-auto"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Edit Profile
+                    </button>
+
+                    <Link
+                      to="/settings/blocked"
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-faint transition-colors hover:text-brand"
+                    >
+                      <ShieldOff className="h-3.5 w-3.5" />
+                      Manage blocked users
+                    </Link>
                   </div>
-
-                  {/* Name & Username */}
-                  <h2 className="mt-6 text-2xl font-bold text-slate-900 dark:text-white">{profile.name}</h2>
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">@{profile.username}</p>
-
-                  {/* Tagline */}
-                  {profile.tagline && (
-                    <span className="mt-3 inline-flex rounded-lg bg-slate-100 px-4 py-1.5 text-sm font-bold uppercase tracking-widest text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                      {profile.tagline}
-                    </span>
-                  )}
-
-                  {/* Bio */}
-                  {profile.bio && (
-                    <p className="mt-4 max-w-xs text-sm text-slate-600 dark:text-slate-400">
-                      {profile.bio}
-                    </p>
-                  )}
-
-                  {/* Stats */}
-                  <div className="mt-8 flex justify-center gap-16 border-t border-slate-100 pt-6 dark:border-slate-800">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{profile.friendsCount}</p>
-                      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-400">Friends</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-emerald-600">Active</p>
-                      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-400">Status</p>
-                    </div>
-                  </div>
-
-                  {/* Edit Button */}
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="mt-6 flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-700 active:scale-95"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Edit Profile
-                  </button>
                 </div>
               </div>
             )}
 
             {/* Edit Form */}
             {isEditing && (
-              <div className="card">
-                <h3 className="mb-6 text-lg font-bold text-slate-900 dark:text-white">Edit Profile</h3>
+              <div className="surface-panel rounded-[28px] p-6 sm:p-8">
+                <div className="mb-6 flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-lg font-bold tracking-tight text-fg">Edit Profile</h3>
+                </div>
 
                 <div className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-faint">
                       Display Name
                     </label>
                     <input
@@ -177,7 +197,7 @@ export const MyProfilePage = () => {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-faint">
                       Tagline
                     </label>
                     <input
@@ -187,11 +207,11 @@ export const MyProfilePage = () => {
                       placeholder="CODE"
                       className="input font-bold uppercase tracking-widest"
                     />
-                    <p className="mt-1.5 text-xs text-slate-400">A 4-character uppercase alphanumeric code</p>
+                    <p className="mt-1.5 text-xs text-faint">A 4-character uppercase alphanumeric code</p>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-faint">
                       Bio
                     </label>
                     <textarea
@@ -207,7 +227,7 @@ export const MyProfilePage = () => {
                 <div className="mt-6 flex gap-3">
                   <button
                     onClick={handleCancelEdit}
-                    className="btn btn-secondary flex-1"
+                    className="btn-secondary flex-1"
                   >
                     Cancel
                   </button>
@@ -216,7 +236,7 @@ export const MyProfilePage = () => {
                     disabled={isSaving || !name.trim()}
                     className={cn(
                       "btn flex-1",
-                      isSaving || !name.trim() ? "bg-slate-400 cursor-not-allowed" : "btn-primary"
+                      isSaving || !name.trim() ? "cursor-not-allowed bg-subtle text-faint" : "btn-primary"
                     )}
                   >
                     {isSaving ? (

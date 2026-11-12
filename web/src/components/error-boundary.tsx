@@ -59,22 +59,20 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex h-dvh flex-col items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
-          <div className="max-w-md text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-              <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+        <div className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-canvas p-6">
+          <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-amber-500/10 blur-[100px]" />
+          <div className="relative max-w-md text-center">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
+              <AlertTriangle className="h-8 w-8" />
             </div>
-            <h2 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">
+            <h2 className="mb-2 text-xl font-bold tracking-tight text-fg">
               {this.props.title || "Something went wrong"}
             </h2>
-            <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mb-6 text-sm leading-relaxed text-muted">
               {this.state.error?.message || this.props.description || "An unexpected error occurred. Please try again."}
             </p>
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <button
-                onClick={this.handleRetry}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98]"
-              >
+            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button onClick={this.handleRetry} className="btn-primary w-full sm:w-auto">
                 <RefreshCw className="h-4 w-4" />
                 Try again
               </button>
@@ -95,7 +93,7 @@ const HomeButton = () => {
   return (
     <button
       onClick={() => (window.location.href = "/")}
-      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+      className="btn-secondary w-full sm:w-auto"
     >
       <Home className="h-4 w-4" />
       Go home
@@ -120,26 +118,20 @@ export const ErrorFallback = ({
 }: ErrorFallbackProps) => {
   return (
     <div className={`flex h-full min-h-[200px] flex-col items-center justify-center p-6 ${className}`}>
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-        <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
+        <AlertTriangle className="h-6 w-6" />
       </div>
-      <h3 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
-      <p className="mb-4 text-center text-sm text-slate-500 dark:text-slate-400">{message}</p>
+      <h3 className="mb-1 text-lg font-semibold text-fg">{title}</h3>
+      <p className="mb-4 text-center text-sm leading-relaxed text-muted">{message}</p>
       <div className="flex gap-2">
         {onRetry && (
-          <button
-            onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-700"
-          >
+          <button onClick={onRetry} className="btn-primary !px-4 !py-2 !text-xs">
             <RefreshCw className="h-4 w-4" />
             Retry
           </button>
         )}
         {onHome && (
-          <button
-            onClick={onHome}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-          >
+          <button onClick={onHome} className="btn-secondary !px-4 !py-2 !text-xs">
             <Home className="h-4 w-4" />
             Home
           </button>

@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  X
-} from "lucide-react";
+import { Keyboard, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 
@@ -33,7 +31,7 @@ export const KeyboardShortcutsHint = () => {
         event.preventDefault();
         setIsOpen(true);
       }
-      
+
       // Close modal on Escape
       if (event.key === "Escape" && isOpen) {
         setIsOpen(false);
@@ -49,74 +47,79 @@ export const KeyboardShortcutsHint = () => {
       {/* Hint button in corner */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 transition-all opacity-60 hover:opacity-100"
+        className="fixed bottom-4 right-4 z-30 flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-xs font-bold text-muted opacity-60 shadow-sm transition-all hover:bg-subtle hover:text-fg hover:opacity-100"
         title="Keyboard shortcuts (?)"
+        aria-label="Keyboard shortcuts"
       >
         ?
       </button>
 
-       {/* Shortcuts Modal */}
-       <AnimatePresence>
-         {isOpen && (
-           <>
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              onClick={() => setIsOpen(false)}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Keyboard shortcuts"
+      {/* Shortcuts Modal */}
+      <AnimatePresence>
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-[600] flex items-center justify-center p-4"
+            onClick={() => setIsOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Keyboard shortcuts"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-line bg-elevated shadow-float"
+              onClick={(e) => e.stopPropagation()}
             >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800"
-                onClick={(e) => e.stopPropagation()}
-              >
-               <div className="border-b border-slate-100 p-4 dark:border-slate-700">
-                 <div className="flex items-center justify-between">
-                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Keyboard Shortcuts</h2>
-                   <button
-                     onClick={() => setIsOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+              <div className="border-b border-line p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                      <Keyboard className="h-4 w-4" />
+                    </div>
+                    <h2 className="text-lg font-bold tracking-tight text-fg">Keyboard Shortcuts</h2>
+                  </div>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="icon-btn"
+                    aria-label="Close"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Press ? or Ctrl+K anytime to see this help</p>
+                <p className="mt-2 text-sm text-muted">Press ? or Ctrl+K anytime to see this help</p>
               </div>
 
-               <div className="p-4">
-                 <div className="space-y-3">
-                   {shortcuts.map((shortcut) => (
-                     <div
+              <div className="p-4">
+                <div className="space-y-2">
+                  {shortcuts.map((shortcut) => (
+                    <div
                       key={shortcut.key}
-                      className="flex items-center justify-between rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50"
+                      className="flex items-center justify-between rounded-xl border border-line/70 bg-subtle/50 p-3"
                     >
-                      <div>
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{shortcut.action}</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">{shortcut.description}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-fg">{shortcut.action}</p>
+                        <p className="truncate text-xs text-faint">{shortcut.description}</p>
                       </div>
-                      <kbd className="rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-600 dark:text-slate-200 dark:ring-slate-600">
+                      <kbd className="shrink-0 rounded-lg border border-line bg-surface px-2 py-1 text-xs font-semibold text-muted shadow-sm">
                         {shortcut.key}
                       </kbd>
                     </div>
                   ))}
-                  </div>
                 </div>
-              </motion.div>
-            </div>
-           </>
-         )}
-       </AnimatePresence>
-     </>
-   );
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
 };
 
 // Hook to handle keyboard shortcuts throughout the app
@@ -128,7 +131,7 @@ export const useAppKeyboardShortcuts = () => {
     // Only handle shortcuts when not typing in an input
     const target = event.target as HTMLElement;
     const isTyping = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-    
+
     if (isTyping && event.key !== "Escape") return;
 
     // Ctrl/Cmd + K - Focus search

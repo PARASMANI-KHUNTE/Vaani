@@ -42,7 +42,7 @@ const getNotificationColor = (kind: NotificationItem["kind"]) => {
       return "bg-violet-500";
     case "message":
     default:
-      return "bg-blue-600";
+      return "bg-brand";
   }
 };
 
@@ -146,21 +146,19 @@ export const NotificationPanel = ({
         ref={buttonRef}
         type="button"
         onClick={onToggle}
-        className="relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+        className="icon-btn relative"
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
       >
         {!notificationToneEnabled ? (
-          <BellOff className={cn("h-4 w-4", unreadCount > 0 ? "text-slate-400" : "text-slate-400")} aria-hidden="true" />
-        ) : unreadCount > 0 ? (
-          <Bell className="h-4 w-4" aria-hidden="true" />
+          <BellOff className="h-4 w-4 text-faint" aria-hidden="true" />
         ) : (
           <Bell className="h-4 w-4" aria-hidden="true" />
         )}
         {unreadCount > 0 && (
           <span
-            className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white shadow-sm"
+            className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white tabular-nums shadow-sm ring-2 ring-surface"
             aria-hidden="true"
           >
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -171,7 +169,7 @@ export const NotificationPanel = ({
       {isOpen && (
         <>
           <div 
-            className="fixed inset-0 z-[210] lg:hidden bg-black/5" 
+            className="fixed inset-0 z-[210] bg-black/5 lg:hidden" 
             onClick={onToggle}
             aria-hidden="true"
           />
@@ -180,17 +178,17 @@ export const NotificationPanel = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-            className="absolute right-0 top-full z-[220] mt-2 flex w-[min(420px,calc(100vw-2rem))] max-h-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-2xl ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-950"
+            className="absolute right-0 top-full z-[220] mt-2 flex max-h-[560px] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-line bg-elevated shadow-float"
             role="dialog"
             aria-modal="true"
             aria-label="Notifications panel"
           >
-          <div className="shrink-0 border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80">
+          <div className="shrink-0 border-b border-line bg-elevated/90 px-4 py-3 backdrop-blur-xl">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Notifications</h3>
+                <h3 className="text-sm font-bold tracking-tight text-fg">Notifications</h3>
                 {unreadCount > 0 ? (
-                  <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold tabular-nums text-white">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 ) : null}
@@ -200,7 +198,7 @@ export const NotificationPanel = ({
                   <button
                     type="button"
                     onClick={onMarkAllRead}
-                    className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30"
+                    className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
                     aria-label="Mark all as read"
                   >
                     <Check className="h-3.5 w-3.5" />
@@ -211,8 +209,8 @@ export const NotificationPanel = ({
                   type="button"
                   onClick={() => setShowSettings((v) => !v)}
                   className={cn(
-                    "inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900",
-                    showSettings && "bg-slate-100 text-slate-900 dark:bg-slate-900"
+                    "inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted transition-colors hover:bg-subtle hover:text-fg",
+                    showSettings && "bg-subtle text-fg"
                   )}
                   aria-label="Notification settings"
                   aria-expanded={showSettings}
@@ -222,7 +220,7 @@ export const NotificationPanel = ({
               </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
+            <div className="mt-3 flex items-center gap-1 rounded-xl border border-line bg-subtle/60 p-1">
               {(
                 [
                   { id: "all", label: "All" },
@@ -240,8 +238,8 @@ export const NotificationPanel = ({
                     className={cn(
                       "flex-1 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition-all",
                       isActive
-                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-black/5 dark:bg-slate-800 dark:text-slate-100 dark:ring-white/10"
-                        : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                        ? "bg-surface text-brand shadow-sm ring-1 ring-brand/15"
+                        : "text-muted hover:text-fg"
                     )}
                   >
                     {t.label}
@@ -251,7 +249,7 @@ export const NotificationPanel = ({
             </div>
 
             {showSettings ? (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+              <div className="mt-3 rounded-xl border border-line bg-subtle/50 p-3">
                 <button
                   type="button"
                   onClick={() => onNotificationToneChange?.(!notificationToneEnabled)}
@@ -259,16 +257,16 @@ export const NotificationPanel = ({
                 >
                   <div className="flex items-center gap-2">
                     {notificationToneEnabled ? (
-                      <Volume2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <Volume2 className="h-4 w-4 text-brand" />
                     ) : (
-                      <VolumeX className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                      <VolumeX className="h-4 w-4 text-faint" />
                     )}
-                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notification sound</span>
+                    <span className="text-sm font-semibold text-fg">Notification sound</span>
                   </div>
                   <div
                     className={cn(
                       "relative h-5 w-9 rounded-full transition-colors",
-                      notificationToneEnabled ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"
+                      notificationToneEnabled ? "bg-brand" : "bg-line"
                     )}
                   >
                     <div
@@ -286,16 +284,18 @@ export const NotificationPanel = ({
           <div className="flex-1 overflow-y-auto p-3" role="list" aria-label="Notification list">
             {filtered.length === 0 ? (
               <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-12 text-center dark:border-slate-800 dark:bg-slate-900/40">
-                  <Bell className="mx-auto mb-3 h-8 w-8 text-slate-300 dark:text-slate-600" />
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">You're all caught up 🎉</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">New notifications will show up here.</p>
+                <div className="rounded-2xl border border-line bg-subtle/40 px-4 py-12 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-subtle text-faint">
+                    <Bell className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-semibold text-fg">You're all caught up</p>
+                  <p className="mt-1 text-xs text-faint">New notifications will show up here.</p>
                 </div>
                 {hasNotifications ? (
                   <button
                     type="button"
                     onClick={onClear}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:border-slate-800 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-500/10 dark:text-rose-400"
                     aria-label="Clear notifications"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -315,7 +315,7 @@ export const NotificationPanel = ({
                   section.items.length ? (
                     <div key={section.label}>
                       <div className="px-1 pb-2 pt-1">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{section.label}</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-faint">{section.label}</p>
                       </div>
                       <div className="space-y-2">
                         <AnimatePresence initial={false}>
@@ -330,8 +330,8 @@ export const NotificationPanel = ({
                               className={cn(
                                 "flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left transition-colors",
                                 notification.read
-                                  ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900/60"
-                                  : "border-blue-200/70 bg-blue-50/60 hover:bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/25 dark:hover:bg-blue-950/35"
+                                  ? "border-line bg-surface hover:bg-subtle/60"
+                                  : "border-brand/20 bg-brand/[0.05] hover:bg-brand/[0.08]"
                               )}
                               role="listitem"
                             >
@@ -362,16 +362,16 @@ export const NotificationPanel = ({
                                     <p
                                       className={cn(
                                         "truncate text-sm font-semibold",
-                                        notification.read ? "text-slate-700 dark:text-slate-200" : "text-slate-900 dark:text-white"
+                                        notification.read ? "text-fg/85" : "text-fg"
                                       )}
                                     >
                                       {notification.title}
                                     </p>
-                                    <span className="shrink-0 text-[10px] font-semibold text-slate-400 tabular-nums">
+                                    <span className="shrink-0 text-[10px] font-semibold tabular-nums text-faint">
                                       {formatConversationDate(notification.createdAt)}
                                     </span>
                                   </div>
-                                  <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-muted">
                                     {notification.body}
                                   </p>
                                 </button>
@@ -385,7 +385,7 @@ export const NotificationPanel = ({
                                         event.stopPropagation();
                                         void onAcceptFriendRequest?.(notification.userId!, notification.id);
                                       }}
-                                      className="rounded-xl bg-blue-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm shadow-blue-600/20 transition-colors hover:bg-blue-500"
+                                      className="rounded-xl bg-brand px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
                                     >
                                       Accept
                                     </button>
@@ -395,7 +395,7 @@ export const NotificationPanel = ({
                                         event.stopPropagation();
                                         void onRejectFriendRequest?.(notification.userId!, notification.id);
                                       }}
-                                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                                      className="rounded-xl border border-line bg-surface px-3 py-1.5 text-[12px] font-semibold text-muted transition-colors hover:bg-subtle hover:text-fg"
                                     >
                                       Decline
                                     </button>
@@ -406,8 +406,8 @@ export const NotificationPanel = ({
                                     <span className={cn(
                                       "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
                                       notification.action === "accepted"
-                                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                        : "bg-subtle text-muted"
                                     )}>
                                       {notification.action === "accepted" ? (
                                         <>
@@ -426,7 +426,7 @@ export const NotificationPanel = ({
                               </div>
                               <div className="flex shrink-0 flex-col items-end gap-2">
                                 {!notification.read ? (
-                                  <span className="mt-1.5 h-2 w-2 rounded-full bg-blue-600" aria-label="Unread" />
+                                  <span className="mt-1.5 h-2 w-2 rounded-full bg-brand" aria-label="Unread" />
                                 ) : null}
                                 <button
                                   type="button"
@@ -435,7 +435,7 @@ export const NotificationPanel = ({
                                     event.stopPropagation();
                                     onDelete(notification.id);
                                   }}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-faint transition-colors hover:bg-subtle hover:text-fg"
                                   aria-label="Delete notification"
                                   title="Delete"
                                 >
@@ -453,7 +453,7 @@ export const NotificationPanel = ({
                 <button
                   type="button"
                   onClick={onClear}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:border-slate-800 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-500/10 dark:text-rose-400"
                   aria-label="Clear notifications"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />

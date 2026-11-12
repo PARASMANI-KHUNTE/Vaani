@@ -121,9 +121,8 @@ export const NotificationToastStack = ({
           key={toast.toastId}
           className={cn(
             "animate-in slide-in-from-right-8 fade-in duration-300",
-            "rounded-[20px] border border-white/80 dark:border-white/5 bg-white/95 dark:bg-slate-800/95 p-3.5 shadow-xl backdrop-blur-md sm:p-4",
-            "cursor-pointer transition-all hover:scale-[1.02] hover:shadow-2xl",
-            "relative overflow-hidden"
+            "relative overflow-hidden rounded-[20px] border border-line bg-elevated/95 p-3.5 shadow-float backdrop-blur-md sm:p-4",
+            "cursor-pointer transition-all hover:scale-[1.02]"
           )}
           style={{ animationDelay: `${index * 80}ms` }}
           onClick={() => handleToastClick(toast)}
@@ -136,19 +135,19 @@ export const NotificationToastStack = ({
           }}
         >
           <div className={cn(
-            "absolute inset-0 bg-gradient-to-r opacity-50",
-            toast.kind === "friend_request" ? "from-lagoon/10 to-transparent" : 
+            "absolute inset-0 bg-gradient-to-r opacity-60",
+            toast.kind === "friend_request" ? "from-brand/10 to-transparent" : 
             toast.kind === "reaction" ? "from-violet-500/10 to-transparent" : 
-            "from-ember/10 to-transparent"
+            "from-accent/10 to-transparent"
           )} />
 
           <div className="relative flex items-start gap-3.5">
             <div
               className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-md",
-                toast.kind === "friend_request" ? "bg-gradient-to-br from-lagoon to-lagoon/80" : 
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm",
+                toast.kind === "friend_request" ? "bg-gradient-to-br from-brand to-brand-500" : 
                 toast.kind === "reaction" ? "bg-gradient-to-br from-violet-500 to-violet-600" : 
-                "bg-gradient-to-br from-ember to-ember/80"
+                "bg-gradient-to-br from-accent to-accent-hover"
               )}
             >
               {toast.kind === "friend_request" ? (
@@ -161,10 +160,10 @@ export const NotificationToastStack = ({
             </div>
 
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="truncate text-sm font-semibold text-ink dark:text-slate-100">
+              <p className="truncate text-sm font-semibold text-fg">
                 {toast.title}
               </p>
-              <p className="mt-1 line-clamp-2 text-xs text-ink/55 dark:text-slate-400">
+              <p className="mt-1 line-clamp-2 text-xs text-muted">
                 {toast.body}
               </p>
             </div>
@@ -175,20 +174,20 @@ export const NotificationToastStack = ({
                 e.stopPropagation();
                 handleDismiss(toast.toastId, toast.id);
               }}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/40 dark:text-slate-500 transition-all hover:bg-ink/5 dark:hover:bg-white/5 hover:text-ink/70 dark:hover:text-slate-300"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-faint transition-all hover:bg-subtle hover:text-fg"
               aria-label="Dismiss notification"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-ink/5 dark:bg-white/10">
+          <div className="relative mt-3 h-1 w-full overflow-hidden rounded-full bg-subtle">
             <div
               className={cn(
                 "h-full transition-all duration-1000 ease-linear",
-                toast.kind === "friend_request" ? "bg-lagoon/60" : 
+                toast.kind === "friend_request" ? "bg-brand/60" : 
                 toast.kind === "reaction" ? "bg-violet-500/60" : 
-                "bg-ember/60"
+                "bg-accent/60"
               )}
               style={{
                 width: "100%",

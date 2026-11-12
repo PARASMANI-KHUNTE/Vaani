@@ -148,7 +148,7 @@ const VoiceNotePlayer = ({ url, isOwnMessage }: { url: string; isOwnMessage: boo
         disabled={isLoading}
         className={cn(
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95",
-          isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#0084ff] text-white",
+          isOwnMessage ? "bg-white/20 text-white hover:bg-white/30" : "bg-brand text-white shadow-sm hover:bg-brand-hover",
           isLoading && "opacity-50"
         )}
       >
@@ -171,7 +171,7 @@ const VoiceNotePlayer = ({ url, isOwnMessage }: { url: string; isOwnMessage: boo
                 key={i}
                 className={cn(
                   "w-[2.5px] rounded-full transition-colors duration-150",
-                  isActive ? (isOwnMessage ? "bg-white/80" : "bg-[#0084ff]") : (isOwnMessage ? "bg-white/30" : "bg-slate-200 dark:bg-slate-600")
+                  isActive ? (isOwnMessage ? "bg-white/80" : "bg-brand") : (isOwnMessage ? "bg-white/30" : "bg-line")
                 )}
                 animate={{ height: isAnim ? [`${bh}%`, `${Math.min(100, bh + 15)}%`, `${bh}%`] : `${bh}%` }}
                 transition={isAnim ? { duration: 0.35, repeat: Infinity, ease: "easeInOut" } : { duration: 0.15 }}
@@ -180,10 +180,10 @@ const VoiceNotePlayer = ({ url, isOwnMessage }: { url: string; isOwnMessage: boo
           })}
         </div>
         <div className="flex justify-between">
-          <span className={cn("text-[10px] font-medium tabular-nums", isOwnMessage ? "text-white/60" : "text-slate-400")}>
+          <span className={cn("text-[10px] font-medium tabular-nums", isOwnMessage ? "text-white/60" : "text-faint")}>
             {formatDuration(currentTime)}
           </span>
-          <span className={cn("text-[10px] font-medium tabular-nums", isOwnMessage ? "text-white/60" : "text-slate-400")}>
+          <span className={cn("text-[10px] font-medium tabular-nums", isOwnMessage ? "text-white/60" : "text-faint")}>
             {formatDuration(duration)}
           </span>
         </div>
@@ -197,14 +197,14 @@ const ReactionPicker = ({ onSelect, onClose }: { onSelect: (emoji: string) => vo
     initial={{ opacity: 0, scale: 0.9 }}
     animate={{ opacity: 1, scale: 1 }}
     exit={{ opacity: 0, scale: 0.9 }}
-    className="flex items-center gap-1 rounded-2xl bg-white p-2 shadow-xl ring-1 ring-black/5 dark:bg-slate-800"
+    className="flex items-center gap-1 rounded-2xl border border-line bg-elevated p-2 shadow-float"
   >
     {REACTION_EMOJIS.map((emoji) => (
       <button
         key={emoji}
         type="button"
         onClick={() => { onSelect(emoji); onClose(); }}
-        className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-125 active:scale-95"
+        className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-125 hover:bg-subtle active:scale-95"
       >
         {emoji}
       </button>
@@ -241,14 +241,14 @@ const MessageReactions = ({
             type="button"
             onClick={() => onReact?.(emoji)}
             className={cn(
-              "flex items-center gap-1 rounded-full px-2 py-0.5 text-sm transition-all active:scale-95",
+              "flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm transition-all active:scale-95",
               users.some((u) => u.userId === currentUserId)
-                ? "bg-[#0084ff]/15 border border-[#0084ff]/30"
-                : "bg-white border border-slate-200 dark:bg-slate-700 dark:border-slate-600"
+                ? "border-brand/30 bg-brand/12"
+                : "border-line bg-surface hover:bg-subtle"
             )}
           >
             <span>{emoji}</span>
-            <span className={cn("text-xs font-semibold", users.some((u) => u.userId === currentUserId) ? "text-[#0084ff]" : "text-slate-500")}>
+            <span className={cn("text-xs font-semibold", users.some((u) => u.userId === currentUserId) ? "text-brand" : "text-muted")}>
               {users.length}
             </span>
           </button>
@@ -256,7 +256,7 @@ const MessageReactions = ({
         <button
           type="button"
           onClick={() => setShowPicker(!showPicker)}
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 transition-all hover:scale-105 active:scale-95 dark:border-slate-600"
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-line text-faint transition-all hover:border-brand/40 hover:text-brand hover:scale-105 active:scale-95"
         >
           <Smile className="h-4 w-4" />
         </button>
@@ -284,22 +284,22 @@ const DeleteConfirmMenu = ({
     animate={{ opacity: 1, scale: 1 }}
     exit={{ opacity: 0, scale: 0.9 }}
     className={cn(
-      "absolute bottom-full mb-2 flex items-center gap-1 rounded-full bg-white p-1 shadow-xl ring-1 ring-black/5 dark:bg-slate-800 overflow-hidden",
+      "absolute bottom-full mb-2 flex items-center gap-1 overflow-hidden rounded-full border border-line bg-elevated p-1 shadow-float",
       isOwnMessage ? "right-0" : "left-0"
     )}
   >
     <button
       onClick={onDeleteMe}
-      className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-700"
+      className="rounded-full px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:bg-subtle hover:text-fg active:scale-95"
     >
       For me
     </button>
     {isOwnMessage && (
       <>
-        <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-600" />
+        <div className="h-4 w-px bg-line" />
         <button
           onClick={onDeleteEveryone}
-          className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 active:scale-95 dark:hover:bg-red-900/20"
+          className="rounded-full px-3 py-1.5 text-xs font-semibold text-rose-500 transition-colors hover:bg-rose-500/10 active:scale-95"
         >
           Everyone
         </button>
@@ -348,7 +348,7 @@ const MessageBubbleBase = ({
   if (message.isSystem) {
     return (
       <div className="my-4 flex justify-center">
-        <span className="rounded-full bg-[#d9e0e7]/70 px-4 py-1 text-[11px] font-medium text-slate-500 backdrop-blur-sm dark:bg-slate-800/70 dark:text-slate-400">
+        <span className="rounded-full border border-line bg-subtle/70 px-4 py-1 text-[11px] font-medium text-muted backdrop-blur-sm">
           {message.content || "Activity"}
         </span>
       </div>
@@ -382,7 +382,7 @@ const MessageBubbleBase = ({
       className={cn(
         "group relative flex flex-col py-0.5",
         isOwnMessage ? "items-end" : "items-start",
-        isHighlighted && "ring-2 ring-blue-500/30 ring-offset-1 rounded-xl bg-blue-50/50 dark:bg-blue-900/10",
+        isHighlighted && "rounded-xl bg-brand/[0.06] ring-2 ring-brand/25 ring-offset-1 ring-offset-canvas",
         isSelectionMode && "cursor-pointer"
       )}
       role="article"
@@ -399,7 +399,7 @@ const MessageBubbleBase = ({
         {isSelectionMode && (
           <div className={cn(
             "mb-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-            isSelected ? "bg-blue-600 border-blue-600 shadow-sm" : "bg-white border-slate-300 dark:bg-slate-700 dark:border-slate-500"
+            isSelected ? "border-brand bg-brand shadow-sm" : "border-line bg-surface"
           )}>
             {isSelected && <Check className="h-3 w-3 text-white stroke-[3]" />}
           </div>
@@ -411,9 +411,9 @@ const MessageBubbleBase = ({
           className={cn(
             "relative px-3.5 py-2.5 text-[14px] leading-[1.45] shadow-sm transition-shadow",
             isOwnMessage
-              ? "bg-blue-600 text-white dark:bg-blue-600"
-              : "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-100 dark:border-slate-700/60",
-            isSelectionMode && isSelected && "ring-2 ring-blue-500"
+              ? "bg-brand-gradient text-white shadow-[0_4px_16px_-8px_rgb(var(--brand-rgb)/0.8)]"
+              : "border border-line bg-surface text-fg",
+            isSelectionMode && isSelected && "ring-2 ring-brand/50"
           )}
         >
           {/* Reply Preview */}
@@ -421,10 +421,10 @@ const MessageBubbleBase = ({
             <div className={cn(
               "mb-2 overflow-hidden rounded-lg border-l-2 px-2.5 py-1.5 text-[12px]",
               isOwnMessage
-                ? "bg-white/15 border-white/80 text-white/90"
-                : "bg-slate-50 border-blue-500 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200"
+                ? "border-white/70 bg-white/15 text-white/90"
+                : "border-brand bg-brand/5 text-muted"
             )}>
-              <p className="font-semibold text-[10px] uppercase tracking-wide opacity-80">
+              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
                 {message.replyTo.senderId?.name || message.replyTo.senderId?.username || "Reply"}
               </p>
               <p className="mt-0.5 line-clamp-1 italic">
@@ -548,7 +548,7 @@ const MessageBubbleBase = ({
                           key={mediaMsg._id}
                           onClick={() => onMediaPreview?.(groupPreviewItems, idx)}
                           className={cn(
-                            "relative overflow-hidden bg-slate-100 dark:bg-slate-700 cursor-pointer",
+                            "relative cursor-pointer overflow-hidden bg-subtle",
                             groupedMedia.length === 3 && idx === 0 ? "row-span-2" : ""
                           )}
                         >
@@ -589,7 +589,7 @@ const MessageBubbleBase = ({
                       title="Save"
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95",
-                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+                        isOwnMessage ? "bg-white/20 text-white hover:bg-white/30" : "bg-brand text-white hover:bg-brand-hover"
                       )}
                     >
                       <Download className="h-4 w-4" />
@@ -601,16 +601,16 @@ const MessageBubbleBase = ({
                 {message.type === "file" && message.media?.url && (
                   <div className={cn(
                     "mb-2 flex items-center gap-3 rounded-xl p-3",
-                    isOwnMessage ? "bg-black/10" : "bg-slate-100 dark:bg-slate-700/50"
+                    isOwnMessage ? "bg-black/10" : "bg-subtle/80"
                   )}>
                     <div className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                      isOwnMessage ? "bg-white/20" : "bg-blue-50 dark:bg-blue-950/40"
+                      isOwnMessage ? "bg-white/20" : "bg-brand/10"
                     )}>
-                      <FileText className={cn("h-5 w-5", isOwnMessage ? "text-white/80" : "text-blue-600 dark:text-blue-400")} />
+                      <FileText className={cn("h-5 w-5", isOwnMessage ? "text-white/80" : "text-brand")} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={cn("truncate text-sm font-medium", isOwnMessage ? "text-white" : "text-slate-800 dark:text-white")}>
+                      <p className={cn("truncate text-sm font-medium", isOwnMessage ? "text-white" : "text-fg")}>
                         {message.media.originalName || "Document"}
                       </p>
                     </div>
@@ -622,7 +622,7 @@ const MessageBubbleBase = ({
                       title="Save"
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95",
-                        isOwnMessage ? "bg-white/20 hover:bg-white/30 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+                        isOwnMessage ? "bg-white/20 text-white hover:bg-white/30" : "bg-brand text-white hover:bg-brand-hover"
                       )}
                     >
                       <Download className="h-4 w-4" />
@@ -641,7 +641,7 @@ const MessageBubbleBase = ({
           </div>
 
           {/* Timestamp + Status */}
-          <div className={cn("mt-1 flex items-center justify-end gap-1 text-[10px] tabular-nums", isOwnMessage ? "text-white/75" : "text-slate-400 dark:text-slate-500")}>
+          <div className={cn("mt-1 flex items-center justify-end gap-1 text-[10px] tabular-nums", isOwnMessage ? "text-white/75" : "text-faint")}>
             {message.edited && (
               <span className="italic text-[9px] opacity-80 mr-0.5">edited</span>
             )}
@@ -665,37 +665,37 @@ const MessageBubbleBase = ({
         )}>
           <button
             onClick={() => onReply?.(message)}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition-all hover:scale-105 hover:border-brand/30 hover:text-brand active:scale-95"
             title="Reply"
           >
-            <CornerUpLeft className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+            <CornerUpLeft className="h-3.5 w-3.5 text-muted" />
           </button>
           
           <button
             onClick={() => onForward?.(message)}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition-all hover:scale-105 hover:border-brand/30 hover:text-brand active:scale-95"
             title="Forward"
           >
-            <Forward className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+            <Forward className="h-3.5 w-3.5 text-muted" />
           </button>
 
           {isOwnMessage && message.type === "text" && !message.deletedForEveryone && (
             <button
               onClick={() => onEdit?.(message)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition-all hover:scale-105 hover:border-brand/30 hover:text-brand active:scale-95"
               title="Edit message"
             >
-              <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+              <Pencil className="h-3.5 w-3.5 text-muted" />
             </button>
           )}
 
           <div className="relative">
             <button
               onClick={() => setShowReactionPicker(!showReactionPicker)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition-all hover:scale-105 hover:border-brand/30 hover:text-brand active:scale-95"
               title="React"
             >
-              <Smile className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+              <Smile className="h-3.5 w-3.5 text-muted" />
             </button>
             <AnimatePresence>
               {showReactionPicker && (
@@ -713,10 +713,10 @@ const MessageBubbleBase = ({
             <div className="relative">
               <button
                 onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 hover:scale-105 active:scale-95 dark:bg-slate-700 dark:ring-white/10"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-sm transition-all hover:scale-105 hover:border-rose-500/30 hover:text-rose-500 active:scale-95"
                 title="Delete"
               >
-                <Trash2 className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
               <AnimatePresence>
                 {showDeleteMenu && (
