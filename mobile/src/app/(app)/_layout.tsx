@@ -1,8 +1,10 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotificationStore } from "@/store/notification-store";
+import { useAppTheme } from "@/theme/use-app-theme";
 
 export default function AppTabsLayout() {
+  const { colors, isDark, isTablet } = useAppTheme();
   const unreadCount = useNotificationStore((state) =>
     state.notifications.filter((item) => !item.read).length
   );
@@ -11,14 +13,24 @@ export default function AppTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#155e75",
-        tabBarInactiveTintColor: "#64748b",
+        tabBarActiveTintColor: colors.brand,
+        tabBarInactiveTintColor: colors.faint,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "700",
+          letterSpacing: 0.1,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 2,
+        },
         tabBarStyle: {
-          height: 68,
+          height: isTablet ? 74 : 66,
           paddingTop: 8,
-          paddingBottom: 10,
-          backgroundColor: "#fffdf8",
-          borderTopColor: "#e2e8f0",
+          paddingBottom: isTablet ? 14 : 10,
+          backgroundColor: isDark ? colors.canvas : colors.glass,
+          borderTopColor: colors.line,
+          borderTopWidth: 1,
+          elevation: 0,
         },
       }}
     >
@@ -26,14 +38,22 @@ export default function AppTabsLayout() {
         name="chats"
         options={{
           title: "Chats",
-          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"}
+              color={color}
+              size={24}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: "Explore",
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "compass" : "compass-outline"} color={color} size={24} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -42,20 +62,35 @@ export default function AppTabsLayout() {
           title: "Alerts",
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: "#155e75",
+            backgroundColor: colors.brand,
+            color: colors.onBrand,
             fontSize: 10,
+            fontWeight: "700",
             minWidth: 18,
             height: 18,
+            lineHeight: 18,
             borderRadius: 9,
           },
-          tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "notifications" : "notifications-outline"}
+              color={color}
+              size={24}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "person-circle" : "person-circle-outline"}
+              color={color}
+              size={26}
+            />
+          ),
         }}
       />
     </Tabs>

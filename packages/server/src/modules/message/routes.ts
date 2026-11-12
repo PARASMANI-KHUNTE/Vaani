@@ -32,7 +32,7 @@ import {
 } from './validators';
 import { authMiddleware } from '../../shared/middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);

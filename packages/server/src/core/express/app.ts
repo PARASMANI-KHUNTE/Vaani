@@ -19,6 +19,8 @@ import { authRoutes } from '../../modules/auth/routes';
 import { userRoutes } from '../../modules/user/routes';
 import { chatRoutes } from '../../modules/chat/routes';
 import { messageRoutes } from '../../modules/message/routes';
+import { notificationRoutes } from '../../modules/notification/routes';
+import { mediaRoutes } from '../../modules/media/routes';
 import { systemRoutes } from '../../modules/system/routes';
 import { getConnection } from '../../config/database';
 import { isRedisConnected } from '../../config/redis';
@@ -164,6 +166,8 @@ export const createApp = (): Application => {
   app.use('/api/users', userRoutes);
   app.use('/api/chats', chatRoutes);
   app.use('/api/messages', messageRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/media', mediaRoutes);
   app.use('/api/system', systemRoutes);
 
   // ============================================================================

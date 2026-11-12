@@ -53,7 +53,7 @@ AuditLogSchema.statics.log = async function (data: {
   userAgent?: string;
   success?: boolean;
   errorMessage?: string;
-}): Promise<IAuditLog> => {
+}): Promise<IAuditLog> {
   return this.create({
     ...data,
     success: data.success ?? true,
@@ -85,17 +85,18 @@ const SystemSettingsSchema = createBaseSchema<ISystemSettings>({
   updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
 });
 
-SystemSettingsSchema.statics.getSetting = async function (key: string): Promise<unknown> => {
+SystemSettingsSchema.statics.getSetting = async function (this: any, key: string): Promise<unknown> {
   const setting = await this.findOne({ key }).lean();
   return setting?.value;
 };
 
 SystemSettingsSchema.statics.setSetting = async function (
+  this: any,
   key: string,
   value: unknown,
   description?: string,
   updatedBy?: mongoose.Types.ObjectId
-): Promise<ISystemSettings> => {
+): Promise<ISystemSettings> {
   return this.findOneAndUpdate(
     { key },
     { key, value, description, updatedBy, updatedAt: new Date() },
@@ -103,9 +104,9 @@ SystemSettingsSchema.statics.setSetting = async function (
   );
 };
 
-SystemSettingsSchema.statics.getPublicSettings = async function (): Promise<Record<string, unknown>> => {
+SystemSettingsSchema.statics.getPublicSettings = async function (this: any): Promise<Record<string, unknown>> {
   const settings = await this.find({ isPublic: true }).lean();
-  return settings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
+  return settings.reduce((acc: any, s: any) => ({ ...acc, [s.key]: s.value }), {});
 };
 
 export const SystemSettings = mongoose.model<ISystemSettings>('SystemSettings', SystemSettingsSchema);
@@ -132,16 +133,17 @@ const MetricSchema = new Schema<IMetric>({
 MetricSchema.index({ name: 1, timestamp: -1 });
 MetricSchema.index({ timestamp: -1 });
 
-MetricSchema.statics.record = async function (name: string, value: number, tags: Record<string, string> = {}): Promise<IMetric> => {
+MetricSchema.statics.record = async function (this: any, name: string, value: number, tags: Record<string, string> = {}): Promise<IMetric> {
   return this.create({ name, value, tags, timestamp: new Date() });
 };
 
 MetricSchema.statics.getMetrics = async function (
+  this: any,
   name: string,
   start: Date,
   end: Date,
   tags: Record<string, string> = {}
-): Promise<IMetric[]> => {
+): Promise<IMetric[]> {
   const query: Record<string, unknown> = {
     name,
     timestamp: { $gte: start, $lte: end },
@@ -178,10 +180,11 @@ const RateLimitRecordSchema = new Schema<IRateLimitRecord>({
 RateLimitRecordSchema.index({ identifier: 1, endpoint: 1 }, { unique: true });
 
 RateLimitRecordSchema.statics.increment = async function (
+  this: any,
   identifier: string,
   endpoint: string,
   windowMs: number
-): Promise<{ count: number; isLimited: boolean }> => {
+): Promise<{ count: number; isLimited: boolean }> {
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
   const expiresAt = new Date(now.getTime() + windowMs);

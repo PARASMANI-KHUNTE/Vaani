@@ -7,6 +7,8 @@ import { ScreenShell } from "@/components/screen-shell";
 import { useMobileSocial } from "@/hooks/use-mobile-social";
 import { useNotificationStore } from "@/store/notification-store";
 import { useSessionStore } from "@/store/session-store";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 
 export default function ProfileScreen() {
   const session = useSessionStore((state) => state.session);
@@ -18,6 +20,8 @@ export default function ProfileScreen() {
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [bio, setBio] = useState("");
+  const { colors, isTablet } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
 
   useEffect(() => {
     if (!profile) return;
@@ -32,86 +36,120 @@ export default function ProfileScreen() {
       title={profile?.name || session?.user?.name || "Your profile"}
       subtitle={error || "Edit your profile information below."}
     >
-      <ScrollView contentContainerStyle={styles.stack}>
-        <View style={styles.card}>
+      <ScrollView
+        contentContainerStyle={[styles.stack, isTablet && styles.stackWide]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.card, isTablet && styles.cardWide]}>
           <Text style={styles.cardTitle}>Identity</Text>
-          <Text style={styles.metaLabel}>Username</Text>
-          <Text style={styles.metaValue}>@{profile?.username || "loading"}</Text>
-          <Text style={styles.metaLabel}>Friends</Text>
-          <Text style={styles.metaValue}>{profile?.friendsCount ?? 0}</Text>
+          <View style={styles.cardBody}>
+            <Text style={styles.metaLabel}>Username</Text>
+            <Text style={styles.metaValue}>@{profile?.username || "loading"}</Text>
+            <Text style={styles.metaLabel}>Friends</Text>
+            <Text style={styles.metaValue}>{profile?.friendsCount ?? 0}</Text>
+          </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isTablet && styles.cardWide]}>
           <Text style={styles.cardTitle}>Edit profile</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Display name" placeholderTextColor="#94a3b8" style={styles.input} />
-          <TextInput
-            value={tagline}
-            onChangeText={(value) => setTagline(value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))}
-            placeholder="AB12"
-            placeholderTextColor="#94a3b8"
-            maxLength={4}
-            style={styles.input}
-          />
-          <TextInput
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Bio"
-            placeholderTextColor="#94a3b8"
-            multiline
-            style={[styles.input, styles.bioInput]}
-          />
-          <Pressable style={styles.primaryButton} onPress={() => void saveProfile({ name, tagline, bio })}>
-            <Text style={styles.primaryButtonText}>{isLoadingProfile ? "Saving..." : "Save profile"}</Text>
-          </Pressable>
+          <View style={styles.cardBody}>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Display name"
+              placeholderTextColor={colors.faint}
+              style={styles.input}
+            />
+            <TextInput
+              value={tagline}
+              onChangeText={(value) =>
+                setTagline(value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))
+              }
+              placeholder="AB12"
+              placeholderTextColor={colors.faint}
+              maxLength={4}
+              style={styles.input}
+            />
+            <TextInput
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Bio"
+              placeholderTextColor={colors.faint}
+              multiline
+              style={[styles.input, styles.bioInput]}
+            />
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => void saveProfile({ name, tagline, bio })}
+              accessibilityRole="button"
+            >
+              <Text style={styles.primaryButtonText}>
+                {isLoadingProfile ? "Saving..." : "Save profile"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isTablet && styles.cardWide]}>
           <Text style={styles.cardTitle}>Settings</Text>
-          <Pressable
-            style={styles.linkRow}
-            onPress={() => setSoundEnabled(!soundEnabled)}
-          >
-            <View style={styles.linkIconContainer}>
-              <Ionicons name={soundEnabled ? "volume-high-outline" : "volume-mute-outline"} size={20} color="#155e75" />
-            </View>
-            <View style={styles.linkContent}>
-              <Text style={styles.linkTitle}>Notification sound</Text>
-              <Text style={styles.linkSubtitle}>{soundEnabled ? "Sound is enabled" : "Sound is muted"}</Text>
-            </View>
-            <View style={[styles.toggleTrack, soundEnabled && styles.toggleTrackOn]}>
-              <View style={[styles.toggleThumb, soundEnabled && styles.toggleThumbOn]} />
-            </View>
-          </Pressable>
-          <Pressable style={styles.linkRow} onPress={() => router.push("/blocked-users" as any)}>
-            <View style={styles.linkIconContainer}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#155e75" />
-            </View>
-            <View style={styles.linkContent}>
-              <Text style={styles.linkTitle}>Blocked Users</Text>
-              <Text style={styles.linkSubtitle}>Manage blocked contacts</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-          </Pressable>
+          <View style={styles.cardBody}>
+            <Pressable
+              style={styles.linkRow}
+              onPress={() => setSoundEnabled(!soundEnabled)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: soundEnabled }}
+            >
+              <View style={styles.linkIconContainer}>
+                <Ionicons
+                  name={soundEnabled ? "volume-high-outline" : "volume-mute-outline"}
+                  size={20}
+                  color={colors.brand}
+                />
+              </View>
+              <View style={styles.linkContent}>
+                <Text style={styles.linkTitle}>Notification sound</Text>
+                <Text style={styles.linkSubtitle}>
+                  {soundEnabled ? "Sound is enabled" : "Sound is muted"}
+                </Text>
+              </View>
+              <View style={[styles.toggleTrack, soundEnabled && styles.toggleTrackOn]}>
+                <View style={[styles.toggleThumb, soundEnabled && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+            <Pressable style={styles.linkRow} onPress={() => router.push("/blocked-users" as any)}>
+              <View style={styles.linkIconContainer}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.brand} />
+              </View>
+              <View style={styles.linkContent}>
+                <Text style={styles.linkTitle}>Blocked users</Text>
+                <Text style={styles.linkSubtitle}>Manage blocked contacts</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.faint} />
+            </Pressable>
+          </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isTablet && styles.cardWide]}>
           <Text style={styles.cardTitle}>OTA readiness</Text>
-          <Text style={styles.metaLabel}>Runtime version</Text>
-          <Text style={styles.metaValue}>{Updates.runtimeVersion || "appVersion policy"}</Text>
-          <Text style={styles.metaLabel}>Channel</Text>
-          <Text style={styles.metaValue}>{Updates.channel || "development"}</Text>
-          <Text style={styles.metaLabel}>Update ID</Text>
-          <Text style={styles.metaValue} numberOfLines={2}>
-            {Updates.updateId || "Embedded build / no OTA update applied yet"}
-          </Text>
+          <View style={styles.cardBody}>
+            <Text style={styles.metaLabel}>Runtime version</Text>
+            <Text style={styles.metaValue}>{Updates.runtimeVersion || "appVersion policy"}</Text>
+            <Text style={styles.metaLabel}>Channel</Text>
+            <Text style={styles.metaValue}>{Updates.channel || "development"}</Text>
+            <Text style={styles.metaLabel}>Update ID</Text>
+            <Text style={styles.metaValue} numberOfLines={2}>
+              {Updates.updateId || "Embedded build / no OTA update applied yet"}
+            </Text>
+          </View>
         </View>
 
         <Pressable
-          style={styles.signOutButton}
+          style={[styles.signOutButton, isTablet && styles.cardWide]}
           onPress={() => {
             void clearSession();
             router.replace("/auth");
           }}
+          accessibilityRole="button"
         >
           <Text style={styles.signOutButtonText}>Clear mobile session</Text>
         </Pressable>
@@ -120,117 +158,132 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  stack: {
-    gap: 14,
-  },
-  card: {
-    borderRadius: 28,
-    backgroundColor: "#fffdf8",
-    padding: 18,
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#0f172a",
-    marginBottom: 4,
-  },
-  metaLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0f766e",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    marginTop: 6,
-  },
-  metaValue: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#334155",
-  },
-  input: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: "#0f172a",
-  },
-  bioInput: {
-    minHeight: 96,
-    textAlignVertical: "top",
-  },
-  primaryButton: {
-    borderRadius: 999,
-    backgroundColor: "#155e75",
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
-  },
-  linkIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#e0f2fe",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  linkContent: {
-    flex: 1,
-  },
-  linkTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#0f172a",
-  },
-  linkSubtitle: {
-    fontSize: 12,
-    color: "#64748b",
-  },
-  toggleTrack: {
-    width: 46,
-    height: 26,
-    borderRadius: 999,
-    backgroundColor: "#e2e8f0",
-    padding: 3,
-    justifyContent: "center",
-  },
-  toggleTrackOn: {
-    backgroundColor: "#155e75",
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    transform: [{ translateX: 0 }],
-  },
-  toggleThumbOn: {
-    transform: [{ translateX: 20 }],
-  },
-  signOutButton: {
-    borderRadius: 999,
-    backgroundColor: "#172033",
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  signOutButtonText: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-});
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    stack: {
+      gap: 14,
+      paddingBottom: spacing.xl,
+    },
+    stackWide: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "flex-start",
+      gap: spacing.md,
+    },
+    card: {
+      borderRadius: radii.xxl,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 18,
+      gap: 8,
+    },
+    cardWide: {
+      flexBasis: "48%",
+      flexGrow: 1,
+      minWidth: 320,
+    },
+    cardTitle: {
+      ...typography.h3,
+      color: c.fg,
+      marginBottom: 4,
+    },
+    cardBody: {
+      gap: 8,
+    },
+    metaLabel: {
+      ...typography.caption,
+      color: c.brand,
+      marginTop: 6,
+    },
+    metaValue: {
+      fontSize: 14,
+      lineHeight: 21,
+      color: c.muted,
+    },
+    input: {
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.elevated,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: c.fg,
+    },
+    bioInput: {
+      minHeight: 96,
+      textAlignVertical: "top",
+    },
+    primaryButton: {
+      borderRadius: radii.pill,
+      backgroundColor: c.brand,
+      paddingVertical: 14,
+      alignItems: "center",
+      marginTop: 4,
+    },
+    primaryButtonText: {
+      color: c.onBrand,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+    linkRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 8,
+    },
+    linkIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.sm,
+      backgroundColor: c.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    linkContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    linkTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: c.fg,
+    },
+    linkSubtitle: {
+      fontSize: 12,
+      color: c.muted,
+    },
+    toggleTrack: {
+      width: 46,
+      height: 26,
+      borderRadius: 999,
+      backgroundColor: c.subtle,
+      padding: 3,
+      justifyContent: "center",
+    },
+    toggleTrackOn: {
+      backgroundColor: c.brand,
+    },
+    toggleThumb: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: c.surface,
+      transform: [{ translateX: 0 }],
+    },
+    toggleThumbOn: {
+      transform: [{ translateX: 20 }],
+    },
+    signOutButton: {
+      borderRadius: radii.pill,
+      backgroundColor: c.fg,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    signOutButtonText: {
+      color: c.canvas,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+  });

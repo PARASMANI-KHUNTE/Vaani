@@ -13,9 +13,18 @@ import { MediaAttachment, MessageReaction, MessageReceipt, SystemEventData } fro
 
 export interface IMediaAttachment extends MediaAttachment {}
 
-export interface IMessageReaction extends MessageReaction {}
+export interface IMessageReaction {
+  emoji: string;
+  userId: mongoose.Types.ObjectId;
+  userName: string;
+  createdAt: Date;
+}
 
-export interface IMessageReceipt extends MessageReceipt {}
+export interface IMessageReceipt {
+  userId: mongoose.Types.ObjectId;
+  status: 'sent' | 'delivered' | 'seen' | 'failed';
+  timestamp: Date;
+}
 
 export interface IReplyTo {
   _id: mongoose.Types.ObjectId;
@@ -26,7 +35,14 @@ export interface IReplyTo {
   media?: IMediaAttachment;
 }
 
-export interface ISystemEventData extends SystemEventData {}
+export interface ISystemEventData {
+  type: string;
+  actorId: mongoose.Types.ObjectId;
+  actorName: string;
+  targetUserId?: mongoose.Types.ObjectId;
+  targetUserName?: string;
+  metadata?: Record<string, unknown>;
+}
 
 export interface IMessage extends Document {
   _id: mongoose.Types.ObjectId;
@@ -50,6 +66,7 @@ export interface IMessage extends Document {
   clientTempId?: string;
   createdAt: Date;
   updatedAt: Date;
+  [key: string]: unknown;
 
   // Methods
   addReaction(userId: mongoose.Types.ObjectId, userName: string, emoji: string): Promise<IMessage>;
@@ -60,6 +77,24 @@ export interface IMessage extends Document {
   softDeleteFor(userId: mongoose.Types.ObjectId): Promise<IMessage>;
   softDeleteForEveryone(): Promise<IMessage>;
   edit(content: string): Promise<IMessage>;
+}
+
+export interface IMessageModel extends mongoose.Model<IMessage> {
+  findChatMessages(
+    chatId: mongoose.Types.ObjectId,
+    options?: {
+      page?: number;
+      limit?: number;
+      before?: Date;
+      after?: Date;
+      userId?: mongoose.Types.ObjectId;
+    }
+  ): Promise<IMessage[]>;
+  getMessageById(
+    messageId: mongoose.Types.ObjectId,
+    userId?: mongoose.Types.ObjectId
+  ): Promise<IMessage | null>;
+  getMessagesByClientTempIds(clientTempIds: string[]): Promise<IMessage[]>;
 }
 
 // ============================================================================
@@ -81,33 +116,33 @@ const MediaAttachmentSchema = new Schema<IMediaAttachment>({
 
 const MessageReactionSchema = new Schema<IMessageReaction>({
   emoji: { type: String, required: true },
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   userName: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
 }, { _id: false });
 
 const MessageReceiptSchema = new Schema<IMessageReceipt>({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   status: { type: String, enum: ['sent', 'delivered', 'seen', 'failed'], required: true },
   timestamp: { type: Date, default: Date.now },
 }, { _id: false });
 
 const ReplyToSchema = new Schema<IReplyTo>({
-  _id: { type: Schema.Types.ObjectId, required: true },
+  _id: { type: mongoose.Schema.Types.ObjectId, required: true },
   content: String,
   type: { type: String, required: true },
-  senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   senderName: { type: String, required: true },
   media: MediaAttachmentSchema,
 }, { _id: false });
 
 const SystemEventDataSchema = new Schema<ISystemEventData>({
   type: { type: String, required: true },
-  actorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   actorName: { type: String, required: true },
-  targetUserId: { type: Schema.Types.ObjectId, ref: 'User' },
+  targetUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   targetUserName: String,
-  metadata: Schema.Types.Mixed,
+  metadata: mongoose.Schema.Types.Mixed,
 }, { _id: false });
 
 // ============================================================================
@@ -235,6 +270,7 @@ MessageSchema.methods.edit = async function (content: string): Promise<IMessage>
 // ============================================================================
 
 MessageSchema.statics.findChatMessages = async function (
+  this: any,
   chatId: mongoose.Types.ObjectId,
   options: {
     page?: number;
@@ -243,7 +279,7 @@ MessageSchema.statics.findChatMessages = async function (
     after?: Date;
     userId?: mongoose.Types.ObjectId; // For deletedFor filtering
   } = {}
-): Promise<IMessage[]> => {
+): Promise<Record<string, unknown>[]> {
   const { page = 1, limit = 30, before, after, userId } = options;
   const skip = (page - 1) * limit;
 
@@ -270,13 +306,14 @@ MessageSchema.statics.findChatMessages = async function (
     .limit(limit)
     .populate('senderId', '_id name username email avatar')
     .populate('replyTo', '_id content type senderId senderName media')
-    .lean();
+    .lean() as Promise<Record<string, unknown>[]>;
 };
 
 MessageSchema.statics.getMessageById = async function (
+  this: any,
   messageId: mongoose.Types.ObjectId,
   userId?: mongoose.Types.ObjectId
-): Promise<IMessage | null> => {
+): Promise<Record<string, unknown> | null> {
   const query: Record<string, unknown> = { _id: messageId };
 
   if (userId) {
@@ -290,18 +327,19 @@ MessageSchema.statics.getMessageById = async function (
   return this.findOne(query)
     .populate('senderId', '_id name username email avatar')
     .populate('replyTo', '_id content type senderId senderName media')
-    .lean();
+    .lean() as Promise<Record<string, unknown> | null>;
 };
 
 MessageSchema.statics.getMessagesByClientTempIds = async function (
+  this: any,
   clientTempIds: string[]
-): Promise<IMessage[]> => {
-  return this.find({ clientTempId: { $in: clientTempIds } }).lean();
+): Promise<Record<string, unknown>[]> {
+  return this.find({ clientTempId: { $in: clientTempIds } }).lean() as Promise<Record<string, unknown>[]>;
 };
 
 // ============================================================================
 // Model Export
 // ============================================================================
 
-export const Message = mongoose.model<IMessage>('Message', MessageSchema);
+export const Message = mongoose.model<IMessage, IMessageModel>('Message', MessageSchema);
 export default Message;

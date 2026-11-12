@@ -129,7 +129,7 @@ export const idempotencyMiddleware = asyncHandler(async (req: Request, res: Resp
 
   // Validate key format (UUID or similar)
   if (!/^[a-zA-Z0-9-_]{16,64}$/.test(idempotencyKey)) {
-    throw new ApiError(400, 'Invalid Idempotency-Key format');
+    throw new ApiError(400, 'Invalid Idempotency-Key format', 'INVALID_IDEMPOTENCY_KEY');
   }
 
   // Create a unique key per user + endpoint + idempotency key

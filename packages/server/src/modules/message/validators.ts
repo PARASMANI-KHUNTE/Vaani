@@ -185,7 +185,7 @@ export const getMessagesQueryValidator: ValidationChain[] = [
 export const validate = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const messages = errors.array().map((e) => `${e.path}: ${e.msg}`).join('; ');
+    const messages = errors.array().map((e: any) => `${e.path || e.param}: ${e.msg}`).join('; ');
     throw new ApiError(400, messages, 'VALIDATION_ERROR');
   }
   next();

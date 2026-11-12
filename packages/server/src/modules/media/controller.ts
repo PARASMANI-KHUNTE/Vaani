@@ -5,9 +5,9 @@
 
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { apiResponse } from '../../shared/utils/apiResponse';
+import { sendSuccess, sendCreated, sendOK, sendNoContent, sendError } from '../../shared/utils/apiResponse';
 import {
-  uploadMedia,
+  uploadMediaDirect,
   getSignedUploadParams,
   confirmClientUpload,
   moderateMedia,
@@ -27,10 +27,10 @@ export const uploadMediaController = asyncHandler(async (req: Request, res: Resp
   const { folder, transformation, chatId, messageId, tags } = req.body;
 
   if (!file) {
-    return apiResponse.error(res, 'No file provided', 400, 'NO_FILE');
+    return sendError(res, 400, 'No file provided', { code: 'NO_FILE' });
   }
 
-  const mediaAsset = await uploadMedia({
+  const mediaAsset = await uploadMediaDirect({
     file: file.buffer,
     fileName: file.originalname,
     mimeType: file.mimetype,
@@ -42,7 +42,7 @@ export const uploadMediaController = asyncHandler(async (req: Request, res: Resp
     tags: tags ? JSON.parse(tags) : [],
   });
 
-  apiResponse.success(res, mediaAsset, 'Media uploaded successfully', 201);
+  sendSuccess(res, 201, 'Media uploaded successfully', mediaAsset);
 });
 
 // ============================================================================
@@ -62,7 +62,7 @@ export const getSignedUploadParamsController = asyncHandler(async (req: Request,
     tags,
   });
 
-  apiResponse.success(res, params, 'Signed upload params generated');
+  sendSuccess(res, 200, 'Signed upload params generated', params);
 });
 
 // ============================================================================
@@ -76,7 +76,7 @@ export const confirmClientUploadController = asyncHandler(async (req: Request, r
 
   const mediaAsset = await confirmClientUpload(publicId, userId, messageId, chatId);
 
-  apiResponse.success(res, mediaAsset, 'Upload confirmed successfully');
+  sendSuccess(res, 200, 'Upload confirmed successfully', mediaAsset);
 });
 
 // ============================================================================
@@ -95,7 +95,7 @@ export const moderateMediaController = asyncHandler(async (req: Request, res: Re
     moderatorId: userId,
   });
 
-  apiResponse.success(res, mediaAsset, `Media ${status} successfully`);
+  sendSuccess(res, 200, `Media ${status} successfully`, mediaAsset);
 });
 
 // ============================================================================
@@ -108,7 +108,7 @@ export const deleteMediaController = asyncHandler(async (req: Request, res: Resp
 
   await deleteMedia(publicId, userId);
 
-  apiResponse.success(res, null, 'Media deleted successfully');
+  sendSuccess(res, 200, 'Media deleted successfully', null);
 });
 
 // ============================================================================
@@ -121,10 +121,10 @@ export const getMediaInfoController = asyncHandler(async (req: Request, res: Res
   const mediaAsset = await getMediaInfo(publicId);
 
   if (!mediaAsset) {
-    return apiResponse.notFound(res, 'Media not found');
+    return sendError(res, 404, 'Media not found', { code: 'MEDIA_NOT_FOUND' });
   }
 
-  apiResponse.success(res, mediaAsset, 'Media info retrieved successfully');
+  sendSuccess(res, 200, 'Media info retrieved successfully', mediaAsset);
 });
 
 // ============================================================================
@@ -142,7 +142,7 @@ export const getUserMediaController = asyncHandler(async (req: Request, res: Res
     resourceType: resourceType as any,
   });
 
-  apiResponse.success(res, result, 'User media retrieved successfully');
+  sendSuccess(res, 200, 'User media retrieved successfully', result);
 });
 
 // ============================================================================
@@ -154,10 +154,10 @@ export const getTransformedUrlController = asyncHandler(async (req: Request, res
   const { transformation } = req.query;
 
   if (!transformation) {
-    return apiResponse.error(res, 'Transformation params required', 400, 'MISSING_TRANSFORMATION');
+    return sendError(res, 400, 'Transformation params required', { code: 'MISSING_TRANSFORMATION' });
   }
 
   const url = getTransformedUrl(publicId, JSON.parse(transformation as string));
 
-  apiResponse.success(res, { url }, 'Transformed URL generated');
+  sendSuccess(res, 200, 'Transformed URL generated', { url });
 });

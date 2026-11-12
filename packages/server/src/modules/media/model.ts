@@ -39,6 +39,45 @@ export interface IMediaAsset extends Document {
   scheduledForDeletion?: Date;
   createdAt: Date;
   updatedAt: Date;
+  [key: string]: unknown;
+}
+
+export interface IMediaAssetModel extends mongoose.Model<IMediaAsset> {
+  recordUpload(data: {
+    publicId: string;
+    url: string;
+    secureUrl: string;
+    format: string;
+    resourceType: 'image' | 'video' | 'raw';
+    type?: 'upload' | 'private' | 'authenticated';
+    width?: number;
+    height?: number;
+    duration?: number;
+    bytes: number;
+    originalFilename?: string;
+    mimeType?: string;
+    folder: string;
+    tags?: string[];
+    uploadedBy: mongoose.Types.ObjectId;
+    messageId?: mongoose.Types.ObjectId;
+    chatId?: mongoose.Types.ObjectId;
+  }): Promise<IMediaAsset>;
+  linkToMessage(
+    publicId: string,
+    messageId: mongoose.Types.ObjectId,
+    chatId: mongoose.Types.ObjectId
+  ): Promise<IMediaAsset | null>;
+  markModerated(
+    publicId: string,
+    status: 'approved' | 'rejected',
+    reason?: string
+  ): Promise<IMediaAsset | null>;
+  scheduleOrphanCleanup(
+    publicId: string,
+    deleteAfterDays?: number
+  ): Promise<IMediaAsset | null>;
+  getOrphanedAssets(olderThan?: Date): Promise<IMediaAsset[]>;
+  getAssetsForCleanup(): Promise<IMediaAsset[]>;
 }
 
 // ============================================================================
@@ -114,7 +153,7 @@ MediaAssetSchema.statics.recordUpload = async function (data: {
   uploadedBy: mongoose.Types.ObjectId;
   messageId?: mongoose.Types.ObjectId;
   chatId?: mongoose.Types.ObjectId;
-}): Promise<IMediaAsset> => {
+}): Promise<IMediaAsset> {
   return this.create({
     ...data,
     type: data.type || 'upload',
@@ -126,10 +165,11 @@ MediaAssetSchema.statics.recordUpload = async function (data: {
 };
 
 MediaAssetSchema.statics.linkToMessage = async function (
+  this: any,
   publicId: string,
   messageId: mongoose.Types.ObjectId,
   chatId: mongoose.Types.ObjectId
-): Promise<IMediaAsset | null> => {
+): Promise<IMediaAsset | null> {
   return this.findOneAndUpdate(
     { publicId },
     {
@@ -143,10 +183,11 @@ MediaAssetSchema.statics.linkToMessage = async function (
 };
 
 MediaAssetSchema.statics.markModerated = async function (
+  this: any,
   publicId: string,
   status: 'approved' | 'rejected',
   reason?: string
-): Promise<IMediaAsset | null> => {
+): Promise<IMediaAsset | null> {
   return this.findOneAndUpdate(
     { publicId },
     {
@@ -159,9 +200,10 @@ MediaAssetSchema.statics.markModerated = async function (
 };
 
 MediaAssetSchema.statics.scheduleOrphanCleanup = async function (
+  this: any,
   publicId: string,
   deleteAfterDays = 7
-): Promise<IMediaAsset | null> => {
+): Promise<IMediaAsset | null> {
   const scheduledForDeletion = new Date();
   scheduledForDeletion.setDate(scheduledForDeletion.getDate() + deleteAfterDays);
 
@@ -175,8 +217,9 @@ MediaAssetSchema.statics.scheduleOrphanCleanup = async function (
 };
 
 MediaAssetSchema.statics.getOrphanedAssets = async function (
+  this: any,
   olderThan?: Date
-): Promise<IMediaAsset[]> => {
+): Promise<IMediaAsset[]> {
   const query: Record<string, unknown> = { isOrphaned: true };
   if (olderThan) {
     query.createdAt = { $lt: olderThan };
@@ -184,7 +227,7 @@ MediaAssetSchema.statics.getOrphanedAssets = async function (
   return this.find(query).lean();
 };
 
-MediaAssetSchema.statics.getAssetsForCleanup = async function (): Promise<IMediaAsset[]> => {
+MediaAssetSchema.statics.getAssetsForCleanup = async function (this: any): Promise<IMediaAsset[]> {
   return this.find({
     scheduledForDeletion: { $lte: new Date() },
   }).lean();
@@ -194,5 +237,5 @@ MediaAssetSchema.statics.getAssetsForCleanup = async function (): Promise<IMedia
 // Model Export
 // ============================================================================
 
-export const MediaAsset = mongoose.model<IMediaAsset>('MediaAsset', MediaAssetSchema);
+export const MediaAsset = mongoose.model<IMediaAsset, IMediaAssetModel>('MediaAsset', MediaAssetSchema);
 export default MediaAsset;

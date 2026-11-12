@@ -8,7 +8,7 @@ import { ValidationChain } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { ApiError } from '../../shared/utils/apiError';
-import { CloudinaryFolder, CloudinaryTransformation } from '@chat-app/shared/constants';
+import { CloudinaryFolders, CloudinaryTransformations } from '@chat-app/shared/constants';
 
 // ============================================================================
 // Validation Chains
@@ -18,7 +18,7 @@ export const uploadMediaValidator: ValidationChain[] = [
   // File is validated by multer middleware
   body('folder')
     .optional()
-    .isIn(Object.values(CloudinaryFolder))
+    .isIn(Object.values(CloudinaryFolders))
     .withMessage('Invalid folder'),
   body('transformation')
     .optional()
@@ -49,7 +49,7 @@ export const signedUploadValidator: ValidationChain[] = [
     .withMessage('MIME type required'),
   body('folder')
     .optional()
-    .isIn(Object.values(CloudinaryFolder))
+    .isIn(Object.values(CloudinaryFolders))
     .withMessage('Invalid folder'),
   body('transformation')
     .optional()
@@ -115,7 +115,7 @@ export const getUserMediaValidator: ValidationChain[] = [
     .withMessage('Limit must be 1-100'),
   query('folder')
     .optional()
-    .isIn(Object.values(CloudinaryFolder))
+    .isIn(Object.values(CloudinaryFolders))
     .withMessage('Invalid folder'),
   query('resourceType')
     .optional()
@@ -141,7 +141,7 @@ export const transformedUrlValidator: ValidationChain[] = [
 export const validate = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const messages = errors.array().map((e) => `${e.path}: ${e.msg}`).join('; ');
+    const messages = errors.array().map((e: any) => `${e.path}: ${e.msg}`).join('; ');
     throw new ApiError(400, messages, 'VALIDATION_ERROR');
   }
   next();

@@ -4,6 +4,7 @@
  */
 
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
 import { sendSuccess, sendPaginated } from '../../shared/utils/apiResponse';
 import {
@@ -24,16 +25,16 @@ import {
   markChatUnread,
   clearChatMessages,
   deleteChatForUser,
-} from './service';
+} from './service.js';
+import { Chat } from './model.js';
 import { ApiError } from '../../shared/utils/apiError';
 import { logger } from '../../shared/utils/logger';
 
 export const listChats = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const { limit = 30, offset = 0, includeHidden = false } = req.query;
 
-  const Chat = (await import('./model')).Chat;
-  const chats = await Chat.findUserChats(new (await import('mongoose')).Types.ObjectId(userId), {
+    const chats = await Chat.findUserChats(new mongoose.Types.ObjectId(userId), {
     limit: Number(limit),
     offset: Number(offset),
     includeHidden: includeHidden === 'true',
@@ -44,16 +45,15 @@ export const listChats = asyncHandler(async (req: Request, res: Response) => {
 
 export const getChat = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
-  const Chat = (await import('./model')).Chat;
-  const chat = await Chat.getChatWithParticipants(new (await import('mongoose')).Types.ObjectId(chatId));
+    const chat = await Chat.getChatWithParticipants(new mongoose.Types.ObjectId(chatId));
 
   if (!chat) {
     throw new ApiError(404, 'Chat not found', 'CHAT_NOT_FOUND');
   }
 
-  if (!chat.isParticipant(new (await import('mongoose')).Types.ObjectId(userId))) {
+  if (!chat.isParticipant(new mongoose.Types.ObjectId(userId))) {
     throw new ApiError(403, 'Not a member of this chat', 'NOT_CHAT_MEMBER');
   }
 
@@ -61,7 +61,7 @@ export const getChat = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createChat = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const { participantId, isGroup, groupName, participantIds, groupDescription, groupAvatar } = req.body;
 
   if (isGroup) {
@@ -81,7 +81,7 @@ export const createChat = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateGroupChat = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const input = req.body;
 
   const chat = await updateGroup(chatId, userId, input);
@@ -90,7 +90,7 @@ export const updateGroupChat = asyncHandler(async (req: Request, res: Response) 
 
 export const addMembers = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const { memberIds } = req.body;
 
   const chat = await addGroupMembers({ chatId, memberIds, currentUserId: userId });
@@ -99,7 +99,7 @@ export const addMembers = asyncHandler(async (req: Request, res: Response) => {
 
 export const removeMember = asyncHandler(async (req: Request, res: Response) => {
   const { chatId, memberId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const chat = await removeGroupMember(chatId, memberId, userId);
   return sendSuccess(res, 200, 'Member removed', { chat });
@@ -107,7 +107,7 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
 
 export const promoteAdmin = asyncHandler(async (req: Request, res: Response) => {
   const { chatId, memberId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const chat = await promoteGroupAdmin(chatId, memberId, userId);
   return sendSuccess(res, 200, 'Member promoted to admin', { chat });
@@ -115,7 +115,7 @@ export const promoteAdmin = asyncHandler(async (req: Request, res: Response) => 
 
 export const demoteAdmin = asyncHandler(async (req: Request, res: Response) => {
   const { chatId, memberId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const chat = await demoteGroupAdmin(chatId, memberId, userId);
   return sendSuccess(res, 200, 'Admin demoted to member', { chat });
@@ -123,7 +123,7 @@ export const demoteAdmin = asyncHandler(async (req: Request, res: Response) => {
 
 export const transferOwnership = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const { nextOwnerId } = req.body;
 
   const chat = await transferGroupOwnership(chatId, nextOwnerId, userId);
@@ -132,7 +132,7 @@ export const transferOwnership = asyncHandler(async (req: Request, res: Response
 
 export const leaveGroupChat = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const result = await leaveGroup(chatId, userId);
   return sendSuccess(res, 200, result.deleted ? 'Group deleted' : 'Left group', result);
@@ -141,7 +141,7 @@ export const leaveGroupChat = asyncHandler(async (req: Request, res: Response) =
 // Group Invites
 export const createInviteLink = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const { expiresInHours, maxUses } = req.body;
 
   const invite = await createGroupInviteLink(chatId, userId, { expiresInHours, maxUses });
@@ -161,7 +161,7 @@ export const getInvitePreview = asyncHandler(async (req: Request, res: Response)
 
 export const joinViaInvite = asyncHandler(async (req: Request, res: Response) => {
   const { inviteToken } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const result = await joinGroupViaInvite(inviteToken, userId);
   return sendSuccess(res, 200, result.joined ? 'Joined group' : 'Already a member', result);
@@ -170,7 +170,7 @@ export const joinViaInvite = asyncHandler(async (req: Request, res: Response) =>
 // Chat Settings
 export const updateChatSettings = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
   const state = req.body;
 
   const chat = await updateUserChatState(chatId, userId, state);
@@ -179,7 +179,7 @@ export const updateChatSettings = asyncHandler(async (req: Request, res: Respons
 
 export const markRead = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const chat = await markChatRead(chatId, userId);
   return sendSuccess(res, 200, 'Chat marked as read', { chat });
@@ -187,7 +187,7 @@ export const markRead = asyncHandler(async (req: Request, res: Response) => {
 
 export const markUnread = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const chat = await markChatUnread(chatId, userId);
   return sendSuccess(res, 200, 'Chat marked as unread', { chat });
@@ -195,7 +195,7 @@ export const markUnread = asyncHandler(async (req: Request, res: Response) => {
 
 export const clearMessages = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const chat = await clearChatMessages(chatId, userId);
   return sendSuccess(res, 200, 'Chat messages cleared', { chat });
@@ -203,7 +203,7 @@ export const clearMessages = asyncHandler(async (req: Request, res: Response) =>
 
 export const deleteChat = asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const userId = (req.user as { _id: string })._id;
+  const userId = req.user._id.toString();
 
   const result = await deleteChatForUser(chatId, userId);
   return sendSuccess(res, 200, 'Chat deleted for you', result);

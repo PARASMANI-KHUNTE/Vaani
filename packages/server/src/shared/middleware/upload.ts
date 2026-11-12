@@ -147,7 +147,7 @@ export const validateUploadedFile = (category: string = 'auto') => {
           mimetype: file.mimetype,
           originalname: file.originalname,
         });
-        throw new ApiError(415, 'File content does not match declared type');
+        throw new ApiError(415, 'File content does not match declared type', 'INVALID_FILE_CONTENT');
       }
 
       // Additional category-specific validation
@@ -155,11 +155,11 @@ export const validateUploadedFile = (category: string = 'auto') => {
         const constraints = UPLOAD_CATEGORIES[category];
         if (constraints) {
           if (!constraints.allowedMimeTypes.includes(file.mimetype)) {
-            throw new ApiError(415, `File type not allowed for ${category} upload`);
+            throw new ApiError(415, `File type not allowed for ${category} upload`, 'FILE_TYPE_NOT_ALLOWED');
           }
           if (file.size > constraints.maxSize) {
             const maxMB = constraints.maxSize / (1024 * 1024);
-            throw new ApiError(413, `File too large. Maximum size for ${category}: ${maxMB}MB`);
+            throw new ApiError(413, `File too large. Maximum size for ${category}: ${maxMB}MB`, 'FILE_TOO_LARGE');
           }
         }
       }

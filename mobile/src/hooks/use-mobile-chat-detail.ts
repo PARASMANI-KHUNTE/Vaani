@@ -231,7 +231,7 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
 
     try {
       await socketAckPromise;
-    } catch (socketError) {
+    } catch {
       try {
         const response = await postMobileMessage(token, {
           chatId: chat._id,
@@ -291,7 +291,7 @@ export const useMobileChatDetail = ({ token, userId, chat }: UseMobileChatDetail
     }
 
     try {
-      const response = await deleteMobileMessage(token, messageId, scope);
+      await deleteMobileMessage(token, messageId, scope);
       
       if (scope === "everyone") {
         setMessages((current) =>

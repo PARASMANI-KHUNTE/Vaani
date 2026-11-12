@@ -131,7 +131,7 @@ export const sendMessage = async (input: SendMessageInput): Promise<IMessage> =>
   // Emit real-time event
   socketEmitters.newMessage(
     chatId,
-    populatedMessage!,
+    populatedMessage! as any,
     clientTempId
   );
 
@@ -140,13 +140,13 @@ export const sendMessage = async (input: SendMessageInput): Promise<IMessage> =>
     if (!participant.userId.equals(senderId)) {
       const recipient = await User.findById(participant.userId);
       if (recipient && !recipient.isOnline) {
-        await enqueueOfflineMessage(participant.userId.toString(), populatedMessage!, chatId);
+        await enqueueOfflineMessage(participant.userId.toString(), populatedMessage! as any, chatId);
       }
     }
   }
 
   logger.debug('Message sent', { messageId: message._id, chatId, senderId });
-  return populatedMessage!;
+  return populatedMessage! as any;
 };
 
 // ============================================================================
@@ -247,10 +247,10 @@ export const editMessage = async (input: EditMessageInput): Promise<IMessage> =>
     .lean();
 
   // Emit real-time event
-  socketEmitters.messageEdited(populatedMessage!);
+  socketEmitters.messageEdited(populatedMessage! as any);
 
   logger.debug('Message edited', { messageId, chatId, userId });
-  return populatedMessage!;
+  return populatedMessage! as any;
 };
 
 // ============================================================================
@@ -285,7 +285,7 @@ export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messag
 
     // Clean up media if no other messages reference it
     if (message.media) {
-      await destroyMediaAssets([message.media]);
+      await destroyMediaAssets([message.media.publicId]);
     }
   } else {
     // Delete for me
@@ -307,7 +307,7 @@ export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messag
   }
 
   // Emit real-time event
-  socketEmitters.messageDeleted(chatId, messageId, scope, populatedMessage);
+  socketEmitters.messageDeleted(chatId, messageId, scope, populatedMessage as any);
 
   logger.debug('Message deleted', { messageId, chatId, userId, scope });
   return { messageId, chatId, message: populatedMessage };
@@ -367,7 +367,7 @@ export const forwardMessage = async (input: ForwardMessageInput): Promise<IMessa
     .lean();
 
   // Emit real-time event
-  socketEmitters.newMessage(targetChatId, populatedMessage!);
+  socketEmitters.newMessage(targetChatId, populatedMessage! as any);
 
   logger.debug('Message forwarded', { originalMessageId: messageId, targetChatId, userId });
   return populatedMessage!;
@@ -402,7 +402,7 @@ export const addReaction = async (input: ReactionInput): Promise<IMessage> => {
     .lean();
 
   // Emit real-time event
-  socketEmitters.reactionAdded(populatedMessage!, userId, userName, emoji);
+  socketEmitters.reactionAdded(populatedMessage! as any, userId, userName, emoji);
 
   logger.debug('Reaction added', { messageId, userId, emoji });
   return populatedMessage!;
@@ -422,7 +422,7 @@ export const removeReaction = async (messageId: string, userId: string, emoji: s
     .lean();
 
   // Emit real-time event
-  socketEmitters.reactionRemoved(populatedMessage!, userId, emoji);
+  socketEmitters.reactionRemoved(populatedMessage! as any, userId, emoji);
 
   logger.debug('Reaction removed', { messageId, userId, emoji });
   return populatedMessage!;

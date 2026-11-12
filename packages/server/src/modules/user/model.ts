@@ -33,6 +33,7 @@ export interface IUser extends Document {
   blockedUsers: mongoose.Types.ObjectId[];
   pushTokens: IPushToken[];
   settings: IUserSettings;
+  role: 'user' | 'admin' | 'moderator';
   createdAt: Date;
   updatedAt: Date;
 
@@ -101,6 +102,7 @@ const UserSchema = createBaseSchema<IUser>({
   blockedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   pushTokens: [PushTokenSchema],
   settings: { type: UserSettingsSchema, default: () => ({}) },
+  role: { type: String, enum: ['user', 'admin', 'moderator'], default: 'user' },
 });
 
 // ============================================================================

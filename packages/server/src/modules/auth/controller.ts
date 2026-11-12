@@ -4,6 +4,7 @@
  */
 
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
 import { sendSuccess, sendCreated } from '../../shared/utils/apiResponse';
 import {
@@ -12,7 +13,7 @@ import {
   logout,
   createMobileAuthCode,
   verifyMobileAuthCode,
-} from './service';
+} from './service.js';
 import { ApiError } from '../../shared/utils/apiError';
 import { logger } from '../../shared/utils/logger';
 
@@ -62,11 +63,15 @@ export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
 
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
   // req.user is attached by authMiddleware
-  const user = req.user as { _id: string; email: string; name: string; [key: string]: unknown };
+  const user = req.user;
+
+  if (!user) {
+    throw new ApiError(401, 'User not found', 'USER_NOT_FOUND');
+  }
 
   return sendSuccess(res, 200, 'Current user', {
     user: {
-      _id: user._id,
+      _id: user._id.toString(),
       email: user.email,
       name: user.name,
       username: user.username,
@@ -79,9 +84,9 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const issueMobileAuthCode = asyncHandler(async (req: Request, res: Response) => {
-  const user = req.user as { _id: string };
+  const userId = req.user._id.toString();
 
-  const result = await createMobileAuthCode(user._id);
+  const result = await createMobileAuthCode(userId);
 
   return sendSuccess(res, 200, 'Mobile auth code issued', {
     code: result.code,
@@ -104,7 +109,7 @@ export const redeemMobileAuthCode = asyncHandler(async (req: Request, res: Respo
 
   // Generate tokens for the user
   const user = { _id: userId, email: '', name: '' }; // Minimal user object for token creation
-  const { createAccessToken, createRefreshToken } = await import('./service');
+  const { createAccessToken, createRefreshToken } = await import('./service.js');
 
   const accessToken = createAccessToken(user);
   const { token: refreshToken } = await createRefreshToken(user);

@@ -23,7 +23,7 @@ interface UpstashClient {
   sAdd(key: string, member: string): Promise<number>;
   sRem(key: string, member: string): Promise<number>;
   sMembers(key: string): Promise<string[]>;
-  sIsMember(key: string, member: string): Promise<boolean>;
+  sIsMember(key: string, member: string): Promise<number>; // Redis returns 0 or 1
   incr(key: string): Promise<number>;
   decr(key: string): Promise<number>;
   keys(pattern: string): Promise<string[]>;
@@ -57,7 +57,7 @@ const createUpstashClient = (): UpstashClient => {
       const url = `${baseUrl}/${lower}/${encodedArgs.join('/')}`;
       const response = await fetch(url, { headers });
       if (!response.ok) return null;
-      const data = await response.json();
+      const data = await response.json() as { result?: unknown };
       return data.result;
     };
 
@@ -70,7 +70,7 @@ const createUpstashClient = (): UpstashClient => {
         body: JSON.stringify({ command: [upper, ...args.map((arg) => String(arg))] }),
       });
       if (!response.ok) return null;
-      const data = await response.json();
+      const data = await response.json() as { result?: unknown };
       return data.result;
     };
 
@@ -104,8 +104,9 @@ const createUpstashClient = (): UpstashClient => {
           headers,
           body: JSON.stringify(body),
         });
-        const data = await response.json();
-        return data.result;
+        const data = await response.json() as { result?: string | null };
+        // Upstash returns 'OK' on success
+        return data.result === 'OK' ? 'OK' : null;
       } catch (error) {
         logger.error('Redis SET error', { error: (error as Error).message });
         return null;
@@ -148,7 +149,7 @@ const createUpstashClient = (): UpstashClient => {
 
     async sIsMember(key, member) {
       const result = await request('sismember', key, member);
-      return typeof result === 'number' ? result === 1 : false;
+      return typeof result === 'number' ? result : 0;
     },
 
     async incr(key) {
@@ -209,7 +210,7 @@ export const connectRedis = async (): Promise<UnifiedRedisClient | null> => {
       redisClient = createClient({
         url: config.redis.url,
         socket: {
-          reconnectStrategy: (retries) => {
+          reconnectStrategy: (retries: number) => {
             if (retries > 10) {
               logger.error('Redis max reconnection attempts reached');
               return new Error('Max reconnection attempts reached');
@@ -219,7 +220,7 @@ export const connectRedis = async (): Promise<UnifiedRedisClient | null> => {
         },
       });
 
-      redisClient.on('error', (err) => {
+      redisClient.on('error', (err: Error) => {
         logger.error('Redis Client Error', { error: err.message });
         isConnected = false;
       });
@@ -314,7 +315,8 @@ export const cache = {
 
     try {
       const data = await client.get(key);
-      return data ? JSON.parse(data) : null;
+      const dataStr = data as string | null;
+      return dataStr ? JSON.parse(dataStr) : null;
     } catch {
       return null;
     }
@@ -397,14 +399,14 @@ export const sets = {
     }
   },
 
-  async isMember(key: string, member: string): Promise<boolean> {
+  async isMember(key: string, member: string): Promise<number> {
     const client = getRedisClient();
-    if (!client) return false;
+    if (!client) return 0;
 
     try {
       return await client.sIsMember(key, member);
     } catch {
-      return false;
+      return 0;
     }
   },
 };

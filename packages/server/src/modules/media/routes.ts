@@ -3,7 +3,7 @@
  * Media upload, management, transformation
  */
 
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import multer from 'multer';
 import {
   uploadMediaController,
@@ -14,7 +14,7 @@ import {
   getMediaInfoController,
   getUserMediaController,
   getTransformedUrlController,
-} from './controller';
+} from './controller.js';
 import {
   uploadMediaValidator,
   signedUploadValidator,
@@ -25,9 +25,8 @@ import {
   getUserMediaValidator,
   transformedUrlValidator,
   validate,
-} from './validators';
-import { authMiddleware } from '../../shared/middleware/auth';
-import { roleMiddleware } from '../../shared/middleware/auth';
+} from './validators.js';
+import { authMiddleware, requireRole } from '../../shared/middleware/auth.js';
 
 // Configure multer for memory storage
 const upload = multer({
@@ -63,7 +62,7 @@ const upload = multer({
   },
 });
 
-const router = Router();
+const router: Router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -93,7 +92,7 @@ router.post('/confirm/:publicId', confirmUploadValidator, validate, confirmClien
 
 router.post(
   '/moderate/:publicId',
-  roleMiddleware(['admin', 'moderator']),
+  requireRole('admin', 'moderator'),
   moderateMediaValidator,
   validate,
   moderateMediaController

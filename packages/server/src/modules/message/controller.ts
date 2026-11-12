@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { apiResponse } from '../../shared/utils/apiResponse';
+import { sendSuccess, sendCreated, sendOK, sendNoContent, sendError } from '../../shared/utils/apiResponse';
 import {
   sendMessage,
   getMessages,
@@ -38,7 +38,7 @@ export const sendMessageController = asyncHandler(async (req: Request, res: Resp
     clientTempId,
   });
 
-  apiResponse.success(res, message, 'Message sent successfully', 201);
+  sendSuccess(res, 201, 'Message sent successfully', message);
 });
 
 // ============================================================================
@@ -56,7 +56,7 @@ export const getMessagesController = asyncHandler(async (req: Request, res: Resp
     before: before ? new Date(before as string) : undefined,
   });
 
-  apiResponse.success(res, result, 'Messages retrieved successfully');
+  sendSuccess(res, 200, 'Messages retrieved successfully', result);
 });
 
 // ============================================================================
@@ -70,10 +70,10 @@ export const getMessageController = asyncHandler(async (req: Request, res: Respo
   const message = await getMessageById(messageId, userId);
 
   if (!message) {
-    return apiResponse.notFound(res, 'Message not found');
+    return sendError(res, 404, 'Message not found', { code: 'MESSAGE_NOT_FOUND' });
   }
 
-  apiResponse.success(res, message, 'Message retrieved successfully');
+  sendSuccess(res, 200, 'Message retrieved successfully', message);
 });
 
 // ============================================================================
@@ -92,7 +92,7 @@ export const editMessageController = asyncHandler(async (req: Request, res: Resp
     content,
   });
 
-  apiResponse.success(res, message, 'Message edited successfully');
+  sendSuccess(res, 200, 'Message edited successfully', message);
 });
 
 // ============================================================================
@@ -111,7 +111,7 @@ export const deleteMessageController = asyncHandler(async (req: Request, res: Re
     scope,
   });
 
-  apiResponse.success(res, result, scope === 'everyone' ? 'Message deleted for everyone' : 'Message deleted for you');
+  sendSuccess(res, 200, scope === 'everyone' ? 'Message deleted for everyone' : 'Message deleted for you', result);
 });
 
 // ============================================================================
@@ -130,7 +130,7 @@ export const forwardMessageController = asyncHandler(async (req: Request, res: R
     userId,
   });
 
-  apiResponse.success(res, message, 'Message forwarded successfully', 201);
+  sendSuccess(res, 201, 'Message forwarded successfully', message);
 });
 
 // ============================================================================
@@ -150,7 +150,7 @@ export const addReactionController = asyncHandler(async (req: Request, res: Resp
     emoji,
   });
 
-  apiResponse.success(res, message, 'Reaction added successfully');
+  sendSuccess(res, 200, 'Reaction added successfully', message);
 });
 
 // ============================================================================
@@ -164,7 +164,7 @@ export const removeReactionController = asyncHandler(async (req: Request, res: R
 
   const message = await removeReaction(messageId, userId, emoji);
 
-  apiResponse.success(res, message, 'Reaction removed successfully');
+  sendSuccess(res, 200, 'Reaction removed successfully', message);
 });
 
 // ============================================================================
@@ -177,7 +177,7 @@ export const markDeliveredController = asyncHandler(async (req: Request, res: Re
 
   await markDelivered(messageId, userId);
 
-  apiResponse.success(res, null, 'Message marked as delivered');
+  sendSuccess(res, 200, 'Message marked as delivered', null);
 });
 
 // ============================================================================
@@ -190,7 +190,7 @@ export const markSeenController = asyncHandler(async (req: Request, res: Respons
 
   await markSeen(messageId, userId);
 
-  apiResponse.success(res, null, 'Message marked as seen');
+  sendSuccess(res, 200, 'Message marked as seen', null);
 });
 
 // ============================================================================
@@ -204,5 +204,5 @@ export const markChatSeenController = asyncHandler(async (req: Request, res: Res
 
   await markChatMessagesSeen(chatId, userId, before ? new Date(before as string) : undefined);
 
-  apiResponse.success(res, null, 'Messages marked as seen');
+  sendSuccess(res, 200, 'Messages marked as seen', null);
 });

@@ -8,7 +8,7 @@ import { Notification, INotification } from './model';
 import { User } from '../user/model';
 import { ApiError } from '../../shared/utils/apiError';
 import { logger } from '../../shared/utils/logger';
-import { sendPushNotification, sendPushToMultiple } from '../../shared/utils/pushNotifications';
+import { sendPushNotification } from '../../shared/utils/pushNotifications';
 import { socketEmitters } from '../../core/socket/server';
 import { NotificationType } from '@chat-app/shared/types';
 
@@ -78,12 +78,24 @@ export const createNotification = async (input: CreateNotificationInput): Promis
   });
 
   // Emit real-time event
-  socketEmitters.notificationCreated(userId, notification);
+  socketEmitters.notificationCreated(userId, {
+    _id: notification._id.toString(),
+    userId: notification.userId.toString(),
+    type: notification.type,
+    title: notification.title,
+    body: notification.body,
+    data: notification.data,
+    read: notification.isRead,
+    chatId: notification.data.chatId?.toString(),
+    actorId: notification.data.actorId?.toString(),
+    createdAt: notification.createdAt.toISOString(),
+  });
 
   // Send push notification if user is offline and has push tokens
   if (sendPush && !user.isOnline && user.pushTokens && user.pushTokens.length > 0) {
+    const tokens = user.pushTokens.map((t) => t.token);
     try {
-      await sendPushNotification(user.pushTokens, {
+      await sendPushNotification(tokens, {
         title,
         body,
         data: {

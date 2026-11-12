@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { apiResponse } from '../../shared/utils/apiResponse';
+import { sendSuccess, sendError } from '../../shared/utils/apiResponse';
 import {
   getNotifications,
   markAsRead,
@@ -30,7 +30,7 @@ export const getNotificationsController = asyncHandler(async (req: Request, res:
     before: before ? new Date(before as string) : undefined,
   });
 
-  apiResponse.success(res, result, 'Notifications retrieved successfully');
+  sendSuccess(res, 200, 'Notifications retrieved successfully', result);
 });
 
 // ============================================================================
@@ -42,7 +42,7 @@ export const getUnreadCountController = asyncHandler(async (req: Request, res: R
 
   const count = await getUnreadCount(userId);
 
-  apiResponse.success(res, { count }, 'Unread count retrieved successfully');
+  sendSuccess(res, 200, 'Unread count retrieved successfully', { count });
 });
 
 // ============================================================================
@@ -55,7 +55,7 @@ export const markAsReadController = asyncHandler(async (req: Request, res: Respo
 
   const notification = await markAsRead(notificationId, userId);
 
-  apiResponse.success(res, notification, 'Notification marked as read');
+  sendSuccess(res, 200, 'Notification marked as read', notification);
 });
 
 // ============================================================================
@@ -67,5 +67,5 @@ export const markAllAsReadController = asyncHandler(async (req: Request, res: Re
 
   await markAllAsRead(userId);
 
-  apiResponse.success(res, null, 'All notifications marked as read');
+  sendSuccess(res, 200, 'All notifications marked as read', null);
 });

@@ -4,23 +4,28 @@
  */
 
 import mongoose from 'mongoose';
-import { MediaAsset, IMediaAsset } from './model';
-import { User } from '../user/model';
-import { ApiError } from '../../shared/utils/apiError';
-import { logger } from '../../shared/utils/logger';
-import { CloudinaryFolder, CloudinaryTransformation, MediaConstraints } from '@chat-app/shared/constants';
+import { MediaAsset, IMediaAsset } from './model.js';
+import { User } from '../user/model.js';
+import { ApiError } from '../../shared/utils/apiError.js';
+import { logger } from '../../shared/utils/logger.js';
+import { CloudinaryFolders, CloudinaryTransformations, MediaConstraints, Limits } from '@chat-app/shared/constants';
+import { config } from '../../config/index.js';
 import {
-  uploadToCloudinary,
-  deleteFromCloudinary,
+  uploadMedia as uploadMediaToCloudinary,
+  destroyMediaAssets,
   generateSignedUploadParams,
-  validateMediaFile,
-  getCloudinaryResource,
-} from '../../shared/utils/mediaUpload';
-import { Limits } from '@chat-app/shared/constants';
+  validateMediaFile as validateMediaFileUtil,
+  validateFileBuffer,
+  getFolderForCategory,
+  getTransformationForCategory,
+} from '../../shared/utils/mediaUpload.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+type CloudinaryFolder = typeof CloudinaryFolders[keyof typeof CloudinaryFolders];
 
 interface UploadInput {
   file: Buffer;
@@ -28,7 +33,7 @@ interface UploadInput {
   mimeType: string;
   userId: string;
   folder?: CloudinaryFolder;
-  transformation?: CloudinaryTransformation;
+  transformation?: string;
   chatId?: string;
   messageId?: string;
   tags?: string[];
@@ -39,7 +44,7 @@ interface SignedUploadInput {
   mimeType: string;
   userId: string;
   folder?: CloudinaryFolder;
-  transformation?: CloudinaryTransformation;
+  transformation?: string;
   tags?: string[];
 }
 
@@ -54,13 +59,13 @@ interface ModerateInput {
 // Direct Upload (Server-side)
 // ============================================================================
 
-export const uploadMedia = async (input: UploadInput): Promise<IMediaAsset> => {
+export const uploadMediaDirect = async (input: UploadInput): Promise<IMediaAsset> => {
   const { file, fileName, mimeType, userId, folder = 'chat_media', transformation, chatId, messageId, tags = [] } = input;
 
   // Validate file
-  const validation = validateMediaFile(file, mimeType);
+  const validation = validateMediaFileUtil(fileName, mimeType, file.length);
   if (!validation.valid) {
-    throw new ApiError(400, validation.error!, 'INVALID_MEDIA_FILE');
+    throw new ApiError(400, validation.error || 'Invalid media file', 'INVALID_MEDIA_FILE');
   }
 
   // Verify user
@@ -70,7 +75,7 @@ export const uploadMedia = async (input: UploadInput): Promise<IMediaAsset> => {
   }
 
   // Upload to Cloudinary
-  const result = await uploadToCloudinary(file, {
+  const result = await uploadMediaToCloudinary(file, {
     folder,
     publicId: undefined, // Auto-generate
     transformation,
@@ -83,12 +88,11 @@ export const uploadMedia = async (input: UploadInput): Promise<IMediaAsset> => {
 
   // Record in database
   const mediaAsset = await MediaAsset.recordUpload({
-    publicId: result.public_id,
+    publicId: result.publicId,
     url: result.url,
-    secureUrl: result.secure_url,
+    secureUrl: result.secureUrl,
     format: result.format,
-    resourceType: result.resource_type as 'image' | 'video' | 'raw',
-    type: result.type as 'upload' | 'private' | 'authenticated',
+    resourceType: result.resourceType as 'image' | 'video' | 'raw',
     width: result.width,
     height: result.height,
     duration: result.duration,
@@ -102,7 +106,7 @@ export const uploadMedia = async (input: UploadInput): Promise<IMediaAsset> => {
     chatId: chatId ? new mongoose.Types.ObjectId(chatId) : undefined,
   });
 
-  logger.debug('Media uploaded', { publicId: result.public_id, userId, folder });
+  logger.debug('Media uploaded', { publicId: result.publicId, userId, folder });
   return mediaAsset;
 };
 
@@ -117,14 +121,14 @@ export const getSignedUploadParams = async (input: SignedUploadInput): Promise<{
   timestamp: number;
   apiKey: string;
   folder: string;
-  transformation?: CloudinaryTransformation;
+  transformation?: string;
 }> => {
   const { fileName, mimeType, userId, folder = 'chat_media', transformation, tags = [] } = input;
 
-  // Validate file type (basic check)
-  const validation = validateMediaFile(Buffer.from(''), mimeType, fileName);
+  // Validate file type (basic check) - using validateMediaFileUtil with a dummy file size
+  const validation = validateMediaFileUtil(fileName, mimeType, 0, 'IMAGE');
   if (!validation.valid) {
-    throw new ApiError(400, validation.error!, 'INVALID_MEDIA_FILE');
+    throw new ApiError(400, validation.error || 'Invalid media file', 'INVALID_MEDIA_FILE');
   }
 
   // Verify user
@@ -134,18 +138,23 @@ export const getSignedUploadParams = async (input: SignedUploadInput): Promise<{
   }
 
   // Generate signed upload params
-  const params = generateSignedUploadParams({
-    folder,
-    publicId: undefined,
-    transformation,
-    tags: [`user:${userId}`, ...tags],
-    context: {
-      uploadedBy: userId,
-      originalName: fileName,
-    },
-  });
+  const params = generateSignedUploadParams(folder, transformation);
 
-  return params;
+  // Generate upload URL (Cloudinary unsigned upload endpoint)
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudinary.cloudName}/auto/upload`;
+
+  // Generate a public ID for the upload
+  const publicId = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+  return {
+    uploadUrl,
+    publicId,
+    signature: params.signature,
+    timestamp: params.timestamp,
+    apiKey: params.apiKey,
+    folder: params.folder,
+    transformation: params.transformation,
+  };
 };
 
 // ============================================================================
@@ -159,9 +168,10 @@ export const confirmClientUpload = async (
   chatId?: string
 ): Promise<IMediaAsset> => {
   // Fetch resource info from Cloudinary
-  const resource = await getCloudinaryResource(publicId);
-
-  if (!resource) {
+  let resource;
+  try {
+    resource = await cloudinary.api.resource(publicId);
+  } catch {
     throw new ApiError(404, 'Media not found in Cloudinary', 'MEDIA_NOT_FOUND');
   }
 
@@ -224,7 +234,7 @@ export const moderateMedia = async (input: ModerateInput): Promise<IMediaAsset> 
 
   // If rejected, delete from Cloudinary
   if (status === 'rejected') {
-    await deleteFromCloudinary(publicId);
+    await destroyMediaAssets([publicId]);
     logger.warn('Media rejected and deleted', { publicId, reason, moderatorId });
   }
 
@@ -251,7 +261,7 @@ export const deleteMedia = async (publicId: string, userId: string): Promise<voi
   }
 
   // Delete from Cloudinary
-  await deleteFromCloudinary(publicId);
+  await destroyMediaAssets([publicId]);
 
   // Delete from database
   await MediaAsset.findByIdAndDelete(mediaAsset._id);
@@ -263,14 +273,14 @@ export const deleteMedia = async (publicId: string, userId: string): Promise<voi
 // Get Media Info
 // ============================================================================
 
-export const getMediaInfo = async (publicId: string): Promise<IMediaAsset | null> => {
-  return MediaAsset.findOne({ publicId }).lean();
+export const getMediaInfo = async (publicId: string): Promise<Record<string, unknown> | null> => {
+  return MediaAsset.findOne({ publicId }).lean() as Promise<Record<string, unknown> | null>;
 };
 
 export const getUserMedia = async (
   userId: string,
   options: { page?: number; limit?: number; folder?: string; resourceType?: 'image' | 'video' | 'raw' } = {}
-): Promise<{ assets: IMediaAsset[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean } }> => {
+): Promise<{ assets: Record<string, unknown>[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean } }> => {
   const { page = 1, limit = 20, folder, resourceType } = options;
   const skip = (page - 1) * limit;
 
@@ -288,7 +298,7 @@ export const getUserMedia = async (
   const totalPages = Math.ceil(total / limit);
 
   return {
-    assets,
+    assets: assets as Record<string, unknown>[],
     pagination: { page, limit, total, totalPages, hasNextPage: page < totalPages },
   };
 };
@@ -305,7 +315,7 @@ export const cleanupOrphanedMedia = async (): Promise<{ deleted: number; failed:
 
   for (const asset of orphanedAssets) {
     try {
-      await deleteFromCloudinary(asset.publicId);
+      await destroyMediaAssets([asset.publicId]);
       await MediaAsset.findByIdAndDelete(asset._id);
       deleted++;
       logger.debug('Orphaned media cleaned up', { publicId: asset.publicId });
@@ -324,20 +334,11 @@ export const cleanupOrphanedMedia = async (): Promise<{ deleted: number; failed:
 
 export const getTransformedUrl = (
   publicId: string,
-  transformation: CloudinaryTransformation
+  transformation: Record<string, unknown>
 ): string => {
-  // This would use Cloudinary's URL generation
-  // For now, return the base URL with transformation params
-  const baseUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`;
-  const transformParts: string[] = [];
-
-  if (transformation.width) transformParts.push(`w_${transformation.width}`);
-  if (transformation.height) transformParts.push(`h_${transformation.height}`);
-  if (transformation.crop) transformParts.push(`c_${transformation.crop}`);
-  if (transformation.gravity) transformParts.push(`g_${transformation.gravity}`);
-  if (transformation.quality) transformParts.push(`q_${transformation.quality}`);
-  if (transformation.format) transformParts.push(`f_${transformation.format}`);
-
-  const transformString = transformParts.length > 0 ? transformParts.join(',') + '/' : '';
-  return `${baseUrl}/${transformString}${publicId}`;
+  // Use Cloudinary's URL generation
+  return cloudinary.url(publicId, {
+    secure: true,
+    transformation: [transformation],
+  });
 };

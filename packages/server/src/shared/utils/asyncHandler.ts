@@ -5,11 +5,12 @@
 
 import { Request, Response, NextFunction } from 'express';
 
+// Allow handlers to return Response (for sendSuccess/sendCreated) or void
 export type AsyncHandler = (
   req: Request,
   res: Response,
   next: NextFunction
-) => Promise<void>;
+) => Promise<Response | void>;
 
 export const asyncHandler = (handler: AsyncHandler) => {
   return (req: Request, res: Response, next: NextFunction) => {

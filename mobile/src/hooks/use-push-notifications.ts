@@ -13,6 +13,14 @@ const isExpoGo =
 
 const loadNotificationsModule = async () => import("expo-notifications");
 
+/**
+ * `expo-modules-core` is not hoisted in every install layout, so the
+ * `status` field on `NotificationPermissionsStatus` may be missing from the
+ * type graph. Read it defensively without depending on that package's types.
+ */
+const readPermissionStatus = (permission: unknown): string | undefined =>
+  (permission as { status?: string } | null | undefined)?.status;
+
 const configureNotificationsAsync = async () => {
   const Notifications = await loadNotificationsModule();
 
@@ -49,11 +57,11 @@ const registerForPushNotificationsAsync = async () => {
   }
 
   const existingPermission = await Notifications.getPermissionsAsync();
-  let finalStatus = existingPermission.status;
+  let finalStatus = readPermissionStatus(existingPermission);
 
   if (finalStatus !== "granted") {
     const requestedPermission = await Notifications.requestPermissionsAsync();
-    finalStatus = requestedPermission.status;
+    finalStatus = readPermissionStatus(requestedPermission);
   }
 
   if (finalStatus !== "granted") {

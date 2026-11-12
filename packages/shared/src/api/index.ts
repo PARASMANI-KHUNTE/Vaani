@@ -3,18 +3,51 @@
  * Base class for typed API clients with retry logic, interceptors, and error handling
  */
 
-import type { ApiResponse, ApiError, PaginationParams, PaginatedResponse } from '../types';
+import type { ApiResponse, PaginationParams, PaginatedResponse } from '../types';
+
+// ============================================================================
+// Cross-platform Type Declarations
+// ============================================================================
+
+// Browser-specific type for XMLHttpRequest - only used in upload() method which runs in browser
+// Using type assertion to avoid complex DOM type declarations in shared package
+interface BrowserXMLHttpRequest {
+  open(method: string, url: string, async?: boolean, user?: string | null, password?: string | null): void;
+  send(body?: BodyInit | null): void;
+  setRequestHeader(header: string, value: string): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  status: number;
+  statusText: string;
+  responseText: string;
+  upload: {
+    addEventListener(type: 'progress', listener: (event: ProgressEvent) => void): void;
+  };
+}
+
+interface ProgressEvent extends Event {
+  lengthComputable: boolean;
+  loaded: number;
+  total: number;
+}
+
+// Use standard DOM types where available, fallback to any for cross-platform compatibility
+type BodyInit = string | FormData | Blob | ArrayBuffer | URLSearchParams | ReadableStream<Uint8Array>;
+type EventListener = (event: Event) => void;
+type EventListenerObject = { handleEvent(event: Event): void };
+type EventListenerOrEventListenerObject = EventListener | EventListenerObject;
+type AddEventListenerOptions = { capture?: boolean; once?: boolean; passive?: boolean; signal?: AbortSignal };
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface RequestOptions extends RequestInit {
+export interface RequestOptions extends Omit<RequestInit, 'body'> {
   params?: Record<string, unknown>;
   signal?: AbortSignal;
   retries?: number;
   retryDelay?: number;
   skipAuth?: boolean;
+  body?: BodyInit | object | null;
 }
 
 export interface UploadProgress {
@@ -113,7 +146,7 @@ export abstract class BaseApiClient {
       'Content-Type': 'application/json',
       ...this.defaultHeaders,
       ...headers,
-    };
+    } as Record<string, string>;
 
     if (token) {
       requestHeaders['Authorization'] = `Bearer ${token}`;
@@ -219,15 +252,15 @@ export abstract class BaseApiClient {
     return this.request<T>('GET', path, options);
   }
 
-  protected post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  protected post<T>(path: string, body?: BodyInit | object, options?: RequestOptions): Promise<T> {
     return this.request<T>('POST', path, { ...options, body });
   }
 
-  protected put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  protected put<T>(path: string, body?: BodyInit | object, options?: RequestOptions): Promise<T> {
     return this.request<T>('PUT', path, { ...options, body });
   }
 
-  protected patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  protected patch<T>(path: string, body?: BodyInit | object, options?: RequestOptions): Promise<T> {
     return this.request<T>('PATCH', path, { ...options, body });
   }
 
@@ -236,7 +269,7 @@ export abstract class BaseApiClient {
   }
 
   // ============================================================================
-  // Upload with Progress
+  // Upload with Progress (Browser only)
   // ============================================================================
 
   protected async upload<T>(
@@ -245,13 +278,22 @@ export abstract class BaseApiClient {
     onProgress?: ProgressCallback,
     options?: Omit<RequestOptions, 'body'>
   ): Promise<T> {
+    // Check if we're in a browser environment - use globalThis for cross-platform check
+    const hasXMLHttpRequest = typeof globalThis !== 'undefined' && 'XMLHttpRequest' in globalThis;
+    if (!hasXMLHttpRequest) {
+      throw new Error('Upload with progress is only supported in browser environments');
+    }
+
     const token = await this.getToken();
     const url = this.buildUrl(path);
 
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
+    // Get the XMLHttpRequest constructor from globalThis (browser only)
+    const XHRConstructor = (globalThis as { XMLHttpRequest?: new () => BrowserXMLHttpRequest }).XMLHttpRequest!;
 
-      xhr.upload.addEventListener('progress', (event) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XHRConstructor();
+
+      xhr.upload.addEventListener('progress', (event: ProgressEvent) => {
         if (event.lengthComputable && onProgress) {
           onProgress({
             loaded: event.loaded,

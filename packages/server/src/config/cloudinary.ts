@@ -95,8 +95,13 @@ export const uploadMedia = async (
     uploadOptions.transformation = transformation;
   }
 
+  // Convert Buffer to base64 data URI if needed
+  const fileToUpload = Buffer.isBuffer(file)
+    ? `data:application/octet-stream;base64,${file.toString('base64')}`
+    : file;
+
   try {
-    const result = await cloudinary.uploader.upload(file, uploadOptions);
+    const result = await cloudinary.uploader.upload(fileToUpload, uploadOptions);
 
     return {
       publicId: result.public_id,
@@ -145,12 +150,13 @@ export const generateSignedUploadParams = (
   }
 
   // Create signature using Cloudinary's internal method
-  const signature = cloudinary.utils.api_sign_request(paramsToSign, config.cloudinary.apiSecret);
+  const apiSecret = config.cloudinary.apiSecret ?? '';
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
 
   return {
     signature,
     timestamp,
-    apiKey: config.cloudinary.apiKey,
+    apiKey: config.cloudinary.apiKey ?? '',
     folder,
     transformation,
   };
@@ -245,7 +251,13 @@ export const validateMediaFile = (
   fileSize: number,
   category: keyof typeof MediaConstraints = 'IMAGE'
 ): { valid: boolean; error?: string } => {
-  const constraints = MediaConstraints[category];
+  // Type-safe access to MediaConstraints
+  type MediaConstraint = {
+    maxSize: number;
+    allowedMimeTypes: readonly string[];
+    allowedExtensions: readonly string[];
+  };
+  const constraints = MediaConstraints[category] as MediaConstraint;
 
   if (!constraints.allowedMimeTypes.includes(mimeType)) {
     return {

@@ -3,7 +3,7 @@
  * Chat creation, management, invites, settings endpoints
  */
 
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import {
   listChats,
   getChat,
@@ -40,7 +40,7 @@ import {
 } from './validators';
 import { authMiddleware } from '../../shared/middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -48,26 +48,7 @@ router.use(authMiddleware);
 // Chat listing
 router.get('/', listChats);
 
-// Create chats
-router.post('/', (req, res, next) => {
-  // Determine if it's a group or direct chat based on request body
-  const isGroup = req.body.isGroup === true;
-  if (isGroup) {
-    return createGroupChatValidator, validate, createChat;
-  } else {
-    return createDirectChatValidator, validate, createChat;
-  }
-}, (req, res, next) => {
-  // This middleware applies the correct validator based on isGroup
-  const isGroup = req.body.isGroup === true;
-  if (isGroup) {
-    return createGroupChatValidator[0](req, res, () => createGroupChatValidator[1](req, res, () => createGroupChatValidator[2](req, res, () => validate(req, res, next))));
-  } else {
-    return createDirectChatValidator[0](req, res, () => validate(req, res, next));
-  }
-}, createChat);
-
-// Better approach - separate endpoints
+// Create chats - separate endpoints
 router.post('/direct', createDirectChatValidator, validate, createChat);
 router.post('/group', createGroupChatValidator, validate, createChat);
 

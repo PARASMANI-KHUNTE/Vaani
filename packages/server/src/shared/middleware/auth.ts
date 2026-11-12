@@ -3,12 +3,13 @@
  * JWT verification and user attachment
  */
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
-import { User } from '../../modules/user/model';
+import { User, IUser } from '../../modules/user/model';
 import { ApiError } from '../../shared/utils/apiError';
 import { asyncHandler } from '../../shared/utils/asyncHandler';
+import mongoose from 'mongoose';
 
 interface JWTPayload {
   sub: string;
@@ -19,22 +20,41 @@ interface JWTPayload {
   exp: number;
 }
 
+// Type for user object attached to request (from User.findById().lean())
+interface AuthenticatedUser {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  username?: string;
+  avatar?: string;
+  tagline?: string;
+  bio?: string;
+  accountStatus: 'active' | 'disabled' | 'deleted';
+  isOnline: boolean;
+  lastSeen?: Date;
+  friends: mongoose.Types.ObjectId[];
+  friendRequests: IUser['friendRequests'];
+  blockedUsers: mongoose.Types.ObjectId[];
+  pushTokens: IUser['pushTokens'];
+  settings: IUser['settings'];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 declare global {
   namespace Express {
     interface Request {
-      user?: mongoose.Document & { _id: mongoose.Types.ObjectId; accountStatus: string; [key: string]: unknown };
+      user?: AuthenticatedUser;
       auth?: JWTPayload;
     }
   }
 }
 
-import mongoose from 'mongoose';
-
 export const authMiddleware = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Authorization token is required');
+    throw new ApiError(401, 'Authorization token is required', 'MISSING_TOKEN');
   }
 
   const token = authHeader.split(' ')[1];
@@ -44,17 +64,17 @@ export const authMiddleware = asyncHandler(async (req: Request, _res: Response, 
     decodedToken = jwt.verify(token, config.auth.jwtSecret) as JWTPayload;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      throw new ApiError(401, 'Token expired');
+      throw new ApiError(401, 'Token expired', 'TOKEN_EXPIRED');
     }
     if (error instanceof jwt.JsonWebTokenError) {
-      throw new ApiError(401, 'Invalid token');
+      throw new ApiError(401, 'Invalid token', 'INVALID_TOKEN');
     }
-    throw new ApiError(401, 'Token verification failed');
+    throw new ApiError(401, 'Token verification failed', 'TOKEN_VERIFICATION_FAILED');
   }
 
   // Check token type
   if (decodedToken.type !== 'access') {
-    throw new ApiError(401, 'Invalid token type');
+    throw new ApiError(401, 'Invalid token type', 'INVALID_TOKEN_TYPE');
   }
 
   let user;
@@ -78,11 +98,11 @@ export const authMiddleware = asyncHandler(async (req: Request, _res: Response, 
   }
 
   if (!user) {
-    throw new ApiError(401, 'Authenticated user no longer exists');
+    throw new ApiError(401, 'Authenticated user no longer exists', 'USER_NOT_FOUND');
   }
 
   if (user.accountStatus !== 'active') {
-    throw new ApiError(403, 'Account is disabled or deleted');
+    throw new ApiError(403, 'Account is disabled or deleted', 'ACCOUNT_DISABLED');
   }
 
   req.user = user;
@@ -122,15 +142,33 @@ export const optionalAuthMiddleware = asyncHandler(async (req: Request, _res: Re
 
 export const requireActiveUser = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   if (!req.user) {
-    throw new ApiError(401, 'Authentication required');
+    throw new ApiError(401, 'Authentication required', 'AUTH_REQUIRED');
   }
 
   if (req.user.accountStatus !== 'active') {
-    throw new ApiError(403, 'Account is disabled or deleted');
+    throw new ApiError(403, 'Account is disabled or deleted', 'ACCOUNT_DISABLED');
   }
 
   next();
 });
+
+// Role-based access control middleware
+export const requireRole = (...allowedRoles: string[]): RequestHandler => {
+  return asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'AUTH_REQUIRED');
+    }
+
+    // Check if user has a role property (from user model or JWT)
+    const userRole = (req.user as Record<string, unknown>).role as string | undefined;
+
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      throw new ApiError(403, 'Insufficient permissions', 'INSUFFICIENT_PERMISSIONS');
+    }
+
+    next();
+  });
+};
 
 // Export types
 export type { JWTPayload };

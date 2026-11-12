@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -14,6 +15,8 @@ import {
 import { ScreenShell } from "@/components/screen-shell";
 import { useMobileChats } from "@/hooks/use-mobile-chats";
 import { useSessionStore } from "@/store/session-store";
+import { radii, spacing, typography, type AppColors } from "@/theme/tokens";
+import { useAppTheme, useThemedStyles } from "@/theme/use-app-theme";
 import NewChatModal from "@/app/new-chat";
 
 const getPreview = (content?: string, type?: string) => {
@@ -23,6 +26,8 @@ const getPreview = (content?: string, type?: string) => {
 
   if (type === "image") return "Sent an image";
   if (type === "file") return "Sent a file";
+  if (type === "video") return "Sent a video";
+  if (type === "voice") return "Sent a voice message";
 
   return "Sent a message";
 };
@@ -53,6 +58,9 @@ export default function ChatsScreen() {
   });
   const [showNewChat, setShowNewChat] = useState(false);
   const [query, setQuery] = useState("");
+  const { colors, isTablet } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const columns = isTablet ? 2 : 1;
 
   const subtitle = useMemo(() => {
     if (isLoading && chats.length === 0) {
@@ -84,97 +92,138 @@ export default function ChatsScreen() {
       title="Chats"
       subtitle={subtitle}
       rightAction={
-        <Pressable style={styles.addButton} onPress={() => setShowNewChat(true)}>
-          <Ionicons name="add" size={24} color="#155e75" />
+        <Pressable
+          style={styles.addButton}
+          onPress={() => setShowNewChat(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Start a new chat"
+        >
+          <Ionicons name="add" size={22} color={colors.brand} />
         </Pressable>
       }
     >
       {isLoading && chats.length === 0 ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#155e75" />
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
       ) : (
         <View style={styles.stack}>
           <View style={styles.searchRow}>
-            <Ionicons name="search" size={18} color="#94a3b8" />
+            <Ionicons name="search" size={18} color={colors.faint} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Search chats..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.faint}
               style={styles.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
+              accessibilityLabel="Search chats"
             />
             {query.trim() ? (
-              <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
-                <Ionicons name="close" size={18} color="#64748b" />
+              <Pressable
+                onPress={() => setQuery("")}
+                style={styles.clearButton}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Ionicons name="close" size={16} color={colors.muted} />
               </Pressable>
             ) : null}
           </View>
 
           <FlatList
+            key={`chats-${columns}`}
             data={filteredChats}
-          keyExtractor={(item) => item._id}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => void refresh()} />}
-            contentContainerStyle={filteredChats.length === 0 ? styles.emptyContent : styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>{query.trim() ? "No matches" : "No chats yet"}</Text>
-              <Text style={styles.emptyBody}>
+            numColumns={columns}
+            columnWrapperStyle={columns > 1 ? styles.column : undefined}
+            keyExtractor={(item) => item._id}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={() => void refresh()}
+                tintColor={colors.brand}
+                colors={[colors.brand]}
+              />
+            }
+            contentContainerStyle={
+              filteredChats.length === 0 ? styles.emptyContent : styles.listContent
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="chatbubbles-outline" size={30} color={colors.faint} />
+                </View>
+                <Text style={styles.emptyTitle}>
+                  {query.trim() ? "No matches" : "No chats yet"}
+                </Text>
+                <Text style={styles.emptyBody}>
                   {query.trim()
                     ? "Try a different search."
                     : "Start a new conversation by tapping the + button above."}
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => {
-            const isGroup = item.isGroup;
-            const displayName = isGroup ? item.groupName || "Group" : item.otherParticipant?.name || "Unknown";
-            const avatarInitial = isGroup ? (item.groupName?.charAt(0) || "G") : (item.otherParticipant?.name?.charAt(0) || "?");
-            const avatarColor = isGroup ? "#0f172a" : "#cffafe";
-            const textColor = isGroup ? "#fff" : "#155e75";
+                </Text>
+              </View>
+            }
+            renderItem={({ item }) => {
+              const isGroup = item.isGroup;
+              const displayName = isGroup
+                ? item.groupName || "Group"
+                : item.otherParticipant?.name || "Unknown";
+              const avatarInitial = isGroup
+                ? item.groupName?.charAt(0) || "G"
+                : item.otherParticipant?.name?.charAt(0) || "?";
+              const avatarUrl = isGroup ? item.groupAvatar : item.otherParticipant?.avatar;
 
-            return (
-              <Pressable
-                style={styles.chatCard}
-                onPress={() => router.push(`/chat/${item._id}`)}
-                onLongPress={() => {
-                  if (isGroup) {
-                    // @ts-expect-error - group-info is a modal route
-                    router.push("/group-info?chatId=" + item._id);
-                  }
-                }}
-              >
-                <View style={[styles.avatar, isGroup && styles.groupAvatar, { backgroundColor: avatarColor }]}>
-                  <Text style={[styles.avatarText, { color: textColor }]}>
-                    {avatarInitial.toUpperCase()}
-                  </Text>
-                  {isGroup && <View style={styles.groupBadge}><Ionicons name="people" size={12} color="#fff" /></View>}
-                </View>
-                <View style={styles.chatMeta}>
-                  <View style={styles.chatHeader}>
-                    <Text style={styles.chatName} numberOfLines={1}>
-                      {displayName}
-                    </Text>
-                    <Text style={styles.chatTime}>
-                      {formatChatTime(item.lastMessage?.createdAt)}
-                    </Text>
-                  </View>
-                  <View style={styles.chatPreviewRow}>
-                    <Text style={styles.chatPreview} numberOfLines={2}>
-                      {getPreview(item.lastMessage?.content, item.lastMessage?.type)}
-                    </Text>
-                    {item.unreadCount > 0 ? (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
+              return (
+                <Pressable
+                  style={({ pressed }) => [styles.chatCard, pressed && styles.chatCardPressed]}
+                  onPress={() => router.push(`/chat/${item._id}`)}
+                  onLongPress={() => {
+                    if (isGroup) {
+                      // @ts-expect-error - group-info is a modal route
+                      router.push("/group-info?chatId=" + item._id);
+                    }
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open chat with ${displayName}`}
+                >
+                  <View style={styles.avatar}>
+                    {avatarUrl ? (
+                      <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.avatarText}>{avatarInitial.toUpperCase()}</Text>
+                    )}
+                    {isGroup && (
+                      <View style={styles.groupBadge}>
+                        <Ionicons name="people" size={11} color={colors.onBrand} />
                       </View>
-                    ) : null}
+                    )}
                   </View>
-                </View>
-              </Pressable>
-            );
-          }}
+                  <View style={styles.chatMeta}>
+                    <View style={styles.chatHeader}>
+                      <Text style={styles.chatName} numberOfLines={1}>
+                        {displayName}
+                      </Text>
+                      <Text style={styles.chatTime}>
+                        {formatChatTime(item.lastMessage?.createdAt)}
+                      </Text>
+                    </View>
+                    <View style={styles.chatPreviewRow}>
+                      <Text style={styles.chatPreview} numberOfLines={1}>
+                        {getPreview(item.lastMessage?.content, item.lastMessage?.type)}
+                      </Text>
+                      {item.unreadCount > 0 ? (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>
+                            {item.unreadCount > 99 ? "99+" : item.unreadCount}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            }}
           />
         </View>
       )}
@@ -183,155 +232,179 @@ export default function ChatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  stack: { flex: 1, gap: 14 },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#e0f2fe",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  centerState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#dbe4ef",
-    backgroundColor: "#fffdf8",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#0f172a",
-  },
-  clearButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f1f5f9",
-  },
-  listContent: {
-    paddingBottom: 24,
-    gap: 12,
-  },
-  emptyContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  emptyCard: {
-    borderRadius: 28,
-    backgroundColor: "#fffdf8",
-    padding: 20,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  emptyBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#64748b",
-  },
-  chatCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderRadius: 24,
-    backgroundColor: "#fffdf8",
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#0f172a",
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
-  },
-  avatar: {
-    height: 52,
-    width: 52,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  groupAvatar: {
-    backgroundColor: "#0f172a",
-  },
-  avatarText: {
-    color: "#155e75",
-    fontWeight: "800",
-    fontSize: 20,
-  },
-  groupBadge: {
-    position: "absolute",
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#155e75",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fffdf8",
-  },
-  chatMeta: {
-    flex: 1,
-    gap: 6,
-  },
-  chatHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  chatName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  chatTime: {
-    fontSize: 12,
-    color: "#94a3b8",
-    fontWeight: "600",
-  },
-  chatPreviewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  chatPreview: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: "#64748b",
-  },
-  badge: {
-    minWidth: 24,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignItems: "center",
-    backgroundColor: "#155e75",
-  },
-  badgeText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-});
+const createStyles = (c: AppColors) =>
+  StyleSheet.create({
+    stack: { flex: 1, gap: spacing.sm },
+    addButton: {
+      width: 42,
+      height: 42,
+      borderRadius: radii.md,
+      backgroundColor: c.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    centerState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 11,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: c.fg,
+      paddingVertical: 0,
+    },
+    clearButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.subtle,
+    },
+    listContent: {
+      paddingBottom: spacing.xl,
+    },
+    emptyContent: {
+      flexGrow: 1,
+      justifyContent: "center",
+    },
+    column: {
+      gap: spacing.sm,
+    },
+    emptyCard: {
+      borderRadius: radii.xxl,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: spacing.xl,
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    emptyIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: radii.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.subtle,
+      marginBottom: 2,
+    },
+    emptyTitle: {
+      ...typography.h3,
+      color: c.fg,
+    },
+    emptyBody: {
+      ...typography.small,
+      color: c.muted,
+      textAlign: "center",
+    },
+    chatCard: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+      padding: 14,
+      marginBottom: spacing.sm,
+    },
+    chatCardPressed: {
+      backgroundColor: c.subtle,
+    },
+    avatar: {
+      height: 50,
+      width: 50,
+      borderRadius: radii.md,
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+      backgroundColor: c.brandSoft,
+      overflow: "visible",
+    },
+    avatarImage: {
+      height: 50,
+      width: 50,
+      borderRadius: radii.md,
+    },
+    avatarText: {
+      color: c.brand,
+      fontWeight: "800",
+      fontSize: 19,
+    },
+    groupBadge: {
+      position: "absolute",
+      bottom: -3,
+      right: -3,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: c.brand,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: c.surface,
+    },
+    chatMeta: {
+      flex: 1,
+      gap: 5,
+      minWidth: 0,
+    },
+    chatHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.xs,
+    },
+    chatName: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: "700",
+      color: c.fg,
+      letterSpacing: -0.2,
+    },
+    chatTime: {
+      fontSize: 11,
+      color: c.faint,
+      fontWeight: "600",
+    },
+    chatPreviewRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    chatPreview: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: c.muted,
+    },
+    badge: {
+      minWidth: 22,
+      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      alignItems: "center",
+      backgroundColor: c.brand,
+    },
+    badgeText: {
+      color: c.onBrand,
+      fontSize: 10,
+      fontWeight: "700",
+    },
+  });

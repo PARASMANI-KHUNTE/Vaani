@@ -1,12 +1,12 @@
-# Canvas Chat Mobile
+# LinkUp Mobile
 
-The Canvas Chat mobile application built with React Native and Expo.
+The LinkUp mobile application built with React Native and Expo.
 
 ---
 
 ## Overview
 
-This is the mobile client for Canvas Chat — a real-time communication platform. The app provides native mobile access to all Canvas Chat features including messaging, media sharing, and audio/video calling.
+This is the mobile client for LinkUp — a real-time communication platform. The app provides native mobile access to all LinkUp features including messaging, media sharing, and audio/video calling.
 
 **Status:** In active development
 
@@ -173,7 +173,7 @@ The app uses the `canvaschat://` scheme for deep links:
 
 ## Learn More
 
-- [Canvas Chat Root README](../README.md) — Project overview and backend setup
+- [LinkUp Root README](../README.md) — Project overview and backend setup
 - [Expo Documentation](https://docs.expo.dev/)
 - [React Native Documentation](https://reactnative.dev/)
 - [EAS Documentation](https://docs.expo.dev/eas/)

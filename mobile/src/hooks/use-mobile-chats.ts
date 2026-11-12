@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getMobileChats } from "@/lib/api/client";
 import { useChatStore } from "@/store/chat-store";
 
@@ -12,7 +12,7 @@ export const useMobileChats = ({ token }: UseMobileChatsParams) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadChats = async () => {
+  const loadChats = useCallback(async () => {
     if (!token) {
       setChats([]);
       return;
@@ -28,11 +28,11 @@ export const useMobileChats = ({ token }: UseMobileChatsParams) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [setChats, token]);
 
   useEffect(() => {
     void loadChats();
-  }, [token]);
+  }, [loadChats]);
 
   return {
     chats,

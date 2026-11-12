@@ -9,11 +9,10 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import { config } from '../../config';
 import { getRedisClient, isRedisEnabled } from '../../config/redis';
 import { logger } from '../../shared/utils/logger';
-import { SocketEvents } from '@chat-app/shared/constants';
 import { verifySocketToken } from '../../shared/middleware/socketAuth';
-import { socketHandlers } from '../../modules/socket/handlers';
-import { presenceService } from '../../modules/socket/presence';
-import { notificationService } from '../../modules/socket/notifications';
+import { registerSocketHandlers } from '../../modules/socket/handlers';
+import { socketEmitters as newSocketEmitters } from '../../modules/socket/service';
+import { SocketEvents } from '@chat-app/shared/constants';
 
 let io: SocketIOServer | null = null;
 
@@ -53,28 +52,8 @@ export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
   // Authentication middleware
   io.use(verifySocketToken);
 
-  // Connection handling
-  io.on('connection', (socket: Socket) => {
-    const userId = socket.data.userId;
-    logger.debug('Socket connected', { socketId: socket.id, userId });
-
-    // Register socket with presence service
-    presenceService.addSocket(userId, socket);
-
-    // Register event handlers
-    socketHandlers(io, socket);
-
-    // Handle disconnection
-    socket.on('disconnect', (reason) => {
-      logger.debug('Socket disconnected', { socketId: socket.id, userId, reason });
-      presenceService.removeSocket(userId, socket);
-    });
-
-    // Error handling
-    socket.on('error', (error) => {
-      logger.error('Socket error', { socketId: socket.id, userId, error: error.message });
-    });
-  });
+  // Register event handlers
+  registerSocketHandlers(io);
 
   // Global error handler
   io.engine.on('connection_error', (err) => {
@@ -114,9 +93,6 @@ export const emitToChat = (chatId: string, event: string, data: unknown, exclude
   }
 };
 
-emitToChat('chat-123', 'test', { hello: 'world' });
-// Note: The above line was incorrectly placed here and should be removed
-
 export const emitToRoom = (room: string, event: string, data: unknown): void => {
   if (!io) return;
   io.to(room).emit(event, data);
@@ -134,104 +110,7 @@ export const broadcast = (event: string, data: unknown): void => {
 export { SocketEvents };
 
 // ============================================================================
-// Typed Event Emitters
+// Typed Event Emitters (re-exported from socket module)
 // ============================================================================
 
-export const socketEmitters = {
-  // Message events
-  newMessage: (chatId: string, message: unknown, clientTempId?: string) => {
-    emitToChat(chatId, SocketEvents.NEW_MESSAGE, { message, chat: { _id: chatId }, clientTempId });
-  },
-
-  messageDelivered: (chatId: string, messageId: string, userId: string) => {
-    emitToChat(chatId, SocketEvents.MESSAGE_DELIVERED, { messageId, chatId, userId });
-  },
-
-  messageSeen: (chatId: string, messageId: string, userId: string) => {
-    emitToChat(chatId, SocketEvents.MESSAGE_SEEN, { messageId, chatId, userId });
-  },
-
-  messageDeleted: (chatId: string, messageId: string, scope: 'me' | 'everyone', message?: unknown) => {
-    emitToChat(chatId, SocketEvents.MESSAGE_DELETED, { messageId, chatId, scope, message });
-  },
-
-  messageEdited: (message: unknown) => {
-    const chatId = (message as { chatId: string }).chatId;
-    emitToChat(chatId, SocketEvents.MESSAGE_EDITED, { message });
-  },
-
-  // Chat events
-  chatUpdated: (chat: unknown) => {
-    const chatId = (chat as { _id: string })._id;
-    emitToChat(chatId, SocketEvents.CHAT_UPDATED, { chat });
-  },
-
-  chatRemoved: (chatId: string) => {
-    emitToChat(chatId, SocketEvents.CHAT_REMOVED, { chatId });
-  },
-
-  chatCreated: (chat: unknown) => {
-    const chatId = (chat as { _id: string })._id;
-    emitToChat(chatId, SocketEvents.CHAT_CREATED, { chat });
-  },
-
-  // Presence events
-  userOnline: (userId: string) => {
-    broadcast(SocketEvents.USER_ONLINE, { userId });
-  },
-
-  userOffline: (userId: string) => {
-    broadcast(SocketEvents.USER_OFFLINE, { userId });
-  },
-
-  presenceSync: (onlineUserIds: string[]) => {
-    broadcast(SocketEvents.PRESENCE_SYNC, { onlineUserIds });
-  },
-
-  // Typing events
-  typingStart: (chatId: string, userId: string, userName: string) => {
-    emitToChat(chatId, SocketEvents.TYPING_START, { chatId, userId, userName }, userId);
-  },
-
-  typingStop: (chatId: string, userId: string) => {
-    emitToChat(chatId, SocketEvents.TYPING_STOP, { chatId, userId }, userId);
-  },
-
-  // Reaction events
-  reactionAdded: (message: unknown, userId: string, userName: string, emoji: string) => {
-    const chatId = (message as { chatId: string }).chatId;
-    emitToChat(chatId, SocketEvents.REACTION_ADDED, { message, userId, userName, emoji });
-  },
-
-  reactionRemoved: (message: unknown, userId: string, emoji: string) => {
-    const chatId = (message as { chatId: string }).chatId;
-    emitToChat(chatId, SocketEvents.REACTION_REMOVED, { message, userId, emoji });
-  },
-
-  // Friend events
-  friendRequestReceived: (notification: unknown) => {
-    const userId = (notification as { toUser: string }).toUser;
-    emitToUser(userId, SocketEvents.FRIEND_REQUEST_RECEIVED, notification);
-  },
-
-  friendRequestAccepted: (notification: unknown) => {
-    const userId = (notification as { fromUser: string }).fromUser;
-    emitToUser(userId, SocketEvents.FRIEND_REQUEST_ACCEPTED, notification);
-  },
-
-  friendRequestRejected: (notification: unknown) => {
-    const userId = (notification as { fromUser: string }).fromUser;
-    emitToUser(userId, SocketEvents.FRIEND_REQUEST_REJECTED, notification);
-  },
-
-  // Group events
-  memberAddedToGroup: (chatId: string, userId: string, userName: string) => {
-    emitToChat(chatId, SocketEvents.MEMBER_ADDED_TO_GROUP, { chatId, userId, userName });
-  },
-
-  // Error
-  socketError: (socketId: string, code: string, message: string) => {
-    if (!io) return;
-    io.to(socketId).emit(SocketEvents.SOCKET_ERROR, { code, message, timestamp: new Date().toISOString() });
-  },
-};
+export const socketEmitters = newSocketEmitters;

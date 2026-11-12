@@ -606,6 +606,7 @@ export const ChatWindow = ({
     <section className={cn("relative flex h-full flex-col overflow-hidden bg-canvas", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}>
       {/* Compact Header - 56px mobile */}
       <header className="relative z-30 shrink-0 border-b border-line bg-surface/80 backdrop-blur-md">
+        <div className="relative mx-auto w-full max-w-3xl">
         {/* Mobile Header */}
         <div className="flex h-14 items-center px-2 sm:px-4">
           {/* Left: Back + Avatar */}
@@ -787,6 +788,7 @@ export const ChatWindow = ({
             </>
           )}
         </AnimatePresence>
+        </div>
       </header>
 
       {/* Messages Area */}
@@ -800,7 +802,7 @@ export const ChatWindow = ({
             <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-line border-t-brand" />
           </div>
         ) : (
-          <div className="space-y-1 sm:space-y-0.5">
+          <div className="mx-auto w-full max-w-3xl space-y-1 sm:space-y-0.5">
             {groupedMessages.map(({ message, isGroupStart, isGroupEnd, groupedMedia }, index) => {
               const prev = index > 0 ? groupedMessages[index - 1].message : null;
               const showDate = !prev || formatDateSeparator(message.createdAt) !== formatDateSeparator(prev.createdAt);
@@ -847,6 +849,7 @@ export const ChatWindow = ({
 
       {/* Input Bar - Sticky Bottom */}
       <footer className="shrink-0 border-t border-line bg-surface/85 px-2.5 pb-2.5 pt-2 backdrop-blur-md sm:px-4 sm:pb-4">
+        <div className="mx-auto w-full max-w-3xl">
         {/* Voice-to-Text Dictating Banner */}
         <AnimatePresence>
           {isSpeechListening && (
@@ -1283,6 +1286,7 @@ export const ChatWindow = ({
               <Mic className="h-5 w-5" />
             </button>
           )}
+        </div>
         </div>
       </footer>
 

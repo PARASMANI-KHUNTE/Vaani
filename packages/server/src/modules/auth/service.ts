@@ -6,6 +6,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { config } from '../../config';
 import { User } from '../user/model';
 import { findOrCreateUser } from '../user/service';
@@ -28,7 +29,7 @@ const googleClient = new OAuth2Client();
 // Token Creation
 // ============================================================================
 
-const createAccessToken = (user: { _id: string; email: string }): string => {
+const createAccessToken = (user: { _id: mongoose.Types.ObjectId | string; email: string }): string => {
   return jwt.sign(
     {
       sub: user._id.toString(),
@@ -37,12 +38,12 @@ const createAccessToken = (user: { _id: string; email: string }): string => {
     },
     config.auth.jwtSecret,
     {
-      expiresIn: config.auth.jwtExpiresIn,
+      expiresIn: config.auth.jwtExpiresIn as jwt.SignOptions['expiresIn'],
     }
   );
 };
 
-const createRefreshToken = async (user: { _id: string }): Promise<{ token: string; jti: string }> => {
+const createRefreshToken = async (user: { _id: mongoose.Types.ObjectId | string }): Promise<{ token: string; jti: string }> => {
   const jti = crypto.randomBytes(64).toString('hex');
   const token = jwt.sign(
     {
@@ -52,7 +53,7 @@ const createRefreshToken = async (user: { _id: string }): Promise<{ token: strin
     },
     config.auth.jwtRefreshSecret,
     {
-      expiresIn: config.auth.jwtRefreshExpiresIn,
+      expiresIn: config.auth.jwtRefreshExpiresIn as jwt.SignOptions['expiresIn'],
     }
   );
 
@@ -203,12 +204,13 @@ export const verifyMobileAuthCode = async (code: string): Promise<string | null>
   if (!redis || !('get' in redis)) return null;
 
   const userId = await redis.get(`${MOBILE_AUTH_CODE_PREFIX}${code}`);
-  if (userId) {
+  const userIdStr = userId as string | null;
+  if (userIdStr) {
     // Delete the code after use (one-time use)
     if ('del' in redis) {
       await redis.del(`${MOBILE_AUTH_CODE_PREFIX}${code}`);
     }
-    return userId;
+    return userIdStr;
   }
 
   return null;
@@ -245,7 +247,7 @@ export const refreshAccessToken = async (refreshToken: string): Promise<{ access
     throw new ApiError(401, 'User not found or inactive', 'USER_INACTIVE');
   }
 
-  const accessToken = createAccessToken(user);
+  const accessToken = createAccessToken({ _id: user._id.toString(), email: user.email });
   return { accessToken };
 };
 

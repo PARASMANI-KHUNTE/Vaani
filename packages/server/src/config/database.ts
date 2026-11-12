@@ -83,7 +83,9 @@ export const isTransactionSupported = (): boolean => {
   const state = mongoose.connection.readyState;
   if (state !== 1) return false;
 
-  const topologyType = mongoose.connection.getClient()?.topology?.description?.type;
+  const client = mongoose.connection.getClient();
+  // Handle different mongoose/mongodb driver versions
+  const topologyType = (client as { topology?: { description?: { type?: string } } }).topology?.description?.type;
   // Transactions are only allowed on Replica Sets or Sharded (mongos) clusters.
   // A standalone instance will have the type 'Single'.
   return topologyType !== undefined && topologyType !== 'Single' && topologyType !== 'Unknown';

@@ -18,7 +18,7 @@ export interface IChatParticipant {
   userState?: IUserChatState;
 }
 
-export interface IUserChatState extends UserChatState {
+export interface IUserChatState extends Omit<UserChatState, 'clearedAt' | 'archivedAt' | 'pinnedAt' | 'mutedUntil'> {
   clearedAt?: Date;
   hidden?: boolean;
   manualUnread?: boolean;
@@ -37,9 +37,10 @@ export interface IChatSettings extends ChatSettings {
   };
 }
 
-export interface IGroupInviteLink extends GroupInviteLink {
+export interface IGroupInviteLink extends Omit<GroupInviteLink, 'expiresAt' | 'createdBy'> {
   _id: mongoose.Types.ObjectId;
   chatId: mongoose.Types.ObjectId;
+  expiresAt: Date;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
 }
@@ -57,6 +58,7 @@ export interface IChat extends Document {
   unreadCount?: number;
   inviteLink?: IGroupInviteLink;
   settings: IChatSettings;
+  [key: string]: unknown;
   createdAt: Date;
   updatedAt: Date;
 
@@ -69,6 +71,20 @@ export interface IChat extends Document {
   canUserManage(userId: mongoose.Types.ObjectId): boolean;
   updateUserState(userId: mongoose.Types.ObjectId, state: Partial<IUserChatState>): Promise<IChat>;
   getUserState(userId: mongoose.Types.ObjectId): IUserChatState | undefined;
+}
+
+export interface IChatModel extends mongoose.Model<IChat> {
+  findUserChats(
+    userId: mongoose.Types.ObjectId,
+    options?: { limit?: number; offset?: number; includeHidden?: boolean }
+  ): Promise<IChat[]>;
+  findDirectChat(
+    userId1: mongoose.Types.ObjectId,
+    userId2: mongoose.Types.ObjectId
+  ): Promise<IChat | null>;
+  getChatWithParticipants(
+    chatId: mongoose.Types.ObjectId
+  ): Promise<IChat | null>;
 }
 
 // ============================================================================
@@ -262,6 +278,6 @@ ChatSchema.statics.getChatWithParticipants = async function (chatId: mongoose.Ty
 // Model Export
 // ============================================================================
 
-export const Chat = mongoose.model<IChat>('Chat', ChatSchema);
+export const Chat = mongoose.model<IChat, IChatModel>('Chat', ChatSchema);
 export const GroupInvite = mongoose.model<IGroupInviteLink>('GroupInvite', GroupInviteLinkSchema);
 export default Chat;

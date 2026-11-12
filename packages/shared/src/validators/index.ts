@@ -7,11 +7,15 @@ import { z } from 'zod';
 import {
   Patterns,
   Limits,
+  PaginationDefaults,
   MediaConstraints,
   MessageType,
   DeleteScope,
   ChatType,
 } from '../constants';
+
+// Type for MediaConstraints keys - exported for consumers
+export type MediaCategory = keyof typeof MediaConstraints;
 
 // ============================================================================
 // Base Schemas
@@ -94,7 +98,7 @@ export const PushTokenSchema = z.object({
 
 export const SearchUsersSchema = z.object({
   q: z.string().min(1).max(100),
-  limit: z.coerce.number().int().positive().max(Limits.USERS_SEARCH_LIMIT).default(Limits.USERS_SEARCH_LIMIT),
+  limit: z.coerce.number().int().positive().max(PaginationDefaults.USERS_SEARCH_LIMIT).default(PaginationDefaults.USERS_SEARCH_LIMIT),
 });
 
 // ============================================================================
@@ -199,7 +203,7 @@ export const ReactionSchema = z.object({
 export const GetMessagesSchema = z.object({
   chatId: ObjectIdSchema,
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(Limits.MESSAGES_MAX_LIMIT).default(Limits.MESSAGES_LIMIT),
+  limit: z.coerce.number().int().positive().max(PaginationDefaults.MESSAGES_MAX_LIMIT).default(PaginationDefaults.MESSAGES_LIMIT),
 });
 
 // ============================================================================
@@ -281,8 +285,20 @@ export const HealthCheckSchema = z.object({
 // Validation Helpers
 // ============================================================================
 
-export function validateMediaFile(file: File, category: keyof typeof MediaConstraints): { valid: boolean; error?: string } {
-  const constraints = MediaConstraints[category];
+// Type for individual media constraint
+type MediaConstraint = {
+  maxSize: number;
+  allowedMimeTypes: readonly string[];
+  allowedExtensions: readonly string[];
+};
+
+// Helper to get constraints with proper typing
+function getConstraints(category: MediaCategory): MediaConstraint {
+  return MediaConstraints[category] as MediaConstraint;
+}
+
+export function validateMediaFile(file: File, category: MediaCategory): { valid: boolean; error?: string } {
+  const constraints = getConstraints(category);
 
   if (!constraints.allowedMimeTypes.includes(file.type)) {
     return {
@@ -314,9 +330,9 @@ export function validateMediaBuffer(
   buffer: Buffer,
   mimeType: string,
   fileName: string,
-  category: keyof typeof MediaConstraints
+  category: MediaCategory
 ): { valid: boolean; error?: string } {
-  const constraints = MediaConstraints[category];
+  const constraints = getConstraints(category);
 
   if (!constraints.allowedMimeTypes.includes(mimeType)) {
     return {
@@ -344,28 +360,8 @@ export function validateMediaBuffer(
   return { valid: true };
 }
 
-// Magic bytes validation for additional security
-export const MagicBytes: Record<string, number[][]> = {
-  'image/jpeg': [[0xff, 0xd8, 0xff]],
-  'image/png': [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
-  'image/webp': [[0x52, 0x49, 0x46, 0x46], [0x57, 0x45, 0x42, 0x50]], // RIFF....WEBP
-  'image/gif': [[0x47, 0x49, 0x46, 0x38, 0x37, 0x61], [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]], // GIF87a / GIF89a
-  'video/mp4': [[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70], [0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70]], // ftyp
-  'video/webm': [[0x1a, 0x45, 0xdf, 0xa3]], // EBML
-  'audio/mpeg': [[0xff, 0xfb], [0xff, 0xf3], [0x49, 0x44, 0x33]], // MP3 / ID3
-  'audio/ogg': [[0x4f, 0x67, 0x67, 0x53]], // OggS
-  'audio/wav': [[0x52, 0x49, 0x46, 0x46], [0x57, 0x41, 0x56, 0x45]], // RIFF....WAVE
-  'application/pdf': [[0x25, 0x50, 0x44, 0x46]], // %PDF
-};
-
-export function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
-  const signatures = MagicBytes[mimeType];
-  if (!signatures) return true; // Unknown type, skip validation
-
-  return signatures.some((sig) =>
-    sig.every((byte, index) => buffer[index] === byte)
-  );
-}
+// Magic bytes validation for additional security (re-exported from constants)
+export { MagicBytes, validateMagicBytes } from '../constants';
 
 // ============================================================================
 // Type Exports (inferred from schemas)

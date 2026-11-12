@@ -18,26 +18,26 @@ export const softDeletePlugin = (schema: mongoose.Schema) => {
   });
 
   // Add deletedAt to queries by default
-  schema.pre(/^find/, function () {
+  schema.pre(/^find/, function (this: mongoose.Query<unknown, unknown>) {
     if (!this.getOptions().includeDeleted) {
       this.where({ deletedAt: null });
     }
   });
 
   // Instance method for soft delete
-  schema.methods.softDelete = async function (deletedBy?: mongoose.Types.ObjectId) {
+  schema.methods.softDelete = async function (this: any, deletedBy?: mongoose.Types.ObjectId) {
     this.deletedAt = new Date();
     this.deletedBy = deletedBy || null;
     return this.save();
   };
 
   // Static method for soft delete
-  schema.statics.softDelete = async function (filter: Record<string, unknown>, deletedBy?: mongoose.Types.ObjectId) {
+  schema.statics.softDelete = async function (this: any, filter: Record<string, unknown>, deletedBy?: mongoose.Types.ObjectId) {
     return this.updateMany(filter, { deletedAt: new Date(), deletedBy: deletedBy || null });
   };
 
   // Static method for restore
-  schema.statics.restore = async function (filter: Record<string, unknown>) {
+  schema.statics.restore = async function (this: any, filter: Record<string, unknown>) {
     return this.updateMany(filter, { deletedAt: null, deletedBy: null });
   };
 };
@@ -79,7 +79,7 @@ export const jsonTransformPlugin = (schema: mongoose.Schema) => {
 export const createBaseSchema = <T extends Record<string, unknown>>(
   definition: mongoose.SchemaDefinition<T>,
   options: mongoose.SchemaOptions = {}
-): mongoose.Schema<T> => {
+): any => {
   const schema = new mongoose.Schema(definition, {
     ...options,
     timestamps: true,
@@ -238,3 +238,6 @@ export const getConnectionState = (): string => {
 };
 
 export const isConnected = (): boolean => mongoose.connection.readyState === 1;
+
+// Re-export transaction helpers from database config
+export { isTransactionSupported, withTransaction } from '../../config/database';

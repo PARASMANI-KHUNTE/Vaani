@@ -52,11 +52,43 @@ export const SocketEvents = {
   FRIEND_REQUEST_ACCEPTED: 'FRIEND_REQUEST_ACCEPTED',
   FRIEND_REQUEST_REJECTED: 'FRIEND_REQUEST_REJECTED',
   MEMBER_ADDED_TO_GROUP: 'MEMBER_ADDED_TO_GROUP',
+  MEMBER_ADDED_TO_GROUP_LOCAL: 'MEMBER_ADDED_TO_GROUP_LOCAL',
   SOCKET_ERROR: 'SOCKET_ERROR',
   ONLINE_USERS_LIST: 'ONLINE_USERS_LIST',
 } as const;
 
 export type SocketEventName = typeof SocketEvents[keyof typeof SocketEvents];
+
+// ============================================================================
+// Message/Chat Types
+// ============================================================================
+
+export const MessageType = {
+  TEXT: 'text',
+  IMAGE: 'image',
+  VIDEO: 'video',
+  AUDIO: 'audio',
+  FILE: 'file',
+  SYSTEM: 'system',
+  LOCATION: 'location',
+  CONTACT: 'contact',
+} as const;
+
+export type MessageTypeValue = typeof MessageType[keyof typeof MessageType];
+
+export const DeleteScope = {
+  ME: 'me',
+  EVERYONE: 'everyone',
+} as const;
+
+export type DeleteScopeValue = typeof DeleteScope[keyof typeof DeleteScope];
+
+export const ChatType = {
+  DIRECT: 'direct',
+  GROUP: 'group',
+} as const;
+
+export type ChatTypeValue = typeof ChatType[keyof typeof ChatType];
 
 // Client-to-server events (for validation)
 export const ClientSocketEvents = [
@@ -105,6 +137,7 @@ export const ServerSocketEvents = [
   SocketEvents.FRIEND_REQUEST_ACCEPTED,
   SocketEvents.FRIEND_REQUEST_REJECTED,
   SocketEvents.MEMBER_ADDED_TO_GROUP,
+  SocketEvents.MEMBER_ADDED_TO_GROUP_LOCAL,
   SocketEvents.SOCKET_ERROR,
   SocketEvents.ONLINE_USERS_LIST,
 ] as const;
@@ -448,3 +481,26 @@ export const Patterns = {
   OBJECT_ID: /^[0-9a-fA-F]{24}$/,
   UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
 } as const;
+
+// Magic Bytes for file type validation
+export const MagicBytes: Record<string, number[][]> = {
+  'image/jpeg': [[0xff, 0xd8, 0xff]],
+  'image/png': [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+  'image/webp': [[0x52, 0x49, 0x46, 0x46], [0x57, 0x45, 0x42, 0x50]], // RIFF....WEBP
+  'image/gif': [[0x47, 0x49, 0x46, 0x38, 0x37, 0x61], [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]], // GIF87a / GIF89a
+  'video/mp4': [[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70], [0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70]], // ftyp
+  'video/webm': [[0x1a, 0x45, 0xdf, 0xa3]], // EBML
+  'audio/mpeg': [[0xff, 0xfb], [0xff, 0xf3], [0x49, 0x44, 0x33]], // MP3 / ID3
+  'audio/ogg': [[0x4f, 0x67, 0x67, 0x53]], // OggS
+  'audio/wav': [[0x52, 0x49, 0x46, 0x46], [0x57, 0x41, 0x56, 0x45]], // RIFF....WAVE
+  'application/pdf': [[0x25, 0x50, 0x44, 0x46]], // %PDF
+};
+
+export function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
+  const signatures = MagicBytes[mimeType as keyof typeof MagicBytes];
+  if (!signatures) return true; // Unknown type, skip validation
+
+  return signatures.some((sig) =>
+    sig.every((byte, index) => buffer[index] === byte)
+  );
+}

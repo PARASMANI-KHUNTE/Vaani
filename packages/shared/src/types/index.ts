@@ -349,10 +349,12 @@ export interface FriendRequestNotification {
 // Notification Types
 // ============================================================================
 
+export type NotificationType = 'message' | 'reaction' | 'friend_request' | 'friend_accepted' | 'friend_rejected' | 'group_invite' | 'mention' | 'system';
+
 export interface InAppNotification extends BaseEntity {
   _id: string;
   userId: string;
-  type: 'message' | 'reaction' | 'friend_request' | 'friend_accepted' | 'friend_rejected' | 'group_invite' | 'mention' | 'system';
+  type: NotificationType;
   title: string;
   body: string;
   data?: Record<string, unknown>;
@@ -362,7 +364,6 @@ export interface InAppNotification extends BaseEntity {
 }
 
 export interface PushNotificationPayload {
-  to: string[];
   title: string;
   body: string;
   data?: Record<string, unknown>;
@@ -510,4 +511,15 @@ export interface MetricsData {
   activeConnections: number;
   activeUsers: number;
   messagesPerMinute: number;
+}
+
+// ============================================================================
+// API Error Type
+// ============================================================================
+
+export interface ApiError {
+  status: number;
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
 }

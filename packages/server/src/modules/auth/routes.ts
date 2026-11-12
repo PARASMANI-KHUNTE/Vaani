@@ -3,12 +3,12 @@
  * Authentication endpoints
  */
 
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import { googleLogin, refreshToken, logoutUser, getMe, issueMobileAuthCode, redeemMobileAuthCode } from './controller';
 import { googleLoginValidator, refreshTokenValidator, mobileAuthCodeValidator, validate } from './validators';
 import { authMiddleware } from '../../shared/middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 // Public routes
 router.post('/login', googleLoginValidator, validate, googleLogin);

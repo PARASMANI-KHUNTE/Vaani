@@ -5,6 +5,7 @@
 
 import mongoose, { ClientSession } from 'mongoose';
 import { Chat, IChat, GroupInvite, IChatParticipant } from './model';
+import { SystemEventData } from '@chat-app/shared/types';
 import { Message } from '../message/model';
 import { User } from '../user/model';
 import { ApiError } from '../../shared/utils/apiError';
@@ -13,7 +14,16 @@ import { Limits } from '@chat-app/shared/constants';
 import { isTransactionSupported, withTransaction, runInTransaction } from '../../core/mongoose';
 import { socketEmitters } from '../../core/socket/server';
 import { generateId } from '@chat-app/shared/utils';
-import { OfflineQueue } from '../../shared/utils/offlineQueue';
+import {
+  enqueueOfflineMessage,
+  dequeueOfflineMessages,
+  peekOfflineQueue,
+  getOfflineQueueStats,
+  clearOfflineQueue,
+  requeueOfflineMessage,
+  getUsersWithOfflineMessages,
+  processOfflineQueue,
+} from '../../shared/utils/offlineQueue';
 
 // ============================================================================
 // Types
@@ -468,11 +478,14 @@ export const createGroupInviteLink = async (
 
   // Update chat with invite link
   chat.inviteLink = {
+    _id: invite._id,
     token: invite.token,
+    chatId: invite.chatId,
     expiresAt: invite.expiresAt,
     maxUses: invite.maxUses,
     useCount: invite.useCount,
-    createdBy: invite.createdBy.toString(),
+    createdBy: new mongoose.Types.ObjectId(invite.createdBy.toString()),
+    createdAt: invite.createdAt,
   };
   await chat.save();
 
@@ -624,7 +637,7 @@ export const deleteChatForUser = async (chatId: string, currentUserId: string): 
 
 const createSystemMessage = async (
   chatId: string,
-  type: IChatParticipant['role'],
+  type: SystemEventData['type'],
   actorId: string,
   actorName: string,
   metadata?: Record<string, unknown>
@@ -632,7 +645,7 @@ const createSystemMessage = async (
   const chat = await Chat.findById(chatId);
   if (!chat) return;
 
-  const systemEvent = {
+  const systemEvent: SystemEventData = {
     type,
     actorId,
     actorName,

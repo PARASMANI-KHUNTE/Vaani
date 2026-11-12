@@ -340,12 +340,16 @@ export function getContrastColor(hex: string): 'black' | 'white' {
 // Platform Detection
 // ============================================================================
 
-export const isBrowser = typeof window !== 'undefined';
-export const isServer = typeof window === 'undefined';
+const hasWindow = typeof globalThis !== 'undefined' && 'window' in globalThis;
+export const isBrowser = hasWindow;
+export const isServer = !hasWindow;
 
 export function getPlatform(): 'web' | 'mobile' | 'server' {
   if (isServer) return 'server';
-  if (typeof navigator !== 'undefined' && /ReactNative|Expo/.test(navigator.userAgent)) return 'mobile';
+  // Use type-safe access to navigator
+  const globalWithNavigator = globalThis as typeof globalThis & { navigator?: { userAgent?: string } };
+  const nav = globalWithNavigator.navigator;
+  if (nav && /ReactNative|Expo/.test(nav.userAgent || '')) return 'mobile';
   return 'web';
 }
 

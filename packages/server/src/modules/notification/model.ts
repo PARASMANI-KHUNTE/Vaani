@@ -7,6 +7,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 import { createBaseSchema, userRef, chatRef, messageRef } from '../../core/mongoose';
 import { NotificationType } from '@chat-app/shared/types';
 
+const NOTIFICATION_TYPES: NotificationType[] = ['message', 'reaction', 'friend_request', 'friend_accepted', 'friend_rejected', 'group_invite', 'mention', 'system'];
+
 // ============================================================================
 // Interfaces
 // ============================================================================
@@ -59,6 +61,7 @@ export interface INotification extends Document {
   // Methods
   markAsRead(): Promise<INotification>;
   markPushSent(success: boolean, failureReason?: string): Promise<INotification>;
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -90,7 +93,7 @@ const NotificationSchema = createBaseSchema<INotification>({
   userId: userRef(),
   type: {
     type: String,
-    enum: Object.values(NotificationType),
+    enum: NOTIFICATION_TYPES,
     required: true,
     index: true,
   },
@@ -158,11 +161,11 @@ NotificationSchema.statics.createNotification = async function (
   });
 };
 
-NotificationSchema.statics.getUnreadCount = async function (userId: mongoose.Types.ObjectId): Promise<number> => {
+NotificationSchema.statics.getUnreadCount = async function (this: any, userId: mongoose.Types.ObjectId): Promise<number> {
   return this.countDocuments({ userId, isRead: false });
 };
 
-NotificationSchema.statics.markAllAsRead = async function (userId: mongoose.Types.ObjectId): Promise<void> => {
+NotificationSchema.statics.markAllAsRead = async function (this: any, userId: mongoose.Types.ObjectId): Promise<void> {
   await this.updateMany(
     { userId, isRead: false },
     { isRead: true, readAt: new Date() }
@@ -170,6 +173,7 @@ NotificationSchema.statics.markAllAsRead = async function (userId: mongoose.Type
 };
 
 NotificationSchema.statics.getNotifications = async function (
+  this: any,
   userId: mongoose.Types.ObjectId,
   options: {
     page?: number;
@@ -178,7 +182,7 @@ NotificationSchema.statics.getNotifications = async function (
     type?: NotificationType;
     before?: Date;
   } = {}
-): Promise<INotification[]> => {
+): Promise<INotification[]> {
   const { page = 1, limit = 20, unreadOnly = false, type, before } = options;
   const skip = (page - 1) * limit;
 

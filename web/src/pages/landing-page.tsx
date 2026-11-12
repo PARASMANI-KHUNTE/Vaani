@@ -185,10 +185,10 @@ const LandingPage = () => {
           transition={{ duration: 0.7, delay: 0.12 }}
           className="mb-5 max-w-3xl text-center"
         >
-          <span className="block text-[2.75rem] font-extrabold leading-[1.05] tracking-tight text-fg sm:text-6xl lg:text-7xl">
+          <span className="block text-[2.35rem] font-extrabold leading-[1.05] tracking-tight text-fg xs:text-[2.75rem] sm:text-6xl lg:text-7xl">
             Chat that feels
           </span>
-          <span className="text-gradient mt-1 block font-display text-[3rem] italic leading-[1.05] sm:text-6xl lg:text-7xl">
+          <span className="text-gradient mt-1 block font-display text-[2.6rem] italic leading-[1.05] xs:text-[3rem] sm:text-6xl lg:text-7xl">
             effortless.
           </span>
         </motion.h1>
@@ -398,7 +398,7 @@ const LandingPage = () => {
           transition={{ duration: 0.6 }}
           className="mx-auto max-w-3xl"
         >
-          <div className="relative overflow-hidden rounded-[32px] border border-brand/15 bg-surface p-10 text-center shadow-soft-lg sm:p-14">
+          <div className="relative overflow-hidden rounded-[28px] border border-brand/15 bg-surface p-8 text-center shadow-soft-lg sm:rounded-[32px] sm:p-14">
             <div className="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-brand/15 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-24 -right-16 h-56 w-56 rounded-full bg-accent/10 blur-3xl" />
             <div className="relative">
