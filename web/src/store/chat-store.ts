@@ -27,8 +27,10 @@ type ChatState = {
     friendsCount: number;
   }>;
   setChats: (chats: Chat[]) => void;
+  appendChats: (chats: Chat[]) => void;
   selectChat: (chatId: string | null) => void;
   setMessages: (chatId: string, messages: Message[]) => void;
+  prependMessages: (chatId: string, messages: Message[]) => void;
   upsertMessage: (chatId: string, message: Message) => void;
   updateMessage: (chatId: string, messageId: string, updater: (message: Message) => Message) => void;
   removeMessage: (chatId: string, messageId: string) => void;
@@ -90,13 +92,21 @@ export const useChatStore = create<ChatState>()(
           hasExplicitlyClosedChat: selectedChatStillExists ? false : state.hasExplicitlyClosedChat,
         });
       },
+      appendChats: (chats) =>
+        set((state) => {
+          const existingIds = new Set(state.chats.map((chat) => chat._id));
+          const incoming = chats.filter((chat) => !existingIds.has(chat._id));
+          if (!incoming.length) {
+            return {};
+          }
+          return {
+            chats: [...state.chats, ...incoming],
+          };
+        }),
       selectChat: (chatId) =>
-        set((state) => ({
+        set(() => ({
           selectedChatId: chatId,
           hasExplicitlyClosedChat: chatId === null,
-          chats: state.chats.map((chat) =>
-            chat._id === chatId ? { ...chat, unreadCount: 0 } : chat
-          ),
         })),
       setMessages: (chatId, messages) =>
         set((state) => ({
@@ -105,20 +115,35 @@ export const useChatStore = create<ChatState>()(
             [chatId]: messages,
           },
         })),
+      prependMessages: (chatId, messages) =>
+        set((state) => {
+          const existing = state.messagesByChat[chatId] || [];
+          const existingIds = new Set(existing.map((entry) => entry._id));
+          const older = messages.filter((entry) => !existingIds.has(entry._id));
+          if (!older.length) {
+            return {};
+          }
+          return {
+            messagesByChat: {
+              ...state.messagesByChat,
+              [chatId]: [...older, ...existing],
+            },
+          };
+        }),
       upsertMessage: (chatId, message) =>
         set((state) => {
           const existingMessages = state.messagesByChat[chatId] || [];
           const alreadyExists = existingMessages.some((entry) => entry._id === message._id);
           const nextMessages = alreadyExists ? existingMessages : [...existingMessages, message];
 
-          // Update the chat object in the list
+          // Update the chat object in the list. Unread counts are owned by the
+          // server (NEW_MESSAGE carries a per-user summary), so this must not
+          // bump them or every message would be counted twice.
           const nextChats = state.chats.map((chat) => {
             if (chat._id === chatId) {
-              const isUnread = state.selectedChatId !== chatId;
               return {
                 ...chat,
                 lastMessage: message,
-                unreadCount: isUnread ? chat.unreadCount + 1 : 0,
                 updatedAt: message.createdAt,
               };
             }
@@ -348,7 +373,6 @@ export const useChatStore = create<ChatState>()(
         chats: state.chats,
         selectedChatId: state.selectedChatId,
         hasExplicitlyClosedChat: state.hasExplicitlyClosedChat,
-        directoryUsers: state.directoryUsers,
       }),
     }
   )

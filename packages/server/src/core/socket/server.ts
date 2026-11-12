@@ -18,7 +18,7 @@ let io: SocketIOServer | null = null;
 
 export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
   if (io) {
-    logger.warn('Socket.IO already initialized');
+    logger.warn({}, 'Socket.IO already initialized');
     return io;
   }
 
@@ -43,9 +43,9 @@ export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
       const subClient = redisClient.duplicate();
 
       io.adapter(createAdapter(pubClient, subClient));
-      logger.info('Socket.IO Redis adapter enabled');
+      logger.info({}, 'Socket.IO Redis adapter enabled');
     } else {
-      logger.info('Socket.IO using in-memory adapter (Upstash or disabled)');
+      logger.info({}, 'Socket.IO using in-memory adapter (Upstash or disabled)');
     }
   }
 
@@ -57,10 +57,10 @@ export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
 
   // Global error handler
   io.engine.on('connection_error', (err) => {
-    logger.error('Socket.IO connection error', { error: err.message, code: err.code });
+    logger.error({ error: err.message, code: err.code }, 'Socket.IO connection error');
   });
 
-  logger.info('Socket.IO server initialized');
+  logger.info({}, 'Socket.IO server initialized');
   return io;
 };
 

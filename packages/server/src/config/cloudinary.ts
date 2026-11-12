@@ -116,7 +116,7 @@ export const uploadMedia = async (
       createdAt: result.created_at,
     };
   } catch (error) {
-    logger.error('Cloudinary upload failed', { error: (error as Error).message, folder });
+    logger.error({ error: (error as Error).message, folder }, 'Cloudinary upload failed');
     throw error;
   }
 };
@@ -175,10 +175,10 @@ export const destroyMediaAssets = async (publicIds: string[]): Promise<number> =
     });
 
     const deleted = result.deleted ? Object.keys(result.deleted).length : 0;
-    logger.info('Cloudinary assets destroyed', { count: deleted, publicIds });
+    logger.info({ count: deleted, publicIds }, 'Cloudinary assets destroyed');
     return deleted;
   } catch (error) {
-    logger.error('Failed to destroy Cloudinary assets', { error: (error as Error).message, publicIds });
+    logger.error({ error: (error as Error).message, publicIds }, 'Failed to destroy Cloudinary assets');
     return 0;
   }
 };
@@ -193,10 +193,10 @@ export const destroyByFolder = async (folder: string): Promise<number> => {
     });
 
     const deleted = result.deleted ? Object.keys(result.deleted).length : 0;
-    logger.info('Cloudinary folder destroyed', { folder, count: deleted });
+    logger.info({ folder, count: deleted }, 'Cloudinary folder destroyed');
     return deleted;
   } catch (error) {
-    logger.error('Failed to destroy Cloudinary folder', { error: (error as Error).message, folder });
+    logger.error({ error: (error as Error).message, folder }, 'Failed to destroy Cloudinary folder');
     return 0;
   }
 };

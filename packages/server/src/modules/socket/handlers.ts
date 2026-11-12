@@ -37,7 +37,7 @@ export const handleAuthentication = async (socket: AuthenticatedSocket, next: (e
     }
 
     const payload = verifyAccessToken(token);
-    const user = await User.findById(payload.userId).select('+pushTokens');
+    const user = await User.findById(payload.sub).select('+pushTokens');
 
     if (!user || user.accountStatus !== 'active') {
       return next(new Error('User not found or inactive'));
@@ -59,7 +59,7 @@ export const handleConnection = async (io: Server, socket: AuthenticatedSocket) 
   const userId = socket.userId!;
   const user = socket.user!;
 
-  logger.info('Socket connected', { userId, socketId: socket.id });
+  logger.info({ userId, socketId: socket.id }, 'Socket connected');
 
   // Update user online status
   await User.findByIdAndUpdate(userId, {
@@ -109,7 +109,7 @@ export const handleConnection = async (io: Server, socket: AuthenticatedSocket) 
 
 const handleDisconnect = async (io: Server, socket: AuthenticatedSocket, reason: string) => {
   const userId = socket.userId!;
-  logger.info('Socket disconnected', { userId, socketId: socket.id, reason });
+  logger.info({ userId, socketId: socket.id, reason }, 'Socket disconnected');
 
   // Update user offline status
   await User.findByIdAndUpdate(userId, {
@@ -157,7 +157,7 @@ export const handleSendMessage = async (io: Server, socket: AuthenticatedSocket,
 
     callback?.({ success: true, message });
   } catch (error) {
-    logger.error('Send message error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Send message error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to send message' });
   }
 };
@@ -172,7 +172,7 @@ export const handleEditMessage = async (io: Server, socket: AuthenticatedSocket,
 
     callback?.({ success: true, message });
   } catch (error) {
-    logger.error('Edit message error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Edit message error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to edit message' });
   }
 };
@@ -187,7 +187,7 @@ export const handleDeleteMessage = async (io: Server, socket: AuthenticatedSocke
 
     callback?.({ success: true, ...result });
   } catch (error) {
-    logger.error('Delete message error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Delete message error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to delete message' });
   }
 };
@@ -202,7 +202,7 @@ export const handleForwardMessage = async (io: Server, socket: AuthenticatedSock
 
     callback?.({ success: true, message });
   } catch (error) {
-    logger.error('Forward message error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Forward message error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to forward message' });
   }
 };
@@ -222,7 +222,7 @@ export const handleAddReaction = async (io: Server, socket: AuthenticatedSocket,
 
     callback?.({ success: true, message });
   } catch (error) {
-    logger.error('Add reaction error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Add reaction error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to add reaction' });
   }
 };
@@ -237,7 +237,7 @@ export const handleRemoveReaction = async (io: Server, socket: AuthenticatedSock
 
     callback?.({ success: true, message });
   } catch (error) {
-    logger.error('Remove reaction error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Remove reaction error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to remove reaction' });
   }
 };
@@ -256,7 +256,7 @@ export const handleMarkDelivered = async (io: Server, socket: AuthenticatedSocke
 
     callback?.({ success: true });
   } catch (error) {
-    logger.error('Mark delivered error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Mark delivered error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to mark delivered' });
   }
 };
@@ -271,7 +271,7 @@ export const handleMarkSeen = async (io: Server, socket: AuthenticatedSocket, da
 
     callback?.({ success: true });
   } catch (error) {
-    logger.error('Mark seen error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Mark seen error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to mark seen' });
   }
 };
@@ -286,7 +286,7 @@ export const handleMarkChatSeen = async (io: Server, socket: AuthenticatedSocket
 
     callback?.({ success: true });
   } catch (error) {
-    logger.error('Mark chat seen error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Mark chat seen error');
     callback?.({ success: false, error: error instanceof Error ? error.message : 'Failed to mark chat seen' });
   }
 };
@@ -342,7 +342,7 @@ export const handleGetPresence = async (io: Server, socket: AuthenticatedSocket,
 
     callback?.({ success: true, presence });
   } catch (error) {
-    logger.error('Get presence error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Get presence error');
     callback?.({ success: false, error: 'Failed to get presence' });
   }
 };
@@ -364,7 +364,7 @@ export const handleJoinChat = async (io: Server, socket: AuthenticatedSocket, da
     socket.join(`chat:${chatId}`);
     callback?.({ success: true });
   } catch (error) {
-    logger.error('Join chat error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Join chat error');
     callback?.({ success: false, error: 'Failed to join chat' });
   }
 };
@@ -389,7 +389,7 @@ export const handleMarkNotificationRead = async (io: Server, socket: Authenticat
 
     callback?.({ success: true });
   } catch (error) {
-    logger.error('Mark notification read error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Mark notification read error');
     callback?.({ success: false, error: 'Failed to mark notification read' });
   }
 };
@@ -403,7 +403,7 @@ export const handleMarkAllNotificationsRead = async (io: Server, socket: Authent
 
     callback?.({ success: true });
   } catch (error) {
-    logger.error('Mark all notifications read error', { error, userId: socket.userId });
+    logger.error({ error, userId: socket.userId }, 'Mark all notifications read error');
     callback?.({ success: false, error: 'Failed to mark all notifications read' });
   }
 };

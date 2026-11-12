@@ -58,6 +58,20 @@ const getVisibleMessageFilter = (userState) => ({
     : {}),
 });
 
+// Unread is per-user: a message counts as read only once this user has a
+// receipt with seenAt set. Delivery receipts (and the global status field)
+// must not clear another participant's unread badge in a group chat.
+const unreadSeenFilter = (userId) => ({
+  receipts: {
+    $not: {
+      $elemMatch: {
+        userId,
+        seenAt: { $ne: null },
+      },
+    },
+  },
+});
+
 const ensureChatUserState = async (chat) => {
   const participantIds = (chat.participants || []).map((participantId) => normalizeId(participantId));
   const stateIds = new Set((chat.userStates || []).map((entry) => normalizeId(entry.userId)));
@@ -255,7 +269,7 @@ const formatChatForList = async (chat, currentUserId) => {
     ...getVisibleMessageFilter(currentUserState),
   })
     .sort({ createdAt: -1 })
-    .select("content type status senderId createdAt deliveredAt seenAt")
+    .select("content type media status senderId createdAt deliveredAt seenAt")
     .lean();
 
   if (!lastMessage && currentUserState?.hidden) {
@@ -267,7 +281,9 @@ const formatChatForList = async (chat, currentUserId) => {
     deletedForEveryone: false,
     deletedFor: { $ne: currentUserId },
     senderId: { $ne: currentUserId },
-    status: { $in: ["sent", "delivered"] },
+    // Audit/system events (e.g. "Group created") should not inflate badges.
+    isSystem: { $ne: true },
+    ...unreadSeenFilter(normalizedCurrentUserId),
     ...getVisibleMessageFilter(currentUserState),
   });
 
@@ -280,6 +296,8 @@ const formatChatForList = async (chat, currentUserId) => {
     adminIds: isGroup ? (chat.admins || []).map((adminId) => normalizeId(adminId)).filter(Boolean) : [],
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
+    wallpaper: chat.wallpaper || null,
+    theme: chat.theme || "default",
     participants: chat.participants.map((participant) =>
       getUserService().mapUserProfile(participant, normalizedCurrentUserId)
     ),
@@ -323,11 +341,11 @@ const listUserChats = async (currentUserId, options = {}) => {
             from: "messages",
             let: { chatId: "$_id", userStateClearedAt: { $arrayElemAt: ["$userState.clearedAt", 0] } },
             pipeline: [
-              { $match: { $expr: { $eq: ["$chatId", "$$chatId"] }, deletedFor: { $ne: userObjectId }, ...(true ? {} : {}) } },
+              { $match: { $expr: { $eq: ["$chatId", "$$chatId"] }, deletedFor: { $ne: userObjectId } } },
               { $match: { $expr: { $or: [{ $eq: ["$$userStateClearedAt", null] }, { $gt: ["$createdAt", "$$userStateClearedAt"] }] } } },
               { $sort: { createdAt: -1 } },
               { $limit: 1 },
-              { $project: { content: 1, type: 1, status: 1, senderId: 1, createdAt: 1, deliveredAt: 1, seenAt: 1 } },
+              { $project: { content: 1, type: 1, media: 1, status: 1, senderId: 1, createdAt: 1, deliveredAt: 1, seenAt: 1 } },
             ],
             as: "lastMessageArr",
           },
@@ -343,8 +361,8 @@ const listUserChats = async (currentUserId, options = {}) => {
                   deletedForEveryone: false,
                   deletedFor: { $ne: userObjectId },
                   senderId: { $ne: userObjectId },
-                  status: { $in: ["sent", "delivered"] },
-                  ...(true ? {} : {}),
+                  isSystem: { $ne: true },
+                  ...unreadSeenFilter(userObjectId),
                 },
               },
               { $match: { $expr: { $or: [{ $eq: ["$$userStateClearedAt", null] }, { $gt: ["$createdAt", "$$userStateClearedAt"] }] } } },
@@ -380,15 +398,14 @@ const listUserChats = async (currentUserId, options = {}) => {
         adminIds: chat.isGroup ? (chat.admins || []).map((adminId) => normalizeId(adminId)).filter(Boolean) : [],
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
-        participants: chat.participants.map((p) => ({
-          ...p,
-          _id: p._id.toString(),
-          isFriend: normalizedUserId !== p._id.toString() ? false : undefined,
-          requestSent: false,
-          requestReceived: false,
-          friendsCount: 0,
-        })),
-        otherParticipant,
+        wallpaper: chat.wallpaper || null,
+        theme: chat.theme || "default",
+        participants: chat.participants.map((participant) =>
+          getUserService().mapUserProfile(participant, normalizedUserId)
+        ),
+        otherParticipant: otherParticipant
+          ? getUserService().mapUserProfile(otherParticipant, normalizedUserId)
+          : null,
         lastMessage,
         unreadCount: Math.max(unreadCount, currentUserState.manualUnread ? 1 : 0),
         manuallyMarkedUnread: Boolean(currentUserState.manualUnread),
@@ -423,57 +440,22 @@ const getChatSummariesForParticipants = async (chatId, participantIds) => {
   const normalizedChatId = normalizeId(chatId);
   const normalizedParticipantIds = participantIds.map((id) => normalizeId(id));
 
-  const [chat, lastMessages] = await Promise.all([
-    Chat.findById(normalizedChatId)
-      .populate("participants", "username name email avatar tagline bio lastSeen friends createdAt")
-      .lean(),
-    Message.aggregate([
-      { $match: { chatId: new mongoose.Types.ObjectId(normalizedChatId), deletedFor: { $nin: normalizedParticipantIds } } },
-      { $sort: { createdAt: -1 } },
-      { $limit: 1 },
-    ]),
-  ]);
+  const chat = await Chat.findById(normalizedChatId)
+    .populate("participants", "username name email avatar tagline bio lastSeen friends createdAt")
+    .lean();
 
   if (!chat) {
     return {};
   }
 
-  const lastMessage = lastMessages[0] || null;
+  await ensureChatUserState(chat);
 
   const summaries = {};
-  for (const userId of normalizedParticipantIds) {
-    const normalizedUserId = normalizeId(userId);
-    const userState = getUserState(chat, normalizedUserId);
-
-    const otherParticipantRaw =
-      !chat.isGroup &&
-      chat.participants.find((p) => normalizeId(p._id || p) !== normalizedUserId);
-
-    summaries[normalizedUserId] = {
-      _id: chat._id,
-      isGroup: Boolean(chat.isGroup),
-      groupName: chat.isGroup ? chat.groupName || "Untitled Group" : null,
-      groupAvatar: chat.isGroup ? chat.groupAvatar || null : null,
-      createdBy: chat.createdBy ? normalizeId(chat.createdBy) : null,
-      adminIds: chat.isGroup ? (chat.admins || []).map((a) => normalizeId(a)).filter(Boolean) : [],
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
-      participants: chat.participants.map((p) => getUserService().mapUserProfile(p, normalizedUserId)),
-      otherParticipant: otherParticipantRaw ? getUserService().mapUserProfile(otherParticipantRaw, normalizedUserId) : null,
-      lastMessage: lastMessage ? {
-        _id: lastMessage._id,
-        content: lastMessage.content,
-        type: lastMessage.type,
-        status: lastMessage.status,
-        senderId: lastMessage.senderId,
-        createdAt: lastMessage.createdAt,
-        deliveredAt: lastMessage.deliveredAt,
-        seenAt: lastMessage.seenAt,
-      } : null,
-      unreadCount: userState?.manualUnread ? 1 : 0,
-      manuallyMarkedUnread: Boolean(userState?.manualUnread),
-    };
-  }
+  await Promise.all(
+    normalizedParticipantIds.map(async (userId) => {
+      summaries[userId] = await formatChatForList(chat, userId);
+    })
+  );
 
   return summaries;
 };
@@ -482,6 +464,7 @@ const markChatRead = async ({ chatId, currentUserId }) => {
   await ensureChatMember(chatId, currentUserId);
 
   const normalizedUserId = normalizeId(currentUserId);
+  const now = new Date();
 
   await Promise.all([
     Chat.findOneAndUpdate(
@@ -503,11 +486,41 @@ const markChatRead = async ({ chatId, currentUserId }) => {
       {
         chatId,
         senderId: { $ne: currentUserId },
-        status: { $in: ["sent", "delivered"] },
+        status: { $nin: ["seen"] },
       },
       {
         $set: {
           status: "seen",
+          deliveredAt: now,
+          seenAt: now,
+        },
+      }
+    ),
+    Message.updateMany(
+      {
+        chatId,
+        senderId: { $ne: currentUserId },
+        "receipts.userId": currentUserId,
+      },
+      {
+        $set: {
+          "receipts.$.seenAt": now,
+        },
+      }
+    ),
+    Message.updateMany(
+      {
+        chatId,
+        senderId: { $ne: currentUserId },
+        "receipts.userId": { $ne: currentUserId },
+      },
+      {
+        $push: {
+          receipts: {
+            userId: currentUserId,
+            deliveredAt: now,
+            seenAt: now,
+          },
         },
       }
     ),
@@ -523,6 +536,7 @@ const markChatUnread = async ({ chatId, currentUserId }) => {
   const latestIncomingMessage = await Message.findOne({
     chatId,
     senderId: { $ne: currentUserId },
+    isSystem: { $ne: true },
     ...getVisibleMessageFilter(currentUserState),
   })
     .sort({ createdAt: -1 })
@@ -675,7 +689,8 @@ const createGroupSystemMessage = async ({
         "userStates.$[senderState].hidden": false,
         // Do NOT reset clearedAt for receivers — if they deleted the chat,
         // old messages must remain gone; only this new message is visible.
-        "userStates.$[receiverState].manualUnread": true,
+        // manualUnread is reserved for an explicit "mark as unread" action;
+        // new messages are unread through their receipts instead.
         "userStates.$[receiverState].hidden": false,
       },
     },
@@ -838,7 +853,7 @@ const addGroupMembers = async ({ chatId, currentUserId, memberIds = [] }) => {
           $each: membersToAdd.map((memberId) => ({
             userId: memberId,
             clearedAt: null,
-            manualUnread: true,
+            manualUnread: false,
             hidden: false,
           })),
         },
@@ -847,6 +862,29 @@ const addGroupMembers = async ({ chatId, currentUserId, memberIds = [] }) => {
         updatedAt: new Date(),
       },
     }
+  );
+
+  // New members can read the group history, but it should not land in their
+  // unread badge. Only messages sent after they join are unread for them.
+  const joinedAt = new Date();
+  await Promise.all(
+    membersToAdd.map((memberId) =>
+      Message.updateMany(
+        {
+          chatId,
+          "receipts.userId": { $ne: memberId },
+        },
+        {
+          $push: {
+            receipts: {
+              userId: memberId,
+              deliveredAt: joinedAt,
+              seenAt: joinedAt,
+            },
+          },
+        }
+      )
+    )
   );
 
   const actor = await User.findById(currentUserId).select("name").lean();
@@ -1287,12 +1325,30 @@ const joinGroupByInvite = async ({ token, currentUserId }) => {
         userStates: {
           userId: normalizedCurrentUserId,
           clearedAt: null,
-          manualUnread: true,
+          manualUnread: false,
           hidden: false,
         },
       },
       $set: {
         updatedAt: new Date(),
+      },
+    }
+  );
+
+  // Existing history is visible to the new member but should not be unread.
+  const joinedAt = new Date();
+  await Message.updateMany(
+    {
+      chatId: chat._id,
+      "receipts.userId": { $ne: normalizedCurrentUserId },
+    },
+    {
+      $push: {
+        receipts: {
+          userId: normalizedCurrentUserId,
+          deliveredAt: joinedAt,
+          seenAt: joinedAt,
+        },
       },
     }
   );

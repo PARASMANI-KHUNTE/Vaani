@@ -52,6 +52,9 @@ type ChatWindowProps = {
   messages: Message[];
   currentUserId?: string;
   isLoading: boolean;
+  isLoadingOlder?: boolean;
+  hasMoreMessages?: boolean;
+  onLoadOlderMessages?: () => void;
   onSendMessage: (content: string, replyToId?: string | null) => Promise<void>;
   onEditMessage?: (messageId: string, content: string) => Promise<void>;
   onForwardMessage?: (messageId: string, targetChatId: string) => Promise<void>;
@@ -95,6 +98,9 @@ export const ChatWindow = ({
   messages,
   currentUserId,
   isLoading,
+  isLoadingOlder,
+  hasMoreMessages,
+  onLoadOlderMessages,
   onSendMessage,
   onEditMessage,
   onForwardMessage,
@@ -204,6 +210,18 @@ export const ChatWindow = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingPrependRef = useRef<{ scrollHeight: number } | null>(null);
+
+  const handleLoadOlderMessages = () => {
+    const container = scrollContainerRef.current;
+    if (!container || isLoadingOlder || !onLoadOlderMessages) {
+      return;
+    }
+    // Remember the height so the viewport stays anchored after older
+    // messages are prepended.
+    pendingPrependRef.current = { scrollHeight: container.scrollHeight };
+    onLoadOlderMessages();
+  };
 
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
@@ -224,9 +242,22 @@ export const ChatWindow = ({
   }, [showHeaderMenu]);
 
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
     }
+
+    const pendingPrepend = pendingPrependRef.current;
+    if (pendingPrepend) {
+      pendingPrependRef.current = null;
+      const addedHeight = container.scrollHeight - pendingPrepend.scrollHeight;
+      if (addedHeight > 0) {
+        container.scrollTop += addedHeight;
+      }
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
@@ -601,9 +632,22 @@ export const ChatWindow = ({
 
   const chatTitle = chat.isGroup ? chat.groupName : chat.otherParticipant?.name;
   const chatAvatar = chat.isGroup ? chat.groupAvatar : chat.otherParticipant?.avatar;
+  const wallpaper = chat.wallpaper || null;
+  const wallpaperIsUrl = Boolean(wallpaper && /^https?:\/\//i.test(wallpaper));
+  const wallpaperClass = wallpaper && !wallpaperIsUrl ? `wallpaper-${wallpaper}` : "";
+  const wallpaperStyle = wallpaperIsUrl
+    ? {
+        backgroundImage: `url("${wallpaper}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : undefined;
 
   return (
-    <section className={cn("relative flex h-full flex-col overflow-hidden bg-canvas", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}>
+    <section
+      className={cn("relative flex h-full flex-col overflow-hidden bg-canvas", wallpaperClass)}
+      style={wallpaperStyle}
+    >
       {/* Compact Header - 56px mobile */}
       <header className="relative z-30 shrink-0 border-b border-line bg-surface/80 backdrop-blur-md">
         <div className="relative mx-auto w-full max-w-3xl">
@@ -794,7 +838,7 @@ export const ChatWindow = ({
       {/* Messages Area */}
       <div 
         ref={scrollContainerRef} 
-        className={cn("flex-1 overflow-y-auto px-3 py-2 sm:px-4 sm:py-3 transition-colors", chat.wallpaper ? `wallpaper-${chat.wallpaper}` : "")}
+        className={cn("flex-1 overflow-y-auto px-3 py-2 sm:px-4 sm:py-3 transition-colors", wallpaperClass)}
       >
         {/* Loading */}
         {isLoading && messages.length === 0 ? (
@@ -803,6 +847,25 @@ export const ChatWindow = ({
           </div>
         ) : (
           <div className="mx-auto w-full max-w-3xl space-y-1 sm:space-y-0.5">
+            {(hasMoreMessages || isLoadingOlder) && onLoadOlderMessages ? (
+              <div className="flex justify-center py-3">
+                <button
+                  type="button"
+                  onClick={handleLoadOlderMessages}
+                  disabled={isLoadingOlder}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-3.5 py-1.5 text-[11px] font-semibold text-muted shadow-sm backdrop-blur-sm transition-colors hover:text-fg disabled:cursor-wait disabled:opacity-70"
+                >
+                  {isLoadingOlder ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-brand" />
+                      Loading older messages
+                    </>
+                  ) : (
+                    "Load older messages"
+                  )}
+                </button>
+              </div>
+            ) : null}
             {groupedMessages.map(({ message, isGroupStart, isGroupEnd, groupedMedia }, index) => {
               const prev = index > 0 ? groupedMessages[index - 1].message : null;
               const showDate = !prev || formatDateSeparator(message.createdAt) !== formatDateSeparator(prev.createdAt);

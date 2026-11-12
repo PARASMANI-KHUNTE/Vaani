@@ -23,6 +23,7 @@ import {
 import { useState } from "react";
 import { Chat } from "@/lib/types";
 import { cn, formatConversationDate } from "@/lib/utils";
+import { useChatStore } from "@/store/chat-store";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { ChatAppearanceModal } from "../ChatAppearanceModal";
 
@@ -37,6 +38,9 @@ type SidebarProps = {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   isLoading: boolean;
+  hasMoreChats?: boolean;
+  isLoadingMoreChats?: boolean;
+  onLoadMoreChats?: () => void;
   onlineUserIds: string[];
   selectedChatIds?: string[];
   onSelectChats?: (chatIds: string[]) => void;
@@ -81,6 +85,9 @@ export const Sidebar = ({
   searchTerm,
   onSearchChange,
   isLoading,
+  hasMoreChats = false,
+  isLoadingMoreChats = false,
+  onLoadMoreChats,
   onlineUserIds,
   selectedChatIds = [],
   onSelectChats,
@@ -94,6 +101,7 @@ export const Sidebar = ({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [deleteDialogChatId, setDeleteDialogChatId] = useState<string | null>(null);
   const [appearanceModalChatId, setAppearanceModalChatId] = useState<string | null>(null);
+  const upsertChat = useChatStore((state) => state.upsertChat);
 
   const contextMenu = useContextMenu();
 
@@ -167,9 +175,24 @@ export const Sidebar = ({
   });
 
   const getChatPreview = (chat: Chat) => {
-    if (!chat.lastMessage) return { text: "No messages yet", isMedia: false, type: "text" };
-    if (chat.lastMessage.type === "image") return { text: chat.lastMessage.content || "Photo", isMedia: true, type: "image" };
-    return { text: chat.lastMessage.content || "No messages yet", isMedia: false, type: chat.lastMessage.type || "text" };
+    const last = chat.lastMessage;
+    if (!last) return { text: "No messages yet", isMedia: false, type: "text" };
+
+    if (last.type && last.type !== "text") {
+      const fallback: Record<string, string> = {
+        image: "Photo",
+        video: "Video",
+        voice: "Voice message",
+        file: last.media?.originalName || "Attachment",
+      };
+      return {
+        text: last.content || fallback[last.type] || "Attachment",
+        isMedia: true,
+        type: last.type,
+      };
+    }
+
+    return { text: last.content || "No messages yet", isMedia: false, type: "text" };
   };
 
   const handleChatClick = (chatId: string) => {
@@ -466,6 +489,25 @@ export const Sidebar = ({
             );
           })
         )}
+        {!isLoading && !searchTerm && hasMoreChats && onLoadMoreChats ? (
+          <div className="flex justify-center px-2 pb-2 pt-1">
+            <button
+              type="button"
+              onClick={onLoadMoreChats}
+              disabled={isLoadingMoreChats}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-[11px] font-semibold text-muted transition-colors hover:text-fg disabled:cursor-wait disabled:opacity-70"
+            >
+              {isLoadingMoreChats ? (
+                <>
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-brand" />
+                  Loading
+                </>
+              ) : (
+                "Load more chats"
+              )}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <DeleteConfirmDialog
@@ -488,6 +530,7 @@ export const Sidebar = ({
           isOpen={!!appearanceModalChatId}
           onClose={() => setAppearanceModalChatId(null)}
           chat={chats.find(c => c._id === appearanceModalChatId)!}
+          onUpdate={upsertChat}
         />
       )}
     </aside>

@@ -39,7 +39,7 @@ export const runRetentionCleanup = async (): Promise<{
   skipped?: boolean;
 }> => {
   if (cleanupInProgress || mongoose.connection.readyState !== 1) {
-    logger.debug('Retention cleanup skipped', { cleanupInProgress, dbReady: mongoose.connection.readyState === 1 });
+    logger.debug({ cleanupInProgress, dbReady: mongoose.connection.readyState === 1 }, 'Retention cleanup skipped');
     return { deletedChats: 0, deletedMessages: 0, deletedMediaAssets: 0, skipped: true };
   }
 
@@ -57,7 +57,7 @@ export const runRetentionCleanup = async (): Promise<{
 
     // Cleanup old chats
     if (chatCutoff) {
-      logger.info('Starting chat retention cleanup', { cutoffDate: chatCutoff.toISOString() });
+      logger.info({ cutoffDate: chatCutoff.toISOString() }, 'Starting chat retention cleanup');
 
       const oldChats = await Chat.find({ updatedAt: { $lt: chatCutoff } })
         .select('_id')
@@ -73,9 +73,10 @@ export const runRetentionCleanup = async (): Promise<{
           .lean();
 
         // Delete associated media assets
-        deletedMediaAssets += await destroyMediaAssets(
-          chatMessages.map((message) => message.media).filter(Boolean)
-        );
+        const mediaPublicIds = chatMessages
+          .map((message) => message.media?.publicId)
+          .filter(Boolean) as string[];
+        deletedMediaAssets += await destroyMediaAssets(mediaPublicIds);
 
         // Delete messages
         const messageDeleteResult = await Message.deleteMany({ chatId: { $in: oldChatIds } });
@@ -85,17 +86,13 @@ export const runRetentionCleanup = async (): Promise<{
         const chatDeleteResult = await Chat.deleteMany({ _id: { $in: oldChatIds } });
         deletedChats += chatDeleteResult.deletedCount || 0;
 
-        logger.info('Chat retention cleanup completed', {
-          chatsDeleted: deletedChats,
-          messagesDeleted: deletedMessages,
-          mediaAssetsDeleted: deletedMediaAssets,
-        });
+        logger.info({ chatsDeleted: deletedChats, messagesDeleted: deletedMessages, mediaAssetsDeleted: deletedMediaAssets }, 'Chat retention cleanup completed');
       }
     }
 
     // Cleanup old messages (not in deleted chats)
     if (messageCutoff) {
-      logger.info('Starting message retention cleanup', { cutoffDate: messageCutoff.toISOString() });
+      logger.info({ cutoffDate: messageCutoff.toISOString() }, 'Starting message retention cleanup');
 
       const query: Record<string, unknown> = { createdAt: { $lt: messageCutoff } };
 
@@ -110,28 +107,21 @@ export const runRetentionCleanup = async (): Promise<{
 
       if (oldMessages.length > 0) {
         // Delete associated media assets
-        deletedMediaAssets += await destroyMediaAssets(
-          oldMessages.map((message) => message.media).filter(Boolean)
-        );
+        const mediaPublicIds = oldMessages
+          .map((message) => message.media?.publicId)
+          .filter(Boolean) as string[];
+        deletedMediaAssets += await destroyMediaAssets(mediaPublicIds);
 
         const messageIds = oldMessages.map((message) => message._id);
         const deleteResult = await Message.deleteMany({ _id: { $in: messageIds } });
         deletedMessages += deleteResult.deletedCount || 0;
 
-        logger.info('Message retention cleanup completed', {
-          messagesDeleted: deleteResult.deletedCount,
-          mediaAssetsDeleted: deletedMediaAssets,
-        });
+        logger.info({ messagesDeleted: deleteResult.deletedCount, mediaAssetsDeleted: deletedMediaAssets }, 'Message retention cleanup completed');
       }
     }
 
     const duration = Date.now() - startTime;
-    logger.info('Retention cleanup completed', {
-      deletedChats,
-      deletedMessages,
-      deletedMediaAssets,
-      durationMs: duration,
-    });
+    logger.info({ deletedChats, deletedMessages, deletedMediaAssets, durationMs: duration }, 'Retention cleanup completed');
 
     return {
       deletedChats,
@@ -139,7 +129,7 @@ export const runRetentionCleanup = async (): Promise<{
       deletedMediaAssets,
     };
   } catch (error) {
-    logger.error('Retention cleanup failed', { error: (error as Error).message, stack: (error as Error).stack });
+    logger.error({ error: (error as Error).message, stack: (error as Error).stack }, 'Retention cleanup failed');
     throw error;
   } finally {
     cleanupInProgress = false;
@@ -154,30 +144,30 @@ export const initializeRetentionCleanup = (): void => {
   const intervalHours = config.retention.cleanupIntervalHours;
 
   if (!Number.isFinite(intervalHours) || intervalHours <= 0) {
-    logger.info('Retention cleanup scheduler disabled (interval not configured)');
+    logger.info({}, 'Retention cleanup scheduler disabled (interval not configured)');
     return;
   }
 
   // Run initial cleanup
   runRetentionCleanup().catch((error) => {
-    logger.error('Initial retention cleanup failed', { error: error.message, stack: error.stack });
+    logger.error({ error: error.message, stack: error.stack }, 'Initial retention cleanup failed');
   });
 
   // Schedule periodic cleanup
   cleanupTimer = setInterval(() => {
     runRetentionCleanup().catch((error) => {
-      logger.error('Scheduled retention cleanup failed', { error: error.message, stack: error.stack });
+      logger.error({ error: error.message, stack: error.stack }, 'Scheduled retention cleanup failed');
     });
   }, intervalHours * 60 * 60 * 1000);
 
-  logger.info('Retention cleanup scheduler initialized', { intervalHours });
+  logger.info({ intervalHours }, 'Retention cleanup scheduler initialized');
 };
 
 export const stopRetentionCleanup = (): void => {
   if (cleanupTimer) {
     clearInterval(cleanupTimer);
     cleanupTimer = null;
-    logger.info('Retention cleanup scheduler stopped');
+    logger.info({}, 'Retention cleanup scheduler stopped');
   }
 };
 
@@ -192,7 +182,7 @@ export const triggerRetentionCleanup = async (): Promise<{
   deletedMessages: number;
   deletedMediaAssets: number;
 }> => {
-  logger.info('Manual retention cleanup triggered');
+  logger.info({}, 'Manual retention cleanup triggered');
   return runRetentionCleanup();
 };
 

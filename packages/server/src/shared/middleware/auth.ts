@@ -40,6 +40,7 @@ interface AuthenticatedUser {
   role: 'user' | 'admin' | 'moderator';
   createdAt: Date;
   updatedAt: Date;
+  [key: string]: unknown;
 }
 
 declare global {

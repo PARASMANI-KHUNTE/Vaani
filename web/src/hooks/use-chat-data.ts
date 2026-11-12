@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   addGroupMembers,
+  addReaction,
   clearChatMessages,
   createGroupInviteLink,
   createChat,
@@ -19,6 +20,7 @@ import {
   markChatUnread,
   promoteGroupAdmin,
   removeGroupMember,
+  removeReaction,
   searchUsers,
   sendMessage,
   transferGroupOwnership,
@@ -97,6 +99,17 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const searchAbortControllerRef = useRef<AbortController | null>(null);
   const failedMediaRef = useRef<MediaMessageInput | null>(null);
+  const readInFlightRef = useRef<Set<string>>(new Set());
+  const lastSelectedChatRef = useRef<string | null>(null);
+  const [messagePagination, setMessagePagination] = useState<
+    Record<string, { cursor: string | null; hasNextPage: boolean }>
+  >({});
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [chatPagination, setChatPagination] = useState<{ offset: number; hasMore: boolean }>({
+    offset: 0,
+    hasMore: false,
+  });
+  const [isLoadingMoreChats, setIsLoadingMoreChats] = useState(false);
 
   const selectedChatId = store.selectedChatId;
   const chats = store.chats;
@@ -131,7 +144,7 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
     const loadChats = async () => {
       try {
         setIsLoadingChats(true);
-        const response = await getChats(token);
+        const response = await getChats(token, { limit: 50 });
 
         if (active) {
           startTransition(() => {
@@ -151,6 +164,11 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
             if (finalChats.length > 0 || currentChats.length === 0) {
               store.setChats(finalChats);
             }
+
+            setChatPagination({
+              offset: response.chats?.length || 0,
+              hasMore: Boolean(response.pagination?.hasMore),
+            });
           });
         }
       } catch (loadError) {
@@ -191,13 +209,19 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
         const response = await getMessages(
           token,
           chatIdToLoad,
-          1,
-          20,
+          { page: 1, limit: 20 },
           abortControllerRef.current?.signal
         );
 
         if (active && !abortControllerRef.current?.signal.aborted) {
           storeRef.current?.setMessages(chatIdToLoad, response.messages);
+          setMessagePagination((previous) => ({
+            ...previous,
+            [chatIdToLoad]: {
+              cursor: response.messages[0]?._id || null,
+              hasNextPage: Boolean(response.pagination?.hasNextPage),
+            },
+          }));
         }
       } catch (loadError) {
         if (active && !(loadError instanceof Error && loadError.name === "AbortError")) {
@@ -221,26 +245,44 @@ export const useChatData = ({ token, currentUserId, searchQuery }: UseChatDataPa
 
   useEffect(() => {
     if (!token || !selectedChatId) {
+      lastSelectedChatRef.current = selectedChatId;
       return;
     }
 
-    const storeState = storeRef.current;
-    if (!storeState) return;
+    const selectedChat = chats.find((chat) => chat._id === selectedChatId);
 
-    const selectedChat = storeState.chats.find((chat) => chat._id === selectedChatId);
+    // Opening a conversation always clears a manual "mark as unread". The
+    // guard only exists so the summary update that follows the "mark unread"
+    // action does not immediately mark it read again.
+    const justOpened = lastSelectedChatRef.current !== selectedChatId;
+    const shouldMarkRead = Boolean(
+      selectedChat && (selectedChat.unreadCount > 0 || (selectedChat.manuallyMarkedUnread && justOpened))
+    );
 
-    if (!selectedChat || selectedChat.unreadCount === 0) {
+    if (
+      !selectedChat ||
+      !shouldMarkRead ||
+      (selectedChat.manuallyMarkedUnread && !justOpened) ||
+      readInFlightRef.current.has(selectedChatId)
+    ) {
       return;
     }
+
+    lastSelectedChatRef.current = selectedChatId;
+
+    readInFlightRef.current.add(selectedChatId);
 
     void markChatRead(token, selectedChatId)
       .then((response) => {
-        storeState.upsertChat(response.chat);
+        upsertChat(response.chat);
       })
       .catch((markError) => {
         setError(markError instanceof Error ? markError.message : "Failed to mark chat as read");
+      })
+      .finally(() => {
+        readInFlightRef.current.delete(selectedChatId);
       });
-  }, [selectedChatId, token]);
+  }, [chats, selectedChatId, token, upsertChat]);
 
   useEffect(() => {
     if (!token || !searchQuery?.trim()) {
@@ -429,15 +471,20 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       }));
     };
 
-    const handleMessageSeen = ({ chatId }: { chatId: string }) => {
+    const handleMessageSeen = ({ chatId, seenAt }: { chatId: string; seenAt?: string }) => {
       const store = storeRef.current;
       if (!store) return;
 
       const existingMessages = store.messagesByChat[chatId] || [];
+      // Only messages that existed when the other side read the chat are seen.
+      const seenAtMs = seenAt ? new Date(seenAt).getTime() : Number.POSITIVE_INFINITY;
 
       existingMessages.forEach((message) => {
         const senderId = typeof message.senderId === "string" ? message.senderId : message.senderId._id;
-        if (senderId === currentUserIdRef.current) {
+        if (
+          senderId === currentUserIdRef.current &&
+          new Date(message.createdAt).getTime() <= seenAtMs
+        ) {
           store.updateMessage(chatId, message._id, (entry) => ({
             ...entry,
             status: "seen",
@@ -456,6 +503,14 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
         return;
       }
       store.removeChat(chatId);
+      setMessagePagination((previous) => {
+        if (!(chatId in previous)) {
+          return previous;
+        }
+        const next = { ...previous };
+        delete next[chatId];
+        return next;
+      });
       if (store.selectedChatId === chatId) {
         store.selectChat(null);
       }
@@ -505,6 +560,15 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
         action: notification.action,
         fromUser: notification.fromUser,
       });
+
+      if (notification.fromUser?._id) {
+        storeRef.current?.updateFriendStatus({
+          userId: notification.fromUser._id,
+          isFriend: false,
+          requestSent: false,
+          requestReceived: true,
+        });
+      }
     };
 
     const handleFriendRequestAccepted = (notification: {
@@ -630,10 +694,48 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     };
 
     const handleConnect = () => {
-      const selectedChatId = storeRef.current?.selectedChatId;
-      if (selectedChatId) {
-        socket.emit(socketEvents.joinChat, { chatId: selectedChatId });
+      const activeChatId = storeRef.current?.selectedChatId;
+      if (activeChatId) {
+        socket.emit(socketEvents.joinChat, { chatId: activeChatId });
       }
+
+      // Messages sent while this socket was offline are not replayed, so
+      // refresh the chat list (and the open conversation) on reconnect.
+      void (async () => {
+        try {
+          const existingChatCount = useChatStore.getState().chats.length;
+          const chatLimit = Math.min(Math.max(50, existingChatCount), 100);
+          const [chatResponse, messageResponse] = await Promise.all([
+            getChats(token, { limit: chatLimit }),
+            activeChatId
+              ? getMessages(token, activeChatId, { page: 1, limit: 20 })
+              : Promise.resolve(null),
+          ]);
+
+          const currentStore = useChatStore.getState();
+
+          if (chatResponse?.chats?.length) {
+            currentStore.setChats(chatResponse.chats);
+            setChatPagination({
+              offset: chatResponse.chats.length,
+              hasMore: Boolean(chatResponse.pagination?.hasMore),
+            });
+          }
+
+          if (activeChatId && messageResponse) {
+            const knownIds = new Set(
+              (currentStore.messagesByChat[activeChatId] || []).map((entry) => entry._id)
+            );
+            messageResponse.messages.forEach((message) => {
+              if (!knownIds.has(message._id)) {
+                currentStore.upsertMessage(activeChatId, message);
+              }
+            });
+          }
+        } catch {
+          // Reconnect resync is best-effort; socket events keep working.
+        }
+      })();
     };
 
     socket.on("connect", handleConnect);
@@ -648,6 +750,7 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     socket.on(socketEvents.chatUpdated, handleChatUpdated);
     socket.on(socketEvents.chatRemoved, handleChatRemoved);
     socket.on(socketEvents.typing, handleTyping);
+    socket.on(socketEvents.stopTyping, handleTyping);
     socket.on(socketEvents.friendRequestReceived, handleFriendRequestReceived);
     socket.on(socketEvents.friendRequestAccepted, handleFriendRequestAccepted);
     socket.on(socketEvents.friendRequestRejected, handleFriendRequestRejected);
@@ -670,6 +773,7 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       socket.off(socketEvents.chatUpdated, handleChatUpdated);
       socket.off(socketEvents.chatRemoved, handleChatRemoved);
       socket.off(socketEvents.typing, handleTyping);
+      socket.off(socketEvents.stopTyping, handleTyping);
       socket.off(socketEvents.friendRequestReceived, handleFriendRequestReceived);
       socket.off(socketEvents.friendRequestAccepted, handleFriendRequestAccepted);
       socket.off(socketEvents.friendRequestRejected, handleFriendRequestRejected);
@@ -872,9 +976,9 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
 
     upsertMessage(selectedChatId, optimisticMessage);
 
-    try {
-      const socket = getSocketClient(token);
+    const socket = getSocketClient(token);
 
+    if (socket.connected) {
       socket.emit(
         socketEvents.sendMessage,
         {
@@ -891,19 +995,20 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
           }
         }
       );
-    } catch {
-      try {
-        const response = await sendMessage(token, {
-          chatId: selectedChatId,
-          content,
-          replyToId: replyToId || null,
-        });
+      return;
+    }
 
-        replaceOptimisticMessage(selectedChatId, optimisticId, response.message);
-      } catch (fallbackError) {
-        markMessageFailed(selectedChatId, optimisticId);
-        setError(fallbackError instanceof Error ? fallbackError.message : "Failed to send message");
-      }
+    try {
+      const response = await sendMessage(token, {
+        chatId: selectedChatId,
+        content,
+        replyToId: replyToId || null,
+      });
+
+      replaceOptimisticMessage(selectedChatId, optimisticId, response.message);
+    } catch (fallbackError) {
+      markMessageFailed(selectedChatId, optimisticId);
+      setError(fallbackError instanceof Error ? fallbackError.message : "Failed to send message");
     }
   };
 
@@ -1005,8 +1110,9 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
         optimistic: true,
       });
 
-      try {
-        const socket = getSocketClient(token);
+      const socket = getSocketClient(token);
+
+      if (socket.connected) {
         socket.emit(
           socketEvents.sendMessage,
           {
@@ -1024,8 +1130,8 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
             }
           }
         );
-      } catch {
-        // Socket failed, fallback to HTTP API
+      } else {
+        // Socket is unavailable, fall back to the HTTP API.
         try {
           const response = await sendMessage(token, {
             chatId: selectedChatId,
@@ -1155,32 +1261,7 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       return;
     }
 
-    try {
-      const socket = getSocketClient(token);
-      socket.emit(
-        socketEvents.deleteMessage,
-        {
-          messageId,
-          scope,
-        },
-        async (acknowledgement: { ok: boolean; error?: string }) => {
-          if (!acknowledgement?.ok) {
-            try {
-              const result = await deleteMessage(token, messageId, scope);
-              if (scope === "everyone" && result.message) {
-                updateMessage(selectedChatId, messageId, () => result.message as Message);
-              } else {
-                removeMessage(selectedChatId, messageId);
-              }
-            } catch (fallbackError) {
-              setError(
-                fallbackError instanceof Error ? fallbackError.message : "Failed to delete message"
-              );
-            }
-          }
-        }
-      );
-    } catch {
+    const fallbackToRest = async () => {
       try {
         const result = await deleteMessage(token, messageId, scope);
         if (scope === "everyone" && result.message) {
@@ -1193,6 +1274,30 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
           fallbackError instanceof Error ? fallbackError.message : "Failed to delete message"
         );
       }
+    };
+
+    try {
+      const socket = getSocketClient(token);
+
+      if (!socket.connected) {
+        await fallbackToRest();
+        return;
+      }
+
+      socket.emit(
+        socketEvents.deleteMessage,
+        {
+          messageId,
+          scope,
+        },
+        async (acknowledgement: { ok: boolean; error?: string }) => {
+          if (!acknowledgement?.ok) {
+            await fallbackToRest();
+          }
+        }
+      );
+    } catch {
+      await fallbackToRest();
     }
   };
 
@@ -1247,6 +1352,20 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     const socket = getSocketClient(token);
     const eventName = hasReacted ? socketEvents.reactionRemoved : socketEvents.reactionAdded;
 
+    if (!socket.connected) {
+      try {
+        const response = hasReacted
+          ? await removeReaction(token, messageId, emoji)
+          : await addReaction(token, messageId, emoji);
+        if (response?.message) {
+          updateMessage(selectedChatId, messageId, () => response.message);
+        }
+      } catch (reactionError) {
+        setError(reactionError instanceof Error ? reactionError.message : "Failed to update reaction");
+      }
+      return;
+    }
+
     socket.emit(eventName, { messageId, emoji }, (acknowledgement: { ok: boolean; error?: string }) => {
       if (!acknowledgement?.ok) {
         setError(acknowledgement.error || "Failed to update reaction");
@@ -1276,7 +1395,67 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
       const response = await markChatUnread(token, chatId);
       upsertChat(response.chat);
     } catch (markError) {
+      // Chats with no incoming messages cannot be marked unread; bulk
+      // actions should not surface that as an application error.
+      if (markError instanceof Error && /no incoming messages/i.test(markError.message)) {
+        return;
+      }
       setError(markError instanceof Error ? markError.message : "Failed to mark chat as unread");
+    }
+  };
+
+  const loadOlderMessages = async () => {
+    const chatId = selectedChatId;
+    const pagination = chatId ? messagePagination[chatId] : null;
+
+    if (!token || !chatId || !pagination?.hasNextPage || !pagination.cursor || isLoadingOlder) {
+      return;
+    }
+
+    setIsLoadingOlder(true);
+    try {
+      const response = await getMessages(token, chatId, {
+        limit: 20,
+        cursor: pagination.cursor,
+      });
+
+      storeRef.current?.prependMessages(chatId, response.messages);
+      const oldestLoaded = response.messages[0]?._id || pagination.cursor;
+      setMessagePagination((previous) => ({
+        ...previous,
+        [chatId]: {
+          cursor: oldestLoaded,
+          hasNextPage: Boolean(response.pagination?.hasNextPage),
+        },
+      }));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load older messages");
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
+  const loadMoreChats = async () => {
+    if (!token || isLoadingMoreChats || !chatPagination.hasMore) {
+      return;
+    }
+
+    setIsLoadingMoreChats(true);
+    try {
+      const response = await getChats(token, {
+        limit: 50,
+        offset: chatPagination.offset,
+      });
+      const store = useChatStore.getState();
+      store.appendChats(response.chats || []);
+      setChatPagination({
+        offset: chatPagination.offset + (response.chats?.length || 0),
+        hasMore: Boolean(response.pagination?.hasMore),
+      });
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load more chats");
+    } finally {
+      setIsLoadingMoreChats(false);
     }
   };
 
@@ -1304,6 +1483,10 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     try {
       const response = await clearChatMessages(token, chatId);
       setMessages(chatId, []);
+      setMessagePagination((previous) => ({
+        ...previous,
+        [chatId]: { cursor: null, hasNextPage: false },
+      }));
       upsertChat(response.chat);
 
       if (selectedChatId === chatId) {
@@ -1320,6 +1503,12 @@ const handlePresenceSync = (payload: { onlineUserIds: string[] }) => {
     selectedChatId,
     isLoadingChats,
     isLoadingMessages,
+    isLoadingOlder,
+    hasMoreMessages: Boolean(selectedChatId && messagePagination[selectedChatId]?.hasNextPage),
+    loadOlderMessages,
+    isLoadingMoreChats,
+    hasMoreChats: chatPagination.hasMore,
+    loadMoreChats,
     isSearchingUsers,
     isPending,
     error,

@@ -121,9 +121,9 @@ export const initializeSocketServer = async (httpServer: any): Promise<Server> =
       await Promise.all([redisPubClient.connect(), redisSubClient.connect()]);
 
       io.adapter(createAdapter(redisPubClient, redisSubClient));
-      logger.info('Socket.IO Redis adapter initialized');
+      logger.info({}, 'Socket.IO Redis adapter initialized');
     } catch (error) {
-      logger.warn('Failed to initialize Redis adapter, using in-memory adapter', { error });
+      logger.warn({ error }, 'Failed to initialize Redis adapter, using in-memory adapter');
     }
   }
 
@@ -131,7 +131,7 @@ export const initializeSocketServer = async (httpServer: any): Promise<Server> =
   const { registerSocketHandlers } = await import('./handlers.js');
   registerSocketHandlers(io);
 
-  logger.info('Socket.IO server initialized');
+  logger.info({}, 'Socket.IO server initialized');
   return io;
 };
 
@@ -150,7 +150,7 @@ export const closeSocketServer = async (): Promise<void> => {
     await redisSubClient.quit();
     redisSubClient = null;
   }
-  logger.info('Socket.IO server closed');
+  logger.info({}, 'Socket.IO server closed');
 };
 
 // ============================================================================

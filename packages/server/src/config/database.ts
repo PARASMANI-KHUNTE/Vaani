@@ -29,14 +29,11 @@ export const connectDatabase = async (): Promise<mongoose.Connection> => {
     await mongoose.connect(config.mongodb.uri, options);
     isConnected = true;
 
-    logger.info('MongoDB connected successfully', {
-      host: mongoose.connection.host,
-      name: mongoose.connection.name,
-    });
+    logger.info({ host: mongoose.connection.host, name: mongoose.connection.name }, 'MongoDB connected successfully');
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
-      logger.error('MongoDB connection error', { error: err.message });
+      logger.error({ error: err.message }, 'MongoDB connection error');
       isConnected = false;
     });
 
@@ -56,13 +53,11 @@ export const connectDatabase = async (): Promise<mongoose.Connection> => {
     const err = error as Error;
 
     if (config.isDevelopment()) {
-      logger.warn('MongoDB not connected — running with offline fallback', {
-        error: err.message,
-      });
+      logger.warn({ error: err.message }, 'MongoDB not connected — running with offline fallback');
       return mongoose.connection;
     }
 
-    logger.error('MongoDB connection failed', { error: err.message, stack: err.stack });
+    logger.error({ error: err.message, stack: err.stack }, 'MongoDB connection failed');
     throw error;
   }
 };

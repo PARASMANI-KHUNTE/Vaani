@@ -78,7 +78,8 @@ const sendExpoPush = async (messages: ExpoPushMessage[]): Promise<ExpoPushRespon
     throw new Error(`Expo push API error: ${response.status} - ${errorText}`);
   }
 
-  return response.json();
+  const json = await response.json();
+  return json as ExpoPushResponse;
 };
 
 // ============================================================================
@@ -99,12 +100,7 @@ const sendWithRetry = async (
     }
 
     const delay = BASE_RETRY_DELAY * Math.pow(2, attempt) + Math.random() * 1000;
-    logger.warn('Push notification send failed, retrying', {
-      attempt: attempt + 1,
-      maxRetries: MAX_RETRIES,
-      delay,
-      error: (error as Error).message,
-    });
+    logger.warn({ attempt: attempt + 1, maxRetries: MAX_RETRIES, delay, error: (error as Error).message }, 'Push notification send failed, retrying');
 
     await sleep(delay);
     return sendWithRetry(messages, attempt + 1);
@@ -133,7 +129,7 @@ export const sendPushNotification = async (
   const invalidCount = tokenArray.length - validTokens.length;
 
   if (invalidCount > 0) {
-    logger.warn('Invalid push tokens filtered out', { invalidCount, tokens: tokenArray });
+    logger.warn({ invalidCount, tokens: tokenArray }, 'Invalid push tokens filtered out');
   }
 
   if (validTokens.length === 0) {
@@ -174,18 +170,14 @@ export const sendPushNotification = async (
           failed++;
           const errorMsg = `Token ${batch[j]}: ${result.message || 'Unknown error'}`;
           errors.push(errorMsg);
-          logger.warn('Push notification failed for token', {
-            token: batch[j].slice(0, 20) + '...',
-            error: result.message,
-            details: result.details,
-          });
+          logger.warn({ token: batch[j].slice(0, 20) + '...', error: result.message, details: result.details }, 'Push notification failed for token');
         }
       }
     } catch (error) {
       failed += batch.length;
       const errorMsg = `Batch failed: ${(error as Error).message}`;
       errors.push(errorMsg);
-      logger.error('Push notification batch failed', { error: (error as Error).message, batchSize: batch.length });
+      logger.error({ error: (error as Error).message, batchSize: batch.length }, 'Push notification batch failed');
     }
   }
 
@@ -407,9 +399,9 @@ export const flushPushQueue = async (): Promise<void> => {
 
   try {
     await sendWithRetry(messages);
-    logger.debug('Flushed push notification queue', { count: messages.length });
+    logger.debug({ count: messages.length }, 'Flushed push notification queue');
   } catch (error) {
-    logger.error('Failed to flush push notification queue', { error: (error as Error).message });
+    logger.error({ error: (error as Error).message }, 'Failed to flush push notification queue');
     // Re-queue failed messages
     for (const message of messages) {
       if (message.to && typeof message.to === 'string') {

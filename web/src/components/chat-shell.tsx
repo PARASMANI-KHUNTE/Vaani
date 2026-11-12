@@ -51,6 +51,12 @@ export const ChatShell = () => {
     messages,
     isLoadingChats,
     isLoadingMessages,
+    isLoadingOlder,
+    hasMoreMessages,
+    loadOlderMessages,
+    isLoadingMoreChats,
+    hasMoreChats,
+    loadMoreChats,
     error,
     clearError,
     sendChatMessage,
@@ -263,6 +269,9 @@ export const ChatShell = () => {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             isLoading={isLoadingChats}
+            hasMoreChats={hasMoreChats}
+            isLoadingMoreChats={isLoadingMoreChats}
+            onLoadMoreChats={() => void loadMoreChats()}
             onlineUserIds={onlineUserIds}
             selectedChatIds={selectedChatIds}
             onSelectChats={setSelectedChatIds}
@@ -293,6 +302,9 @@ export const ChatShell = () => {
               messages={messages}
               currentUserId={session.backendUser?._id}
               isLoading={isLoadingMessages}
+              isLoadingOlder={isLoadingOlder}
+              hasMoreMessages={hasMoreMessages}
+              onLoadOlderMessages={loadOlderMessages}
               onSendMessage={sendChatMessage}
               onSendMedia={sendMediaMessage}
               onTyping={notifyTyping}

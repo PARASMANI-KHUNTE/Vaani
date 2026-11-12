@@ -79,7 +79,7 @@ const createUpstashClient = (): UpstashClient => {
       if (result !== null && result !== undefined) return result;
       return await tryCommand();
     } catch (error) {
-      logger.error(`Redis ${upper} error`, { error: (error as Error).message });
+      logger.error({ error: (error as Error).message }, `Redis ${upper} error`);
       return null;
     }
   };
@@ -108,7 +108,7 @@ const createUpstashClient = (): UpstashClient => {
         // Upstash returns 'OK' on success
         return data.result === 'OK' ? 'OK' : null;
       } catch (error) {
-        logger.error('Redis SET error', { error: (error as Error).message });
+        logger.error({ error: (error as Error).message }, 'Redis SET error');
         return null;
       }
     },
@@ -221,7 +221,7 @@ export const connectRedis = async (): Promise<UnifiedRedisClient | null> => {
       });
 
       redisClient.on('error', (err: Error) => {
-        logger.error('Redis Client Error', { error: err.message });
+        logger.error({ error: err.message }, 'Redis Client Error');
         isConnected = false;
       });
 
@@ -248,7 +248,7 @@ export const connectRedis = async (): Promise<UnifiedRedisClient | null> => {
     return redisClient;
   } catch (error) {
     isConnected = false;
-    logger.error('Redis connection failed', { error: (error as Error).message });
+    logger.error({ error: (error as Error).message }, 'Redis connection failed');
 
     if (config.isDevelopment()) {
       logger.warn('Falling back to in-memory cache');

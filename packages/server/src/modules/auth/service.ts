@@ -154,7 +154,7 @@ const verifyGoogleIdToken = async (idToken: string): Promise<{ email: string; na
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       };
     }
-    logger.error('Google ID token verification failed', { error: (error as Error).message });
+    logger.error({ error: (error as Error).message }, 'Google ID token verification failed');
     throw new ApiError(401, 'Failed to verify Google identity', 'GOOGLE_AUTH_FAILED');
   }
 
@@ -230,7 +230,7 @@ export const loginWithGoogleProfile = async (idToken: string): Promise<{
   const accessToken = createAccessToken(user);
   const { token: refreshToken } = await createRefreshToken(user);
 
-  logger.info('User logged in via Google', { userId: user._id, email: user.email });
+  logger.info({ userId: user._id, email: user.email }, 'User logged in via Google');
 
   return {
     user: { _id: user._id.toString(), email: user.email, name: user.name },

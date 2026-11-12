@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { getMobileChats } from "@/lib/api/client";
 import { disconnectMobileSocket, getMobileSocket } from "@/lib/socket/client";
 import { mobileSocketEvents } from "@/lib/socket/events";
 import { MobileChat, MobileMessage, MobileNotificationItem } from "@/lib/types";
@@ -20,6 +21,8 @@ const getNotificationPreview = (message: MobileMessage) => {
 
 export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimeParams) => {
   const upsertChat = useChatStore((state) => state.upsertChat);
+  const setChats = useChatStore((state) => state.setChats);
+  const removeChat = useChatStore((state) => state.removeChat);
   const addNotification = useNotificationStore((state) => state.addNotification);
   const setOnlineUsers = useNotificationStore((state) => state.setOnlineUsers);
   const setUserOnlineState = useNotificationStore((state) => state.setUserOnlineState);
@@ -78,6 +81,16 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
 
     const handleChatUpdated = ({ chat }: { chat: MobileChat }) => {
       upsertChat(chat);
+    };
+
+    const handleChatCreated = ({ chat }: { chat: MobileChat }) => {
+      upsertChat(chat);
+    };
+
+    const handleChatRemoved = ({ chatId }: { chatId: string }) => {
+      if (chatId) {
+        removeChat(chatId);
+      }
     };
 
     const handleFriendRequestReceived = (notification: MobileNotificationItem) => {
@@ -152,11 +165,22 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
     }) => {
     };
 
+    // The server does not replay missed events, so refresh the chat list
+    // whenever the socket reconnects.
+    const handleConnect = () => {
+      void getMobileChats(token)
+        .then((response) => setChats(response.chats))
+        .catch(() => undefined);
+    };
+
+    socket.on("connect", handleConnect);
     socket.on(mobileSocketEvents.presenceSync, handlePresenceSync);
     socket.on(mobileSocketEvents.userOnline, handleUserOnline);
     socket.on(mobileSocketEvents.userOffline, handleUserOffline);
     socket.on(mobileSocketEvents.newMessage, handleNewMessage);
     socket.on(mobileSocketEvents.chatUpdated, handleChatUpdated);
+    socket.on(mobileSocketEvents.chatCreated, handleChatCreated);
+    socket.on(mobileSocketEvents.chatRemoved, handleChatRemoved);
     socket.on(mobileSocketEvents.friendRequestReceived, handleFriendRequestReceived);
     socket.on(mobileSocketEvents.friendRequestAccepted, handleFriendRequestAccepted);
     socket.on(mobileSocketEvents.friendRequestRejected, handleFriendRequestRejected);
@@ -165,11 +189,14 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
     socket.on(mobileSocketEvents.messageDeleted, handleMessageDeleted);
 
     return () => {
+      socket.off("connect", handleConnect);
       socket.off(mobileSocketEvents.presenceSync, handlePresenceSync);
       socket.off(mobileSocketEvents.userOnline, handleUserOnline);
       socket.off(mobileSocketEvents.userOffline, handleUserOffline);
       socket.off(mobileSocketEvents.newMessage, handleNewMessage);
       socket.off(mobileSocketEvents.chatUpdated, handleChatUpdated);
+      socket.off(mobileSocketEvents.chatCreated, handleChatCreated);
+      socket.off(mobileSocketEvents.chatRemoved, handleChatRemoved);
       socket.off(mobileSocketEvents.friendRequestReceived, handleFriendRequestReceived);
       socket.off(mobileSocketEvents.friendRequestAccepted, handleFriendRequestAccepted);
       socket.off(mobileSocketEvents.friendRequestRejected, handleFriendRequestRejected);
@@ -177,5 +204,5 @@ export const useMobileRealtime = ({ token, currentUserId }: UseMobileRealtimePar
       socket.off(mobileSocketEvents.reactionRemoved, handleReactionRemoved);
       socket.off(mobileSocketEvents.messageDeleted, handleMessageDeleted);
     };
-  }, [addNotification, currentUserId, setOnlineUsers, setUserOnlineState, token, upsertChat, updateFriendStatus]);
+  }, [addNotification, currentUserId, removeChat, setChats, setOnlineUsers, setUserOnlineState, token, upsertChat, updateFriendStatus]);
 };

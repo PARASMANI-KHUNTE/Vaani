@@ -9,11 +9,15 @@ const generateEncryptionKey = (): string => {
 };
 
 const getOrCreateEncryptionKey = (): string => {
-  const stored = sessionStorage.getItem(ENCRYPTION_KEY_NAME);
+  // Keep the key in the same storage bucket as the session. If the key only
+  // lived in sessionStorage, a persisted (localStorage) session could never
+  // be decrypted after the browser restarts.
+  const storage = getSessionMode() ? sessionStorage : localStorage;
+  const stored = storage.getItem(ENCRYPTION_KEY_NAME);
   if (stored) return stored;
 
   const newKey = generateEncryptionKey();
-  sessionStorage.setItem(ENCRYPTION_KEY_NAME, newKey);
+  storage.setItem(ENCRYPTION_KEY_NAME, newKey);
   return newKey;
 };
 
@@ -124,5 +128,6 @@ export const clearAllSecureStorage = (): void => {
   localStorage.removeItem(STORAGE_KEY);
   sessionStorage.removeItem(STORAGE_KEY);
   sessionStorage.removeItem(`${STORAGE_KEY}-session`);
+  localStorage.removeItem(ENCRYPTION_KEY_NAME);
   sessionStorage.removeItem(ENCRYPTION_KEY_NAME);
 };

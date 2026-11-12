@@ -76,7 +76,7 @@ AuditLogSchema.statics.log = async function (data: {
   });
 };
 
-export const AuditLog = mongoose.model<IAuditLog>('AuditLog', AuditLogSchema);
+export const AuditLog = mongoose.model<IAuditLog, IAuditLogModel>('AuditLog', AuditLogSchema);
 
 // ============================================================================
 // System Settings
@@ -92,6 +92,12 @@ export interface ISystemSettings extends Document {
   createdAt: Date;
   updatedAt: Date;
   [key: string]: unknown;
+}
+
+export interface ISystemSettingsModel extends mongoose.Model<ISystemSettings> {
+  getSetting(key: string): Promise<unknown>;
+  setSetting(key: string, value: unknown, description?: string, updatedBy?: mongoose.Types.ObjectId): Promise<ISystemSettings>;
+  getPublicSettings(): Promise<Record<string, unknown>>;
 }
 
 const SystemSettingsSchema = createBaseSchema<ISystemSettings>({
@@ -126,7 +132,7 @@ SystemSettingsSchema.statics.getPublicSettings = async function (this: any): Pro
   return settings.reduce((acc: any, s: any) => ({ ...acc, [s.key]: s.value }), {});
 };
 
-export const SystemSettings = mongoose.model<ISystemSettings>('SystemSettings', SystemSettingsSchema);
+export const SystemSettings = mongoose.model<ISystemSettings, ISystemSettingsModel>('SystemSettings', SystemSettingsSchema);
 
 // ============================================================================
 // Metrics / Analytics
@@ -138,6 +144,12 @@ export interface IMetric extends Document {
   value: number;
   tags: Record<string, string>;
   timestamp: Date;
+  [key: string]: unknown;
+}
+
+export interface IMetricModel extends mongoose.Model<IMetric> {
+  record(name: string, value: number, tags?: Record<string, string>): Promise<IMetric>;
+  getMetrics(name: string, start: Date, end: Date, tags?: Record<string, string>): Promise<IMetric[]>;
 }
 
 const MetricSchema = new Schema<IMetric>({
@@ -171,7 +183,7 @@ MetricSchema.statics.getMetrics = async function (
   return this.find(query).sort({ timestamp: 1 }).lean();
 };
 
-export const Metric = mongoose.model<IMetric>('Metric', MetricSchema);
+export const Metric = mongoose.model<IMetric, IMetricModel>('Metric', MetricSchema);
 
 // ============================================================================
 // Rate Limit Tracking

@@ -38,7 +38,7 @@ export const createApp = (): Application => {
   // Request timeout
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.setTimeout(30000, () => {
-      logger.warn('Request timeout', { path: req.path, method: req.method, ip: req.ip });
+      logger.warn({ path: req.path, method: req.method, ip: req.ip }, 'Request timeout');
     });
     next();
   });
@@ -74,7 +74,7 @@ export const createApp = (): Application => {
 
   // Logging
   app.use(morgan(config.isProduction() ? 'combined' : 'dev', {
-    stream: { write: (message) => logger.http(message.trim()) },
+    stream: { write: (message) => logger.info({ source: 'morgan' }, message.trim()) },
   }));
 
   // Body parsing
@@ -209,7 +209,7 @@ export const createApp = (): Application => {
       err.message?.includes('connection closed');
 
     if (isDbError) {
-      logger.warn('Database offline — returning fallback response', { error: err.message });
+      logger.warn({ error: err.message }, 'Database offline — returning fallback response');
       if (req.method === 'GET') {
         return res.json({
           success: true,

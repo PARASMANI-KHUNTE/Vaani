@@ -411,6 +411,8 @@ export const Limits = {
   PRESENCE_HEARTBEAT_MS: 30000,
   MESSAGE_DEDUP_WINDOW_MS: 5000,
   OFFLINE_QUEUE_MAX_SIZE: 1000,
+  USERS_SEARCH_LIMIT: 20,
+  USERS_EXPLORE_LIMIT: 30,
 } as const;
 
 // ============================================================================

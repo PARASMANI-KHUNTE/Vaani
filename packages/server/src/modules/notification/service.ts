@@ -119,12 +119,12 @@ export const createNotification = async (input: CreateNotificationInput): Promis
       });
       await notification.markPushSent(true);
     } catch (error) {
-      logger.error('Push notification failed', { userId, notificationId: notification._id, error });
+      logger.error({ userId, notificationId: notification._id, error }, 'Push notification failed');
       await notification.markPushSent(false, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
-  logger.debug('Notification created', { notificationId: notification._id, userId, type });
+  logger.debug({ notificationId: notification._id, userId, type }, 'Notification created');
   return notification;
 };
 

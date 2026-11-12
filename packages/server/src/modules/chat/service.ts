@@ -105,7 +105,7 @@ export const createDirectChat = async (input: CreateDirectChatInput): Promise<IC
     ],
   });
 
-  logger.info('Direct chat created', { chatId: chat._id, participants: [currentUserId, participantId] });
+  logger.info({ chatId: chat._id, participants: [currentUserId, participantId] }, 'Direct chat created');
   return chat;
 };
 
@@ -163,7 +163,7 @@ export const createGroupChat = async (input: CreateGroupChatInput): Promise<ICha
     socketEmitters.memberAddedToGroup(chat._id.toString(), currentUserId, users.find((u) => u._id.equals(currentUserId))?.name || 'Someone');
   }
 
-  logger.info('Group chat created', { chatId: chat._id, owner: currentUserId, memberCount: participantIds.length + 1 });
+  logger.info({ chatId: chat._id, owner: currentUserId, memberCount: participantIds.length + 1 }, 'Group chat created');
   return chat;
 };
 
@@ -196,7 +196,7 @@ export const updateGroup = async (
   }
 
   await chat.save();
-  logger.info('Group updated', { chatId, updatedBy: currentUserId });
+  logger.info({ chatId, updatedBy: currentUserId }, 'Group updated');
 
   return chat;
 };
@@ -266,7 +266,7 @@ export const addGroupMembers = async (input: AddMembersInput): Promise<IChat> =>
   }
 
   await chat.save();
-  logger.info('Members added to group', { chatId, addedBy: currentUserId, memberIds });
+  logger.info({ chatId, addedBy: currentUserId, memberIds }, 'Members added to group');
 
   return chat;
 };
@@ -309,7 +309,7 @@ export const removeGroupMember = async (
   await chat.removeParticipant(new mongoose.Types.ObjectId(memberId));
   await chat.save();
 
-  logger.info('Member removed from group', { chatId, removedBy: currentUserId, memberId });
+  logger.info({ chatId, removedBy: currentUserId, memberId }, 'Member removed from group');
 
   return chat;
 };
@@ -334,7 +334,7 @@ export const promoteGroupAdmin = async (
   await chat.updateParticipantRole(new mongoose.Types.ObjectId(memberId), 'admin');
   await chat.save();
 
-  logger.info('Member promoted to admin', { chatId, promotedBy: currentUserId, memberId });
+  logger.info({ chatId, promotedBy: currentUserId, memberId }, 'Member promoted to admin');
   return chat;
 };
 
@@ -358,7 +358,7 @@ export const demoteGroupAdmin = async (
   await chat.updateParticipantRole(new mongoose.Types.ObjectId(memberId), 'member');
   await chat.save();
 
-  logger.info('Admin demoted to member', { chatId, demotedBy: currentUserId, memberId });
+  logger.info({ chatId, demotedBy: currentUserId, memberId }, 'Admin demoted to member');
   return chat;
 };
 
@@ -393,7 +393,7 @@ export const transferGroupOwnership = async (
   chat.ownerId = new mongoose.Types.ObjectId(nextOwnerId);
   await chat.save();
 
-  logger.info('Group ownership transferred', { chatId, from: currentUserId, to: nextOwnerId });
+  logger.info({ chatId, from: currentUserId, to: nextOwnerId }, 'Group ownership transferred');
   return chat;
 };
 
@@ -430,7 +430,7 @@ export const leaveGroup = async (chatId: string, currentUserId: string): Promise
       // No other members, delete group
       await Chat.findByIdAndDelete(chatId);
       await Message.deleteMany({ chatId });
-      logger.info('Group deleted (last member left)', { chatId });
+      logger.info({ chatId }, 'Group deleted (last member left)');
       return { chatId, deleted: true };
     }
   }
@@ -439,7 +439,7 @@ export const leaveGroup = async (chatId: string, currentUserId: string): Promise
   await chat.removeParticipant(new mongoose.Types.ObjectId(currentUserId));
   await chat.save();
 
-  logger.info('Member left group', { chatId, memberId: currentUserId });
+  logger.info({ chatId, memberId: currentUserId }, 'Member left group');
   return { chatId, deleted: false };
 };
 
@@ -489,7 +489,7 @@ export const createGroupInviteLink = async (
   };
   await chat.save();
 
-  logger.info('Group invite link created', { chatId, createdBy: currentUserId, expiresAt });
+  logger.info({ chatId, createdBy: currentUserId, expiresAt }, 'Group invite link created');
   return { token: invite.token, expiresAt: invite.expiresAt, maxUses: invite.maxUses };
 };
 
@@ -575,7 +575,7 @@ export const joinGroupViaInvite = async (
   invite.useCount += 1;
   await invite.save();
 
-  logger.info('User joined group via invite', { chatId: chat._id, userId: currentUserId, inviteToken });
+  logger.info({ chatId: chat._id, userId: currentUserId, inviteToken }, 'User joined group via invite');
   return { chat, joined: true };
 };
 

@@ -106,7 +106,7 @@ export const uploadMediaDirect = async (input: UploadInput): Promise<IMediaAsset
     chatId: chatId ? new mongoose.Types.ObjectId(chatId) : undefined,
   });
 
-  logger.debug('Media uploaded', { publicId: result.publicId, userId, folder });
+  logger.debug({ publicId: result.publicId, userId, folder }, 'Media uploaded');
   return mediaAsset;
 };
 
@@ -209,7 +209,7 @@ export const confirmClientUpload = async (
     await MediaAsset.scheduleOrphanCleanup(publicId, 7);
   }
 
-  logger.debug('Client upload confirmed', { publicId, userId });
+  logger.debug({ publicId, userId }, 'Client upload confirmed');
   return mediaAsset;
 };
 
@@ -235,7 +235,7 @@ export const moderateMedia = async (input: ModerateInput): Promise<IMediaAsset> 
   // If rejected, delete from Cloudinary
   if (status === 'rejected') {
     await destroyMediaAssets([publicId]);
-    logger.warn('Media rejected and deleted', { publicId, reason, moderatorId });
+    logger.warn({ publicId, reason, moderatorId }, 'Media rejected and deleted');
   }
 
   return mediaAsset;
@@ -266,7 +266,7 @@ export const deleteMedia = async (publicId: string, userId: string): Promise<voi
   // Delete from database
   await MediaAsset.findByIdAndDelete(mediaAsset._id);
 
-  logger.debug('Media deleted', { publicId, userId });
+  logger.debug({ publicId, userId }, 'Media deleted');
 };
 
 // ============================================================================
@@ -318,10 +318,10 @@ export const cleanupOrphanedMedia = async (): Promise<{ deleted: number; failed:
       await destroyMediaAssets([asset.publicId]);
       await MediaAsset.findByIdAndDelete(asset._id);
       deleted++;
-      logger.debug('Orphaned media cleaned up', { publicId: asset.publicId });
+      logger.debug({ publicId: asset.publicId }, 'Orphaned media cleaned up');
     } catch (error) {
       failed++;
-      logger.error('Failed to cleanup orphaned media', { publicId: asset.publicId, error });
+      logger.error({ publicId: asset.publicId, error }, 'Failed to cleanup orphaned media');
     }
   }
 

@@ -74,6 +74,7 @@ export default function ChatDetailScreen() {
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { colors, isTablet, threadWidth } = useAppTheme();
   const styles = useThemedStyles(createStyles);
@@ -95,7 +96,7 @@ export default function ChatDetailScreen() {
       .catch(() => undefined);
   }, [chatId, session?.accessToken, upsertChat]);
 
-  const { messages, isLoading, isSending, error, sendMessage, toggleReaction, deleteMessage, editMessage } = useMobileChatDetail({
+  const { messages, isLoading, isSending, isLoadingOlder, hasOlderMessages, error, sendMessage, toggleReaction, deleteMessage, editMessage, loadOlderMessages } = useMobileChatDetail({
     token: session?.accessToken,
     userId: session?.user?.userId,
     chat,
@@ -447,7 +448,31 @@ export default function ChatDetailScreen() {
             ]}
             style={styles.messageListView}
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            onContentSizeChange={() => {
+              const lastMessageId = messages[messages.length - 1]?._id ?? null;
+              if (lastMessageId !== lastMessageIdRef.current) {
+                lastMessageIdRef.current = lastMessageId;
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
+            ListHeaderComponent={
+              hasOlderMessages ? (
+                <Pressable
+                  onPress={() => void loadOlderMessages()}
+                  disabled={isLoadingOlder}
+                  style={styles.loadOlderButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Load older messages"
+                >
+                  {isLoadingOlder ? (
+                    <ActivityIndicator size="small" color={colors.brand} />
+                  ) : (
+                    <Text style={styles.loadOlderText}>Load older messages</Text>
+                  )}
+                </Pressable>
+              ) : null
+            }
             renderItem={({ item }) => {
               const senderId = typeof item.senderId === "string" ? item.senderId : item.senderId._id;
               const isOwn = senderId === session?.user?.userId;
@@ -888,6 +913,21 @@ const createStyles = (c: AppColors) =>
     },
     messageListView: {
       flex: 1,
+    },
+    loadOlderButton: {
+      alignSelf: "center",
+      marginVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+    },
+    loadOlderText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: c.muted,
     },
     messageList: {
       width: "100%",

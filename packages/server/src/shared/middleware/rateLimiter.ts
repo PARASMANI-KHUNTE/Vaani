@@ -107,12 +107,7 @@ const createRateLimiter = (options: RateLimiterOptions = {}) => {
       resetKey: (key: string) => store.resetKey(key),
     },
     handler: (req: Request, res: Response) => {
-      logger.warn('Rate limit exceeded', {
-        ip: req.ip,
-        path: req.path,
-        method: req.method,
-        userId: (req as unknown as { user?: { _id: string } }).user?._id,
-      });
+      logger.warn({ ip: req.ip, path: req.path, method: req.method, userId: (req as unknown as { user?: { _id: string } }).user?._id }, 'Rate limit exceeded');
       res.status(statusCode).json({ success: false, error: message });
     },
   });

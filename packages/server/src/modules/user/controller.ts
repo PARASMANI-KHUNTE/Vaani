@@ -31,14 +31,14 @@ import { ApiError } from '../../shared/utils/apiError';
 import { logger } from '../../shared/utils/logger';
 
 export const getMyProfile = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const profile = await getUserProfile(userId, userId);
 
   return sendSuccess(res, 200, 'Profile retrieved', { profile });
 });
 
 export const updateMyProfile = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const input = req.body;
 
   const profile = await updateProfile(userId, input);
@@ -57,7 +57,7 @@ export const updateMyProfile = asyncHandler(async (req: Request, res: Response) 
 });
 
 export const updateMySettings = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const settings = req.body;
 
   const profile = await updateSettings(userId, settings);
@@ -67,7 +67,7 @@ export const updateMySettings = asyncHandler(async (req: Request, res: Response)
 
 export const getProfileByUsername = asyncHandler(async (req: Request, res: Response) => {
   const { username } = req.params;
-  const currentUserId = (req.user as { _id: string })._id;
+  const currentUserId = (req.user!._id as unknown as string);
 
   const user = await getUserProfile(username, currentUserId);
   if (!user) {
@@ -79,7 +79,7 @@ export const getProfileByUsername = asyncHandler(async (req: Request, res: Respo
 
 export const getProfileById = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = req.params;
-  const currentUserId = (req.user as { _id: string })._id;
+  const currentUserId = (req.user!._id as unknown as string);
 
   const profile = await getUserProfile(userId, currentUserId);
   if (!profile) {
@@ -91,7 +91,7 @@ export const getProfileById = asyncHandler(async (req: Request, res: Response) =
 
 // Friend management
 export const sendFriendRequestHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { userId: targetId } = req.params;
 
   await sendFriendRequest(userId, targetId);
@@ -100,7 +100,7 @@ export const sendFriendRequestHandler = asyncHandler(async (req: Request, res: R
 });
 
 export const acceptFriendRequestHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { userId: fromUserId } = req.params;
 
   await acceptFriendRequest(userId, fromUserId);
@@ -109,7 +109,7 @@ export const acceptFriendRequestHandler = asyncHandler(async (req: Request, res:
 });
 
 export const rejectFriendRequestHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { userId: fromUserId } = req.params;
 
   await rejectFriendRequest(userId, fromUserId);
@@ -118,7 +118,7 @@ export const rejectFriendRequestHandler = asyncHandler(async (req: Request, res:
 });
 
 export const removeFriendHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { userId: friendId } = req.params;
 
   await removeFriend(userId, friendId);
@@ -128,7 +128,7 @@ export const removeFriendHandler = asyncHandler(async (req: Request, res: Respon
 
 // Block management
 export const blockUserHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { userId: targetId } = req.params;
 
   await blockUser(userId, targetId);
@@ -137,7 +137,7 @@ export const blockUserHandler = asyncHandler(async (req: Request, res: Response)
 });
 
 export const unblockUserHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { userId: targetId } = req.params;
 
   await unblockUser(userId, targetId);
@@ -147,28 +147,28 @@ export const unblockUserHandler = asyncHandler(async (req: Request, res: Respons
 
 // Friends list
 export const getFriendsHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const friends = await getFriends(userId);
 
   return sendSuccess(res, 200, 'Friends retrieved', { friends });
 });
 
 export const getBlockedUsersHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const blocked = await getBlockedUsers(userId);
 
   return sendSuccess(res, 200, 'Blocked users retrieved', { blockedUsers: blocked });
 });
 
 export const getPendingFriendRequestsHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const requests = await getPendingFriendRequests(userId);
 
   return sendSuccess(res, 200, 'Pending requests retrieved', { requests });
 });
 
 export const getSentFriendRequestsHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const requests = await getSentFriendRequests(userId);
 
   return sendSuccess(res, 200, 'Sent requests retrieved', { requests });
@@ -176,7 +176,7 @@ export const getSentFriendRequestsHandler = asyncHandler(async (req: Request, re
 
 // Search & Explore
 export const searchUsersHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { q } = req.query;
 
   if (!q || typeof q !== 'string') {
@@ -189,7 +189,7 @@ export const searchUsersHandler = asyncHandler(async (req: Request, res: Respons
 });
 
 export const exploreUsersHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const users = await exploreUsers(userId);
 
   return sendSuccess(res, 200, 'Users found', { users });
@@ -197,7 +197,7 @@ export const exploreUsersHandler = asyncHandler(async (req: Request, res: Respon
 
 // Push tokens
 export const registerPushToken = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { pushToken, platform } = req.body;
 
   if (!pushToken || !platform) {
@@ -210,7 +210,7 @@ export const registerPushToken = asyncHandler(async (req: Request, res: Response
 });
 
 export const unregisterPushToken = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
   const { token } = req.body;
 
   if (!token) {
@@ -224,7 +224,7 @@ export const unregisterPushToken = asyncHandler(async (req: Request, res: Respon
 
 // Account management
 export const disableMyAccount = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
 
   await disableAccount(userId);
 
@@ -232,7 +232,7 @@ export const disableMyAccount = asyncHandler(async (req: Request, res: Response)
 });
 
 export const deleteMyAccount = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.user as { _id: string })._id;
+  const userId = (req.user!._id as unknown as string);
 
   await deleteAccount(userId);
 

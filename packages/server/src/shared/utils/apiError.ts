@@ -190,9 +190,10 @@ export const getErrorCode = (error: Error): string => {
 
 export const getErrorStatusCode = (error: Error): number => {
   if (error instanceof ApiError) return error.statusCode;
-  if ((error as { statusCode?: number }).statusCode) return (error as { statusCode: number }).statusCode;
-  if ((error as { status?: number }).status) return (error as { status: number }).status;
-  if ((error as { code?: number }).code === 11000) return 409;
+  const err = error as unknown as { statusCode?: number; status?: number; code?: number };
+  if (err.statusCode) return err.statusCode;
+  if (err.status) return err.status;
+  if (err.code === 11000) return 409;
   if (error.name === 'ValidationError') return 400;
   if (error.name === 'CastError') return 400;
   if (error.name === 'TokenExpiredError') return 401;

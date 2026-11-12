@@ -21,18 +21,19 @@ interface FormattedValidationError {
 
 const formatValidationErrors = (errors: ValidationError[]): FormattedValidationError[] => {
   return errors.map((error) => {
+    const err = error as any;
     if ('path' in error) {
       return {
         field: error.path,
         message: error.msg,
         value: error.value,
-        location: error.location,
+        location: err.location || 'unknown',
       };
     }
     return {
       field: 'unknown',
       message: error.msg,
-      location: error.location,
+      location: err.location || 'unknown',
     };
   });
 };
@@ -50,7 +51,7 @@ export const validateRequest = asyncHandler(async (req: Request, _res: Response,
     // Create a user-friendly message
     const messages = formattedErrors.map((e) => `${e.field}: ${e.message}`).join('; ');
 
-    throw new ApiError(400, messages, {
+    throw new ApiError(400, messages, 'VALIDATION_ERROR', {
       validationErrors: formattedErrors,
     });
   }

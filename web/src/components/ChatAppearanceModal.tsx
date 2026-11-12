@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { 
   X, Palette, Image as ImageIcon, CheckCircle2, RefreshCw, Check, Link2
 } from "lucide-react";
@@ -23,17 +23,40 @@ export const ChatAppearanceModal = ({ chat, isOpen, onClose, onUpdate }: ChatApp
   const [uploadingWallpaper, setUploadingWallpaper] = useState(false);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
+  // Keep the form in sync when the modal is reopened for another chat.
+  useEffect(() => {
+    if (!isOpen) return;
+    setTheme(chat?.theme || "default");
+    setWallpaper(chat?.wallpaper || null);
+    setError(null);
+  }, [chat?._id, chat?.theme, chat?.wallpaper, isOpen]);
+
   if (!isOpen || !chat) return null;
 
   const handleSave = async () => {
     if (!session?.backendAccessToken) return;
+
+    const currentTheme = chat.theme || "default";
+    const currentWallpaper = chat.wallpaper || null;
+    const nextWallpaper = wallpaper || null;
+    const updates: { theme?: string; wallpaper?: string | null } = {};
+
+    if (theme !== currentTheme) {
+      updates.theme = theme;
+    }
+    if (nextWallpaper !== currentWallpaper) {
+      updates.wallpaper = nextWallpaper;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      onClose();
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     try {
-      const result = await patchChatSettings(session.backendAccessToken, chat._id, {
-        theme,
-        wallpaper: wallpaper || undefined,
-      });
+      const result = await patchChatSettings(session.backendAccessToken, chat._id, updates);
       onUpdate?.(result.chat);
       onClose();
     } catch (err) {

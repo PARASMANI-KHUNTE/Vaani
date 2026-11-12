@@ -72,7 +72,7 @@ export const generateAccessToken = (payload: Omit<JWTPayload, 'iat' | 'exp' | 't
   return jwt.sign(
     { ...payload, type: 'access' },
     config.auth.jwtSecret,
-    { expiresIn: config.auth.accessTokenExpiry }
+    { expiresIn: config.auth.jwtExpiresIn as jwt.SignOptions['expiresIn'] }
   );
 };
 
@@ -83,6 +83,6 @@ export const generateRefreshToken = (payload: Omit<JWTPayload, 'iat' | 'exp' | '
   return jwt.sign(
     { ...payload, type: 'refresh' },
     config.auth.jwtRefreshSecret,
-    { expiresIn: config.auth.refreshTokenExpiry }
+    { expiresIn: config.auth.jwtRefreshExpiresIn as jwt.SignOptions['expiresIn'] }
   );
 };

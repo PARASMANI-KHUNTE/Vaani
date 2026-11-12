@@ -53,7 +53,7 @@ const formatChatTime = (value?: string) => {
 
 export default function ChatsScreen() {
   const session = useSessionStore((state) => state.session);
-  const { chats, isLoading, error, refresh } = useMobileChats({
+  const { chats, isLoading, isLoadingMore, error, refresh, loadMoreChats } = useMobileChats({
     token: session?.accessToken,
   });
   const [showNewChat, setShowNewChat] = useState(false);
@@ -148,6 +148,19 @@ export default function ChatsScreen() {
             }
             contentContainerStyle={
               filteredChats.length === 0 ? styles.emptyContent : styles.listContent
+            }
+            onEndReached={() => {
+              if (!query.trim()) {
+                void loadMoreChats();
+              }
+            }}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={
+              isLoadingMore && !query.trim() ? (
+                <View style={styles.loadingMore}>
+                  <ActivityIndicator size="small" color={colors.brand} />
+                </View>
+              ) : null
             }
             ListEmptyComponent={
               <View style={styles.emptyCard}>
@@ -277,6 +290,10 @@ const createStyles = (c: AppColors) =>
     },
     listContent: {
       paddingBottom: spacing.xl,
+    },
+    loadingMore: {
+      paddingVertical: spacing.md,
+      alignItems: "center",
     },
     emptyContent: {
       flexGrow: 1,

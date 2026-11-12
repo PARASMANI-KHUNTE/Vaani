@@ -1,5 +1,5 @@
 const Chat = require("../chat/chat.model");
-const { getChatSummary } = require("../chat/chat.service");
+const { getChatSummary, getChatSummariesForParticipants } = require("../chat/chat.service");
 const logger = require("../../utils/logger");
 const { assertSafeMessageContent } = require("../../utils/contentSafety");
 const {
@@ -163,28 +163,38 @@ const registerSocketHandlers = (io, socket) => {
 
       socket.join(getChatRoom(chatId));
 
-      const seenCount = await markMessagesAsSeen({
+      const seen = await markMessagesAsSeen({
         chatId,
         currentUserId,
       });
+      const seenCount = seen.count;
+
+      const participantIds = chat.participants.map((participantId) => participantId.toString());
 
       if (seenCount > 0) {
-        const updatedChat = await getChatSummary(chatId, currentUserId);
+        // Each participant needs their own summary (unread count and
+        // participant relationship flags are per-user).
+        const summaries = await getChatSummariesForParticipants(chatId, participantIds);
 
-        chat.participants
-          .map((participantId) => participantId.toString())
-          .filter((participantId) => participantId !== currentUserId)
-          .forEach((participantId) => {
+        participantIds.forEach((participantId) => {
+          if (participantId !== currentUserId) {
             emitToUser(io, participantId, SOCKET_EVENTS.MESSAGE_SEEN, {
               chatId,
               seenByUserId: currentUserId,
               count: seenCount,
+              seenAt: seen.seenAt,
             });
+          }
+          if (summaries[participantId]) {
             emitToUser(io, participantId, SOCKET_EVENTS.CHAT_UPDATED, {
-              chat: updatedChat,
+              chat: summaries[participantId],
             });
-          });
-
+          }
+        });
+      } else {
+        // No messages changed, but the manual-unread flag may have been
+        // cleared by markMessagesAsSeen, so refresh the reader's own view.
+        const updatedChat = await getChatSummary(chatId, currentUserId);
         emitToUser(io, currentUserId, SOCKET_EVENTS.CHAT_UPDATED, {
           chat: updatedChat,
         });

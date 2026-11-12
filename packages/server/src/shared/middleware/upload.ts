@@ -4,7 +4,7 @@
  */
 
 import multer, { FileFilterCallback, Multer } from 'multer';
-import { Request } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { MediaConstraints, MagicBytes } from '@chat-app/shared/constants';
 import { ApiError } from '../../shared/utils/apiError';
 import { logger } from '../../shared/utils/logger';
@@ -21,25 +21,47 @@ interface UploadCategory {
   allowedExtensions: string[];
 }
 
+// Create mutable copies to avoid readonly issues
+const imageConstraints = {
+  maxSize: MediaConstraints.IMAGE.maxSize,
+  allowedMimeTypes: [...MediaConstraints.IMAGE.allowedMimeTypes],
+  allowedExtensions: [...MediaConstraints.IMAGE.allowedExtensions],
+};
+const videoConstraints = {
+  maxSize: MediaConstraints.VIDEO.maxSize,
+  allowedMimeTypes: [...MediaConstraints.VIDEO.allowedMimeTypes],
+  allowedExtensions: [...MediaConstraints.VIDEO.allowedExtensions],
+};
+const audioConstraints = {
+  maxSize: MediaConstraints.AUDIO.maxSize,
+  allowedMimeTypes: [...MediaConstraints.AUDIO.allowedMimeTypes],
+  allowedExtensions: [...MediaConstraints.AUDIO.allowedExtensions],
+};
+const fileConstraints = {
+  maxSize: MediaConstraints.FILE.maxSize,
+  allowedMimeTypes: [...MediaConstraints.FILE.allowedMimeTypes],
+  allowedExtensions: [...MediaConstraints.FILE.allowedExtensions],
+};
+
 const UPLOAD_CATEGORIES: Record<string, UploadCategory> = {
-  avatar: MediaConstraints.IMAGE,
-  image: MediaConstraints.IMAGE,
-  video: MediaConstraints.VIDEO,
-  audio: MediaConstraints.AUDIO,
-  file: MediaConstraints.FILE,
+  avatar: imageConstraints,
+  image: imageConstraints,
+  video: videoConstraints,
+  audio: audioConstraints,
+  file: fileConstraints,
   auto: {
     maxSize: MAX_FILE_SIZE,
     allowedMimeTypes: [
-      ...MediaConstraints.IMAGE.allowedMimeTypes,
-      ...MediaConstraints.VIDEO.allowedMimeTypes,
-      ...MediaConstraints.AUDIO.allowedMimeTypes,
-      ...MediaConstraints.FILE.allowedMimeTypes,
+      ...imageConstraints.allowedMimeTypes,
+      ...videoConstraints.allowedMimeTypes,
+      ...audioConstraints.allowedMimeTypes,
+      ...fileConstraints.allowedMimeTypes,
     ],
     allowedExtensions: [
-      ...MediaConstraints.IMAGE.allowedExtensions,
-      ...MediaConstraints.VIDEO.allowedExtensions,
-      ...MediaConstraints.AUDIO.allowedExtensions,
-      ...MediaConstraints.FILE.allowedExtensions,
+      ...imageConstraints.allowedExtensions,
+      ...videoConstraints.allowedExtensions,
+      ...audioConstraints.allowedExtensions,
+      ...fileConstraints.allowedExtensions,
     ],
   },
 };
@@ -67,23 +89,15 @@ const createFileFilter = (category: string = 'auto') => {
   return (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     // Check MIME type
     if (!constraints.allowedMimeTypes.includes(file.mimetype)) {
-      logger.warn('File upload rejected: invalid MIME type', {
-        mimetype: file.mimetype,
-        allowed: constraints.allowedMimeTypes,
-        category,
-      });
-      return cb(new ApiError(415, `File type not allowed. Allowed: ${constraints.allowedMimeTypes.join(', ')}`));
+      logger.warn({ mimetype: file.mimetype, allowed: constraints.allowedMimeTypes, category }, 'File upload rejected: invalid MIME type');
+      return cb(new ApiError(415, `File type not allowed. Allowed: ${constraints.allowedMimeTypes.join(', ')}`, 'UNSUPPORTED_MEDIA_TYPE'));
     }
 
     // Check extension
     const extension = '.' + file.originalname.split('.').pop()?.toLowerCase();
     if (!constraints.allowedExtensions.includes(extension)) {
-      logger.warn('File upload rejected: invalid extension', {
-        extension,
-        allowed: constraints.allowedExtensions,
-        category,
-      });
-      return cb(new ApiError(415, `File extension not allowed. Allowed: ${constraints.allowedExtensions.join(', ')}`));
+      logger.warn({ extension, allowed: constraints.allowedExtensions, category }, 'File upload rejected: invalid extension');
+      return cb(new ApiError(415, `File extension not allowed. Allowed: ${constraints.allowedExtensions.join(', ')}`, 'UNSUPPORTED_MEDIA_TYPE'));
     }
 
     cb(null, true);
@@ -114,16 +128,18 @@ const createMulter = (category: string = 'auto'): Multer => {
 // Pre-configured Upload Middlewares
 // ============================================================================
 
-export const uploadAvatar = createMulter('avatar').single('avatar');
-export const uploadImage = createMulter('image').single('image');
-export const uploadVideo = createMulter('video').single('video');
-export const uploadAudio = createMulter('audio').single('audio');
-export const uploadFile = createMulter('file').single('file');
-export const uploadAny = createMulter('auto').single('file');
-export const uploadMultiple = createMulter('auto').array('files', 10);
+import type { RequestHandler } from 'express';
+
+export const uploadAvatar: RequestHandler = createMulter('avatar').single('avatar');
+export const uploadImage: RequestHandler = createMulter('image').single('image');
+export const uploadVideo: RequestHandler = createMulter('video').single('video');
+export const uploadAudio: RequestHandler = createMulter('audio').single('audio');
+export const uploadFile: RequestHandler = createMulter('file').single('file');
+export const uploadAny: RequestHandler = createMulter('auto').single('file');
+export const uploadMultiple: RequestHandler = createMulter('auto').array('files', 10);
 
 // Mixed fields for different file types
-export const uploadMixed = createMulter('auto').fields([
+export const uploadMixed: RequestHandler = createMulter('auto').fields([
   { name: 'avatar', maxCount: 1 },
   { name: 'image', maxCount: 5 },
   { name: 'video', maxCount: 2 },
@@ -143,10 +159,7 @@ export const validateUploadedFile = (category: string = 'auto') => {
     try {
       // Validate magic bytes
       if (!validateMagicBytes(file.buffer, file.mimetype)) {
-        logger.warn('File upload rejected: magic bytes mismatch', {
-          mimetype: file.mimetype,
-          originalname: file.originalname,
-        });
+        logger.warn({ mimetype: file.mimetype, originalname: file.originalname }, 'File upload rejected: magic bytes mismatch');
         throw new ApiError(415, 'File content does not match declared type', 'INVALID_FILE_CONTENT');
       }
 
@@ -170,6 +183,8 @@ export const validateUploadedFile = (category: string = 'auto') => {
     }
   };
 };
+
+// Remove duplicate import at end of file
 
 // ============================================================================
 // Error Handling for Multer
@@ -258,5 +273,3 @@ declare global {
     }
   }
 }
-
-import { Response, NextFunction } from 'express';

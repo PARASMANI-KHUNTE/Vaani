@@ -107,6 +107,19 @@ const messageSchema = new mongoose.Schema(
       type: mediaSchema,
       default: null,
     },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "seen"],
+      default: "sent",
+    },
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
+    seenAt: {
+      type: Date,
+      default: null,
+    },
     receipts: {
       type: [receiptSchema],
       default: [],
@@ -194,6 +207,7 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ chatId: 1, senderId: 1 });
+messageSchema.index({ chatId: 1, status: 1 });
 messageSchema.index({ chatId: 1, deletedForEveryone: 1, deletedFor: 1 });
 messageSchema.index({ "reactions.userId": 1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });

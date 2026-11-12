@@ -192,7 +192,7 @@ export const idempotencyMiddleware = asyncHandler(async (req: Request, res: Resp
         headers: responseHeaders,
         createdAt: Date.now(),
       }).catch((err) => {
-        logger.error('Failed to store idempotency response', { error: err.message });
+        logger.error({ error: err.message }, 'Failed to store idempotency response');
       });
     }
 

@@ -13,9 +13,20 @@ import { UserSettings, PushToken, FriendRequest } from '@chat-app/shared/types';
 
 export interface IUserSettings extends UserSettings {}
 
-export interface IPushToken extends PushToken {}
+export interface IPushToken {
+  token: string;
+  platform: 'web' | 'ios' | 'android';
+  deviceId?: string;
+  createdAt: Date;
+}
 
-export interface IFriendRequest extends FriendRequest {}
+export interface IFriendRequest {
+  _id: mongoose.Types.ObjectId;
+  fromUser: mongoose.Types.ObjectId;
+  toUser: mongoose.Types.ObjectId;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+}
 
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
@@ -36,6 +47,7 @@ export interface IUser extends Document {
   role: 'user' | 'admin' | 'moderator';
   createdAt: Date;
   updatedAt: Date;
+  [key: string]: unknown;
 
   // Methods
   addFriend(userId: mongoose.Types.ObjectId): Promise<IUser>;
@@ -104,6 +116,13 @@ const UserSchema = createBaseSchema<IUser>({
   settings: { type: UserSettingsSchema, default: () => ({}) },
   role: { type: String, enum: ['user', 'admin', 'moderator'], default: 'user' },
 });
+
+export interface IUserModel extends mongoose.Model<IUser> {
+  findByEmail(email: string): Promise<IUser | null>;
+  findByUsername(username: string): Promise<IUser | null>;
+  searchUsers(query: string, currentUserId: mongoose.Types.ObjectId, limit?: number): Promise<IUser[]>;
+  getExploreUsers(currentUserId: mongoose.Types.ObjectId, limit?: number): Promise<IUser[]>;
+}
 
 // ============================================================================
 // Indexes
@@ -288,5 +307,5 @@ UserSchema.statics.getExploreUsers = async function (excludeId: mongoose.Types.O
 // Model Export
 // ============================================================================
 
-export const User = mongoose.model<IUser>('User', UserSchema);
+export const User = mongoose.model<IUser, IUserModel>('User', UserSchema);
 export default User;

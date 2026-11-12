@@ -17,13 +17,12 @@ interface SocketJWTPayload {
   exp: number;
 }
 
+// Extend SocketData interface for socket.data
 declare module 'socket.io' {
-  interface Socket {
-    data: {
-      userId: string;
-      email: string;
-      auth?: SocketJWTPayload;
-    };
+  interface SocketData {
+    userId: string;
+    email: string;
+    auth?: SocketJWTPayload;
   }
 }
 
@@ -35,7 +34,7 @@ export const verifySocketToken = async (socket: Socket, next: (err?: Error) => v
       socket.handshake.query?.token as string;
 
     if (!token) {
-      logger.warn('Socket connection attempt without token', { socketId: socket.id });
+      logger.warn({ socketId: socket.id }, 'Socket connection attempt without token');
       return next(new Error('Authentication token required'));
     }
 
@@ -66,10 +65,10 @@ export const verifySocketToken = async (socket: Socket, next: (err?: Error) => v
     // Join user's personal room for direct messages
     socket.join(`user:${decoded.sub}`);
 
-    logger.debug('Socket authenticated', { socketId: socket.id, userId: decoded.sub });
+    logger.debug({ socketId: socket.id, userId: decoded.sub }, 'Socket authenticated');
     next();
   } catch (error) {
-    logger.error('Socket authentication error', { socketId: socket.id, error: (error as Error).message });
+    logger.error({ socketId: socket.id, error: (error as Error).message }, 'Socket authentication error');
     next(new Error('Authentication failed'));
   }
 };

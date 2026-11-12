@@ -11,6 +11,17 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 
+type AuthRefreshHandler = {
+  refresh: () => Promise<string | null>;
+  onRefreshFailed?: () => void;
+};
+
+let authRefreshHandler: AuthRefreshHandler | null = null;
+
+export const setAuthRefreshHandler = (handler: AuthRefreshHandler | null) => {
+  authRefreshHandler = handler;
+};
+
 class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -34,13 +45,28 @@ async function request<T>(
     headers?: Record<string, string>;
     signal?: AbortSignal;
     retries?: number;
+    skipAuthRefresh?: boolean;
   } = {}
 ): Promise<T> {
-  const { method = "GET", token, body, headers = {}, signal, retries = MAX_RETRIES } = options;
+  const {
+    method = "GET",
+    token,
+    body,
+    headers = {},
+    signal,
+    retries,
+    skipAuthRefresh = false,
+  } = options;
   const url = `${API_BASE_URL}${path}`;
   let lastError: Error | null = null;
+  let activeToken = token;
+  let refreshAttempted = false;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  // POST requests are not retried because the server may have already
+  // processed them (duplicate groups/messages). GET/PUT/DELETE are safe.
+  const maxRetries = retries ?? (method === "POST" ? 0 : MAX_RETRIES);
+
+  for (let attempt = 0; ; attempt++) {
     if (signal?.aborted) {
       throw new Error("Request cancelled");
     }
@@ -50,8 +76,8 @@ async function request<T>(
         ...headers,
       };
 
-      if (token) {
-        requestHeaders["Authorization"] = `Bearer ${token}`;
+      if (activeToken) {
+        requestHeaders["Authorization"] = `Bearer ${activeToken}`;
       }
 
       if (!(body instanceof FormData) && !requestHeaders["Content-Type"]) {
@@ -66,6 +92,25 @@ async function request<T>(
       });
 
       const payload = await response.json().catch(() => null);
+
+      if (
+        response.status === 401 &&
+        !refreshAttempted &&
+        !skipAuthRefresh &&
+        activeToken &&
+        authRefreshHandler
+      ) {
+        refreshAttempted = true;
+        const refreshedToken = await authRefreshHandler.refresh().catch(() => null);
+
+        if (refreshedToken) {
+          activeToken = refreshedToken;
+          attempt -= 1;
+          continue;
+        }
+
+        authRefreshHandler.onRefreshFailed?.();
+      }
 
       if (!response.ok) {
         const errorMessage = payload?.message || `Request failed with status ${response.status}`;
@@ -85,7 +130,7 @@ async function request<T>(
         throw error;
       }
 
-      if (attempt < retries) {
+      if (attempt < maxRetries) {
         const delay = calculateBackoff(attempt);
         await sleep(delay);
         continue;
@@ -308,21 +353,35 @@ export const joinGroupViaInvite = async (token: string, inviteToken: string) =>
     token,
   });
 
-export const getMessages = async (token: string, chatId: string, page = 1, limit = 30, signal?: AbortSignal) =>
-  request<{
+export const getMessages = async (
+  token: string,
+  chatId: string,
+  options: { page?: number; limit?: number; cursor?: string | null } = {},
+  signal?: AbortSignal
+) => {
+  const params = new URLSearchParams();
+  params.set("page", String(options.page ?? 1));
+  params.set("limit", String(options.limit ?? 20));
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  return request<{
     messages: Message[];
     pagination: {
-      page: number;
+      page?: number;
       limit: number;
       total: number;
-      totalPages: number;
+      totalPages?: number;
       hasNextPage: boolean;
+      cursor?: string | null;
     };
-  }>(`/messages/${chatId}?page=${page}&limit=${limit}`, {
+  }>(`/messages/${chatId}?${params.toString()}`, {
     method: "GET",
     token,
     signal,
   });
+};
 
 export const sendMessage = async (
   token: string,
@@ -532,9 +591,24 @@ export const exchangeGoogleLogin = async (idToken: string) =>
   request<{
     user: BackendUser & { email: string };
     accessToken: string;
+    refreshToken?: string;
   }>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ idToken }),
+  });
+
+export const refreshAccessToken = async (refreshToken: string) =>
+  request<{ accessToken: string }>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+    skipAuthRefresh: true,
+  });
+
+export const revokeSession = async (refreshToken: string) =>
+  request<null>("/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+    skipAuthRefresh: true,
   });
 
 export const getAuthMe = async (token: string) =>

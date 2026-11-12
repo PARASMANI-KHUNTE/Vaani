@@ -145,7 +145,7 @@ export const sendMessage = async (input: SendMessageInput): Promise<IMessage> =>
     }
   }
 
-  logger.debug('Message sent', { messageId: message._id, chatId, senderId });
+  logger.debug({ messageId: message._id, chatId, senderId }, 'Message sent');
   return populatedMessage! as any;
 };
 
@@ -205,7 +205,7 @@ export const getMessageById = async (messageId: string, userId: string): Promise
 // Edit Message
 // ============================================================================
 
-export const editMessage = async (input: EditMessageInput): Promise<IMessage> => {
+export const editMessage = async (input: EditMessageInput): Promise<Record<string, unknown>> => {
   const { messageId, chatId, userId, content } = input;
 
   if (!content || content.trim().length === 0) {
@@ -249,7 +249,7 @@ export const editMessage = async (input: EditMessageInput): Promise<IMessage> =>
   // Emit real-time event
   socketEmitters.messageEdited(populatedMessage! as any);
 
-  logger.debug('Message edited', { messageId, chatId, userId });
+  logger.debug({ messageId, chatId, userId }, 'Message edited');
   return populatedMessage! as Record<string, unknown>;
 };
 
@@ -309,7 +309,7 @@ export const deleteMessage = async (input: DeleteMessageInput): Promise<{ messag
   // Emit real-time event
   socketEmitters.messageDeleted(chatId, messageId, scope, populatedMessage as any);
 
-  logger.debug('Message deleted', { messageId, chatId, userId, scope });
+  logger.debug({ messageId, chatId, userId, scope }, 'Message deleted');
   return { messageId, chatId, message: populatedMessage };
 };
 
@@ -369,7 +369,7 @@ export const forwardMessage = async (input: ForwardMessageInput): Promise<Record
   // Emit real-time event
   socketEmitters.newMessage(targetChatId, populatedMessage! as any);
 
-  logger.debug('Message forwarded', { originalMessageId: messageId, targetChatId, userId });
+  logger.debug({ originalMessageId: messageId, targetChatId, userId }, 'Message forwarded');
   return populatedMessage! as Record<string, unknown>;
 };
 
@@ -404,7 +404,7 @@ export const addReaction = async (input: ReactionInput): Promise<Record<string, 
   // Emit real-time event
   socketEmitters.reactionAdded(populatedMessage! as any, userId, userName, emoji);
 
-  logger.debug('Reaction added', { messageId, userId, emoji });
+  logger.debug({ messageId, userId, emoji }, 'Reaction added');
   return populatedMessage! as Record<string, unknown>;
 };
 
@@ -424,7 +424,7 @@ export const removeReaction = async (messageId: string, userId: string, emoji: s
   // Emit real-time event
   socketEmitters.reactionRemoved(populatedMessage! as any, userId, emoji);
 
-  logger.debug('Reaction removed', { messageId, userId, emoji });
+  logger.debug({ messageId, userId, emoji }, 'Reaction removed');
   return populatedMessage! as Record<string, unknown>;
 };
 

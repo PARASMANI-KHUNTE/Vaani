@@ -57,7 +57,7 @@ if (config.cloudinary.cloudName && config.cloudinary.apiKey && config.cloudinary
     secure: true,
   });
 } else {
-  logger.warn('Cloudinary not configured - media uploads will fail');
+  logger.warn({ cloudinary: 'not configured' }, 'Cloudinary not configured - media uploads will fail');
 }
 
 // ============================================================================
@@ -102,7 +102,8 @@ export const uploadMedia = async (
   }
 
   try {
-    const result = await cloudinary.uploader.upload(file, uploadOptions);
+    // Cloudinary accepts string (path, URL, base64) or Buffer - cast to satisfy TypeScript
+    const result = await cloudinary.uploader.upload(file as string, uploadOptions);
 
     return {
       publicId: result.public_id,
@@ -117,7 +118,7 @@ export const uploadMedia = async (
       createdAt: result.created_at,
     };
   } catch (error) {
-    logger.error('Cloudinary upload failed', { error: (error as Error).message, folder });
+    logger.error({ error: (error as Error).message, folder }, 'Cloudinary upload failed');
     throw error;
   }
 };
@@ -173,10 +174,10 @@ export const destroyMediaAssets = async (publicIds: string[]): Promise<number> =
     });
 
     const deleted = result.deleted ? Object.keys(result.deleted).length : 0;
-    logger.info('Cloudinary assets destroyed', { count: deleted, publicIds });
+    logger.info({ count: deleted, publicIds }, 'Cloudinary assets destroyed');
     return deleted;
   } catch (error) {
-    logger.error('Failed to destroy Cloudinary assets', { error: (error as Error).message, publicIds });
+    logger.error({ error: (error as Error).message, publicIds }, 'Failed to destroy Cloudinary assets');
     return 0;
   }
 };
@@ -191,10 +192,10 @@ export const destroyByFolder = async (folder: string): Promise<number> => {
     });
 
     const deleted = result.deleted ? Object.keys(result.deleted).length : 0;
-    logger.info('Cloudinary folder destroyed', { folder, count: deleted });
+    logger.info({ folder, count: deleted }, 'Cloudinary folder destroyed');
     return deleted;
   } catch (error) {
-    logger.error('Failed to destroy Cloudinary folder', { error: (error as Error).message, folder });
+    logger.error({ error: (error as Error).message, folder }, 'Failed to destroy Cloudinary folder');
     return 0;
   }
 };
@@ -249,7 +250,8 @@ export const validateMediaFile = (
   fileSize: number,
   category: keyof typeof MediaConstraints = 'IMAGE'
 ): { valid: boolean; error?: string } => {
-  const constraints = MediaConstraints[category];
+  // Type assertion to avoid TypeScript narrowing issues
+  const constraints = MediaConstraints[category] as { maxSize: number; allowedMimeTypes: readonly string[]; allowedExtensions: readonly string[] };
 
   if (!constraints.allowedMimeTypes.includes(mimeType)) {
     return {

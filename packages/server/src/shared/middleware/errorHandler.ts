@@ -7,7 +7,6 @@ import { Request, Response, NextFunction } from 'express';
 import { config } from '../../config';
 import { logger } from '../../shared/utils/logger';
 import { ApiError } from '../../shared/utils/apiError';
-import { ErrorCodes } from '@chat-app/shared/constants';
 
 // ============================================================================
 // Error Messages Map
@@ -185,8 +184,9 @@ export const errorHandler = (err: Error, req: Request, res: Response, _next: Nex
       message = `${field} already exists`;
     } else if (error.name === 'ValidationError') {
       statusCode = 400;
-      if ((error as { errors?: Record<string, { message: string }> }).errors) {
-        message = Object.values((error as { errors: Record<string, { message: string }> }).errors)
+      const validationError = error as unknown as { errors?: Record<string, { message: string }> };
+      if (validationError.errors) {
+        message = Object.values(validationError.errors)
           .map((val) => val.message)
           .join(', ');
       }
@@ -224,13 +224,9 @@ export const errorHandler = (err: Error, req: Request, res: Response, _next: Nex
     };
 
     if (statusCode >= 500) {
-      logger.error('Server Error', {
-        ...logData,
-        stack: error.stack,
-        body: req.body && Object.keys(req.body).length > 0 ? '[REDACTED]' : undefined,
-      });
+      logger.error({ ...logData, stack: error.stack, body: req.body && Object.keys(req.body).length > 0 ? '[REDACTED]' : undefined }, 'Server Error');
     } else {
-      logger.warn('Client Error', logData);
+      logger.warn(logData, 'Client Error');
     }
   }
 
@@ -286,56 +282,56 @@ export const asyncHandler = (handler: (req: Request, res: Response, next: NextFu
 
 export class NotFoundError extends ApiError {
   constructor(resource: string, id?: string) {
-    super(404, `${resource} not found${id ? ` (${id})` : ''}`, { resource, id });
+    super(404, `${resource} not found${id ? ` (${id})` : ''}`, 'NOT_FOUND', { resource, id });
     this.name = 'NotFoundError';
   }
 }
 
 export class ValidationError extends ApiError {
   constructor(message: string, details?: Record<string, unknown>) {
-    super(400, message, details);
+    super(400, message, 'VALIDATION_ERROR', details);
     this.name = 'ValidationError';
   }
 }
 
 export class UnauthorizedError extends ApiError {
-  constructor(message: string = 'Authentication required') {
-    super(401, message);
+  constructor(message: string = 'Authentication required', code: string = 'UNAUTHORIZED') {
+    super(401, message, code);
     this.name = 'UnauthorizedError';
   }
 }
 
 export class ForbiddenError extends ApiError {
-  constructor(message: string = 'Access denied') {
-    super(403, message);
+  constructor(message: string = 'Access denied', code: string = 'FORBIDDEN') {
+    super(403, message, code);
     this.name = 'ForbiddenError';
   }
 }
 
 export class ConflictError extends ApiError {
-  constructor(message: string, details?: Record<string, unknown>) {
-    super(409, message, details);
+  constructor(message: string, details?: Record<string, unknown>, code: string = 'CONFLICT') {
+    super(409, message, code, details);
     this.name = 'ConflictError';
   }
 }
 
 export class RateLimitError extends ApiError {
-  constructor(message: string = 'Too many requests') {
-    super(429, message);
+  constructor(message: string = 'Too many requests', code: string = 'RATE_LIMIT_EXCEEDED') {
+    super(429, message, code);
     this.name = 'RateLimitError';
   }
 }
 
 export class PayloadTooLargeError extends ApiError {
   constructor(message: string = 'Payload too large') {
-    super(413, message);
+    super(413, message, 'PAYLOAD_TOO_LARGE');
     this.name = 'PayloadTooLargeError';
   }
 }
 
 export class UnsupportedMediaTypeError extends ApiError {
   constructor(message: string = 'Unsupported media type') {
-    super(415, message);
+    super(415, message, 'UNSUPPORTED_MEDIA_TYPE');
     this.name = 'UnsupportedMediaTypeError';
   }
 }

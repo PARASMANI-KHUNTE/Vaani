@@ -73,7 +73,7 @@ export const getHealthStatus = async (): Promise<{
 };
 
 export const getDetailedHealth = async (): Promise<{
-  health: ReturnType<typeof getHealthStatus>;
+  health: { status: 'healthy' | 'degraded' | 'unhealthy'; checks: Record<string, { status: 'up' | 'down' | 'degraded'; latency?: number; error?: string }>; timestamp: Date };
   stats: {
     uptime: number;
     memory: NodeJS.MemoryUsage;
@@ -217,7 +217,7 @@ export const runRetentionCleanup = async (): Promise<{
   metricsDeleted: number;
   rateLimitsDeleted: number;
 }> => {
-  logger.info('Starting retention cleanup job');
+  logger.info({}, 'Starting retention cleanup job');
 
   const results = {
     chatsDeleted: 0,
@@ -230,7 +230,7 @@ export const runRetentionCleanup = async (): Promise<{
   };
 
   // 1. Clean up old deleted chats and messages
-  const retentionDays = config.retention.chatRetentionDays || 365;
+  const retentionDays = config.retention.chatDays || 365;
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
@@ -259,7 +259,8 @@ export const runRetentionCleanup = async (): Promise<{
 
     // Delete media assets
     if (mediaAssets.length > 0) {
-      await destroyMediaAssets(mediaAssets);
+      const publicIds = mediaAssets.map((m: any) => m.publicId);
+      await destroyMediaAssets(publicIds);
       results.mediaDeleted += mediaAssets.length;
     }
   }
@@ -299,7 +300,7 @@ export const runRetentionCleanup = async (): Promise<{
   });
   results.rateLimitsDeleted = rateLimitResult.deletedCount || 0;
 
-  logger.info('Retention cleanup completed', results);
+  logger.info(results, 'Retention cleanup completed');
   return results;
 };
 
@@ -315,17 +316,12 @@ const cleanupOrphanedMedia = async (): Promise<{ deleted: number; failed: number
 
   for (const asset of orphanedAssets) {
     try {
-      await destroyMediaAssets([{
-        url: asset.url,
-        publicId: asset.publicId,
-        format: asset.format,
-        fileSize: asset.bytes,
-      }]);
+      await destroyMediaAssets([asset.publicId]);
       await MediaAsset.findByIdAndDelete(asset._id);
       deleted++;
     } catch (error) {
       failed++;
-      logger.error('Failed to cleanup orphaned media', { publicId: asset.publicId, error });
+      logger.error({ publicId: asset.publicId, error }, 'Failed to cleanup orphaned media');
     }
   }
 
@@ -390,6 +386,6 @@ export const getSystemStats = async (): Promise<{
 export const processAllOfflineQueues = async (): Promise<void> => {
   // This would be called periodically to process offline queues
   // In practice, this is handled by the socket layer when users come online
-  logger.debug('Processing all offline queues');
+  logger.debug({}, 'Processing all offline queues');
   // Implementation depends on offline queue structure
 };

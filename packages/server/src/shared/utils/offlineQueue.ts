@@ -46,7 +46,7 @@ export const enqueueOfflineMessage = async (
   chatId: string
 ): Promise<boolean> => {
   if (!isRedisEnabled()) {
-    logger.debug('Offline queue: Redis disabled, skipping', { userId });
+    logger.debug({ userId }, 'Offline queue: Redis disabled, skipping');
     return false;
   }
 
@@ -70,13 +70,13 @@ export const enqueueOfflineMessage = async (
       await client.ltrim?.(key, 0, MAX_QUEUE_SIZE - 1);
       // Set TTL
       await client.expire?.(key, QUEUE_TTL);
-      logger.debug('Message enqueued for offline user', { userId, messageId: message._id });
+      logger.debug({ userId, messageId: message._id }, 'Message enqueued for offline user');
       return true;
     }
 
     return false;
   } catch (error) {
-    logger.error('Failed to enqueue offline message', { userId, error: (error as Error).message });
+    logger.error({ userId, error: (error as Error).message }, 'Failed to enqueue offline message');
     return false;
   }
 };
@@ -103,7 +103,7 @@ export const dequeueOfflineMessages = async (userId: string, limit: number = 100
 
     return messages.map((msg) => JSON.parse(msg) as QueuedMessage);
   } catch (error) {
-    logger.error('Failed to dequeue offline messages', { userId, error: (error as Error).message });
+    logger.error({ userId, error: (error as Error).message }, 'Failed to dequeue offline messages');
     return [];
   }
 };
@@ -125,7 +125,7 @@ export const peekOfflineQueue = async (userId: string, limit: number = 50): Prom
     const messages = await client.lrange(key, 0, limit - 1);
     return messages.map((msg) => JSON.parse(msg) as QueuedMessage);
   } catch (error) {
-    logger.error('Failed to peek offline queue', { userId, error: (error as Error).message });
+    logger.error({ userId, error: (error as Error).message }, 'Failed to peek offline queue');
     return [];
   }
 };
@@ -158,7 +158,7 @@ export const getOfflineQueueStats = async (userId: string): Promise<QueueStats> 
       newestMessage: newest?.[0] ? JSON.parse(newest[0]).enqueuedAt : undefined,
     };
   } catch (error) {
-    logger.error('Failed to get offline queue stats', { userId, error: (error as Error).message });
+    logger.error({ userId, error: (error as Error).message }, 'Failed to get offline queue stats');
     return { totalMessages: 0 };
   }
 };
@@ -174,10 +174,10 @@ export const clearOfflineQueue = async (userId: string): Promise<boolean> => {
   try {
     const key = `${OFFLINE_QUEUE_PREFIX}${userId}`;
     await cache.del(key);
-    logger.debug('Offline queue cleared', { userId });
+    logger.debug({ userId }, 'Offline queue cleared');
     return true;
   } catch (error) {
-    logger.error('Failed to clear offline queue', { userId, error: (error as Error).message });
+    logger.error({ userId, error: (error as Error).message }, 'Failed to clear offline queue');
     return false;
   }
 };
@@ -209,7 +209,7 @@ export const requeueOfflineMessage = async (
     await client.ltrim?.(key, 0, MAX_QUEUE_SIZE - 1);
     return true;
   } catch (error) {
-    logger.error('Failed to requeue offline message', { userId, error: (error as Error).message });
+    logger.error({ userId, error: (error as Error).message }, 'Failed to requeue offline message');
     return false;
   }
 };
@@ -229,7 +229,7 @@ export const getUsersWithOfflineMessages = async (): Promise<string[]> => {
     const keys = await client.keys(`${OFFLINE_QUEUE_PREFIX}*`);
     return keys.map((key) => key.replace(OFFLINE_QUEUE_PREFIX, ''));
   } catch (error) {
-    logger.error('Failed to get users with offline messages', { error: (error as Error).message });
+    logger.error({ error: (error as Error).message }, 'Failed to get users with offline messages');
     return [];
   }
 };
@@ -265,11 +265,7 @@ export const processOfflineQueue = async (
       }
     } catch (error) {
       failed++;
-      logger.error('Failed to send offline message', {
-        userId,
-        messageId: queuedMessage.message._id,
-        error: (error as Error).message,
-      });
+      logger.error({ userId, messageId: queuedMessage.message._id, error: (error as Error).message }, 'Failed to send offline message');
       // Re-queue for later
       await requeueOfflineMessage(userId, queuedMessage);
     }

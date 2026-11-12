@@ -24,18 +24,18 @@ export const findOrCreateUser = async (profile: { email: string; name: string; a
       avatar: profile.avatar,
       username: generateUniqueUsername(profile.name),
     });
-    logger.info('New user created', { userId: user._id, email: user.email });
+    logger.info({ userId: user._id, email: user.email }, 'New user created');
   }
 
   return user;
 };
 
-export const getUserById = async (userId: string): Promise<IUser | null> => {
+export const getUserById = async (userId: string): Promise<Record<string, unknown> | null> => {
   if (!mongoose.Types.ObjectId.isValid(userId)) return null;
   return User.findById(userId).lean();
 };
 
-export const getUserProfile = async (userId: string, currentUserId?: string): Promise<IUser | null> => {
+export const getUserProfile = async (userId: string, currentUserId?: string): Promise<Record<string, unknown> | null> => {
   const user = await User.findById(userId)
     .select('-pushTokens -friendRequests -blockedUsers -settings.notifications')
     .lean();
@@ -46,13 +46,13 @@ export const getUserProfile = async (userId: string, currentUserId?: string): Pr
   if (currentUserId && currentUserId !== userId) {
     const currentUser = await User.findById(currentUserId).select('friends blockedUsers friendRequests').lean();
     if (currentUser) {
-      (user as Record<string, unknown>).isFriend = currentUser.friends.some((id) => id.equals(userId));
-      (user as Record<string, unknown>).isBlocked = currentUser.blockedUsers.some((id) => id.equals(userId));
+      (user as Record<string, unknown>).isFriend = currentUser.friends.some((id: any) => id.equals(userId));
+      (user as Record<string, unknown>).isBlocked = currentUser.blockedUsers.some((id: any) => id.equals(userId));
       (user as Record<string, unknown>).friendRequestSent = currentUser.friendRequests.some(
-        (req) => req.fromUser.equals(userId) && req.status === 'pending'
+        (req: any) => req.fromUser.equals(userId) && req.status === 'pending'
       );
       (user as Record<string, unknown>).friendRequestReceived = currentUser.friendRequests.some(
-        (req) => req.toUser.equals(userId) && req.status === 'pending'
+        (req: any) => req.toUser.equals(userId) && req.status === 'pending'
       );
     }
   }
@@ -223,43 +223,43 @@ export const unblockUser = async (userId: string, targetId: string): Promise<IUs
   return user;
 };
 
-export const getFriends = async (userId: string): Promise<IUser[]> => {
+export const getFriends = async (userId: string): Promise<Record<string, unknown>[]> => {
   const user = await User.findById(userId).populate('friends', '_id name username email avatar tagline isOnline lastSeen').lean();
-  return user?.friends as unknown as IUser[] || [];
+  return (user?.friends as unknown as Record<string, unknown>[]) || [];
 };
 
-export const getBlockedUsers = async (userId: string): Promise<IUser[]> => {
+export const getBlockedUsers = async (userId: string): Promise<Record<string, unknown>[]> => {
   const user = await User.findById(userId).populate('blockedUsers', '_id name username email avatar').lean();
-  return user?.blockedUsers as unknown as IUser[] || [];
+  return (user?.blockedUsers as unknown as Record<string, unknown>[]) || [];
 };
 
-export const getPendingFriendRequests = async (userId: string): Promise<Array<{ fromUser: IUser; createdAt: Date }>> => {
+export const getPendingFriendRequests = async (userId: string): Promise<Array<{ fromUser: Record<string, unknown>; createdAt: Date }>> => {
   const user = await User.findById(userId).populate('friendRequests.fromUser', '_id name username email avatar').lean();
   if (!user) return [];
 
   return user.friendRequests
     .filter((req) => req.status === 'pending')
-    .map((req) => ({ fromUser: req.fromUser as unknown as IUser, createdAt: req.createdAt }));
+    .map((req) => ({ fromUser: req.fromUser as unknown as Record<string, unknown>, createdAt: req.createdAt as Date }));
 };
 
-export const getSentFriendRequests = async (userId: string): Promise<Array<{ toUser: IUser; createdAt: Date }>> => {
+export const getSentFriendRequests = async (userId: string): Promise<Array<{ toUser: Record<string, unknown>; createdAt: Date }>> => {
   const user = await User.findById(userId).populate('friendRequests.toUser', '_id name username email avatar').lean();
   if (!user) return [];
 
   return user.friendRequests
     .filter((req) => req.status === 'pending')
-    .map((req) => ({ toUser: req.toUser as unknown as IUser, createdAt: req.createdAt }));
+    .map((req) => ({ toUser: req.toUser as unknown as Record<string, unknown>, createdAt: req.createdAt as Date }));
 };
 
 // ============================================================================
 // Search & Explore
 // ============================================================================
 
-export const searchUsers = async (query: string, currentUserId: string, limit: number = Limits.USERS_SEARCH_LIMIT): Promise<IUser[]> => {
+export const searchUsers = async (query: string, currentUserId: string, limit: number = Limits.USERS_SEARCH_LIMIT): Promise<Record<string, unknown>[]> => {
   return User.searchUsers(query, new mongoose.Types.ObjectId(currentUserId), limit);
 };
 
-export const exploreUsers = async (currentUserId: string, limit: number = Limits.USERS_EXPLORE_LIMIT): Promise<IUser[]> => {
+export const exploreUsers = async (currentUserId: string, limit: number = Limits.USERS_EXPLORE_LIMIT): Promise<Record<string, unknown>[]> => {
   return User.getExploreUsers(new mongoose.Types.ObjectId(currentUserId), limit);
 };
 
@@ -271,7 +271,7 @@ export const addPushToken = async (userId: string, token: string, platform: 'web
   const user = await User.findById(userId);
   if (!user) throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
 
-  await user.addPushToken({ token, platform, deviceId, createdAt: new Date().toISOString() });
+  await user.addPushToken({ token, platform, deviceId, createdAt: new Date() });
   return user;
 };
 
