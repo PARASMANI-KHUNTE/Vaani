@@ -24,7 +24,7 @@ const googleClientIds = process.env.GOOGLE_CLIENT_IDS
       .filter(Boolean)
   : [process.env.GOOGLE_CLIENT_ID].filter(Boolean);
 
-const defaultDevOrigins = ["http://localhost:3000", "http://localhost:5173"];
+const defaultDevOrigins = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"];
 const configuredClientOrigins = parseOriginList(process.env.CLIENT_URLS);
 const fallbackClientOrigin = process.env.CLIENT_URL || defaultDevOrigins[1];
 const allowedClientOrigins = Array.from(
